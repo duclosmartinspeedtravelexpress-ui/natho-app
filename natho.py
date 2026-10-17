@@ -1245,6 +1245,18 @@ def layout(title, body, user=None):
 </footer>
 <script>window.NATHO_TTS = {'true' if TTS_OK else 'false'};</script>
 <script>{{% raw %}}{AUDIO_JS}{{% endraw %}}</script>
+<script>
+// NATHO : active le mode PWA nécessaire à la lecture en arrière-plan.
+// La lecture continue via l'élément HTMLAudio MP3 ; SpeechSynthesis seul n'est
+// pas fiable lorsque l'écran est verrouillé.
+if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) {{
+  window.addEventListener('load', function () {{
+    navigator.serviceWorker.register('/sw.js').catch(function (err) {{
+      console.warn('NATHO : service worker indisponible', err);
+    }});
+  }});
+}}
+</script>
 </body></html>"""
 
 # ---------------------------------------------------------
