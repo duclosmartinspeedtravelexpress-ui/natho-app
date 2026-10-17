@@ -1,7 +1,7 @@
 # =========================================================
 # NATHO — Plateforme d'apprentissage de l'allemand A1
 # Fichier unique • Python + Flask + SQLite
-# Version finale corrigée : Connexion, BDD, Responsive (PC/Mobile)
+# Version finale : Admin fixé, base de données persistante
 # =========================================================
 
 import os
@@ -76,6 +76,29 @@ def init_db():
             created_at TEXT DEFAULT CURRENT_TIMESTAMP
         )""")
 
+        # -----------------------------------------------------
+        # SÉCURITÉ ABSOLUE POUR L'ADMIN
+        # -----------------------------------------------------
+        admin_email = "admin@natho.com"
+        admin_pwd = "Achilled@vy2015"
+        
+        c.execute("SELECT * FROM users WHERE email=?", (admin_email,))
+        admin_row = c.fetchone()
+        
+        if not admin_row:
+            # L'admin n'existe pas, on le crée
+            c.execute("INSERT INTO users(name,email,password,is_admin) VALUES(?,?,?,1)",
+                      ("Admin NATHO", admin_email, hash_pwd(admin_pwd)))
+            print("✅ Compte Admin créé avec succès.")
+        else:
+            # L'admin existe déjà (ex: ancienne base), on force le bon mot de passe
+            c.execute("UPDATE users SET password=?, is_admin=1 WHERE email=?", 
+                      (hash_pwd(admin_pwd), admin_email))
+            print("✅ Compte Admin mis à jour (sécurisé).")
+
+        # -----------------------------------------------------
+        # TABLES ET CONTENU
+        # -----------------------------------------------------
         c.execute("""CREATE TABLE IF NOT EXISTS lessons (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             category TEXT NOT NULL,
@@ -119,12 +142,6 @@ def init_db():
             FOREIGN KEY(user_id) REFERENCES users(id)
         )""")
 
-        # Admin par défaut
-        c.execute("SELECT * FROM users WHERE email='admin@natho.com'")
-        if not c.fetchone():
-            c.execute("INSERT INTO users(name,email,password,is_admin) VALUES(?,?,?,1)",
-                      ("Admin NATHO", "admin@natho.com", hash_pwd("admin123")))
-
         # Remplissage initial
         c.execute("SELECT COUNT(*) FROM lessons")
         if c.fetchone()[0] == 0:
@@ -139,7 +156,9 @@ def init_db():
     except Exception as e:
         print("❌ Erreur d'initialisation de la BDD :", e)
 
-# (Le contenu des seeds reste identique à ton code précédent, pas besoin de le modifier)
+# ---------------------------------------------------------
+# CONTENU PÉDAGOGIQUE (Identique à tes souhaits)
+# ---------------------------------------------------------
 def seed_lessons(cursor):
     data = [
         ("Salutations", "Hallo!", "Salut ! / Bonjour !"), ("Salutations", "Guten Morgen!", "Bonjour ! (le matin)"),
@@ -2554,7 +2573,7 @@ if __name__ == "__main__":
     print("  NATHO — Plateforme d'apprentissage de l'allemand A1")
     print("="*60)
     print("  URL       : http://127.0.0.1:5000")
-    print("  Admin     : admin@natho.com / admin123")
+    print("  Admin     : admin@natho.com / Achilled@vy2015")
     print("  ⚠ Change le mot de passe admin dès que possible.")
     print("="*60 + "\n")
     app.run(debug=True, host="0.0.0.0", port=5000)
