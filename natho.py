@@ -1,7 +1,7 @@
 # =========================================================
 # NATHO — Plateforme d'apprentissage de l'allemand A1
 # Fichier unique • Python + Flask + SQLite
-# Version finale : Admin fixé, base de données persistante
+# Version finale : Code complet restauré + Admin corrigé
 # =========================================================
 
 import os
@@ -34,12 +34,11 @@ APP_SECRET = os.environ.get("NATHO_SECRET", "change-me-in-prod-" + secrets.token
 DATA_DIR = "/app/data"
 DB_PATH = os.path.join(DATA_DIR, "natho.db")
 
-# Création forcée du dossier avec droits d'écriture
 try:
     os.makedirs(DATA_DIR, exist_ok=True)
     os.chmod(DATA_DIR, stat.S_IRWXU | stat.S_IRWXG | stat.S_IRWXO)
 except Exception as e:
-    print("Attention, impossible de créer le dossier data :", e)
+    print("Attention dossier data :", e)
 
 app = Flask(__name__)
 app.secret_key = APP_SECRET
@@ -76,9 +75,7 @@ def init_db():
             created_at TEXT DEFAULT CURRENT_TIMESTAMP
         )""")
 
-        # -----------------------------------------------------
-        # SÉCURITÉ ABSOLUE POUR L'ADMIN
-        # -----------------------------------------------------
+        # FORCE L'ADMINISTRATEUR AVEC TON NOUVEAU MOT DE PASSE
         admin_email = "admin@natho.com"
         admin_pwd = "Achilled@vy2015"
         
@@ -86,15 +83,13 @@ def init_db():
         admin_row = c.fetchone()
         
         if not admin_row:
-            # L'admin n'existe pas, on le crée
             c.execute("INSERT INTO users(name,email,password,is_admin) VALUES(?,?,?,1)",
                       ("Admin NATHO", admin_email, hash_pwd(admin_pwd)))
-            print("✅ Compte Admin créé avec succès.")
+            print("✅ Compte Admin créé.")
         else:
-            # L'admin existe déjà (ex: ancienne base), on force le bon mot de passe
             c.execute("UPDATE users SET password=?, is_admin=1 WHERE email=?", 
                       (hash_pwd(admin_pwd), admin_email))
-            print("✅ Compte Admin mis à jour (sécurisé).")
+            print("✅ Compte Admin mis à jour avec ton mot de passe.")
 
         # -----------------------------------------------------
         # TABLES ET CONTENU
@@ -152,12 +147,12 @@ def init_db():
 
         db.commit()
         db.close()
-        print("✅ Base de données initialisée avec succès.")
+        print("✅ Base de données initialisée.")
     except Exception as e:
-        print("❌ Erreur d'initialisation de la BDD :", e)
+        print("❌ Erreur d'initialisation :", e)
 
 # ---------------------------------------------------------
-# CONTENU PÉDAGOGIQUE (Identique à tes souhaits)
+# CONTENU PÉDAGOGIQUE (Tes 300 phrases et 320 mots)
 # ---------------------------------------------------------
 def seed_lessons(cursor):
     data = [
