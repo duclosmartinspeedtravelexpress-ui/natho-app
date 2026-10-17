@@ -1,6 +1,6 @@
 # =========================================================
 # NATHO — Plateforme d'apprentissage de l'allemand A1
-# Version finale : W-Fragen + PWA (Correctif SyntaxError)
+# Version finale : W-Fragen + PWA (Correction définitive)
 # =========================================================
 
 import os
@@ -1245,12 +1245,6 @@ def layout(title, body, user=None):
 </footer>
 <script>window.NATHO_TTS = {'true' if TTS_OK else 'false'};</script>
 <script>{{% raw %}}{AUDIO_JS}{{% endraw %}}</script>
-<!-- PWA Service Worker pour arrière-plan -->
-<script>
-  if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('/sw.js').catch(function(){});
-  }
-</script>
 </body></html>"""
 
 # ---------------------------------------------------------
