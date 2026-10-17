@@ -2561,13 +2561,9 @@ def admin_add_lesson():
 # ---------------------------------------------------------
 # LANCEMENT
 # ---------------------------------------------------------
-if __name__ == "__main__":
+# On force l'initialisation de la BDD au démarrage, même avec Gunicorn
+with app.app_context():
     init_db()
-    print("\n" + "="*60)
-    print("  NATHO — Plateforme d'apprentissage de l'allemand A1")
-    print("="*60)
-    print("  URL       : http://127.0.0.1:5000")
-    print("  Admin     : admin@natho.com / Achilled@vy2015")
-    print("  ⚠ Change le mot de passe admin dès que possible.")
-    print("="*60 + "\n")
+
+if __name__ == "__main__":
     app.run(debug=True, host="0.0.0.0", port=5000)
