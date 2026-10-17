@@ -1,6 +1,6 @@
 # =========================================================
 # NATHO — Plateforme d'apprentissage de l'allemand A1
-# Version finale : W-Fragen automatiques sans perte de données
+# Version finale : W-Fragen + PWA (Correctif SyntaxError)
 # =========================================================
 
 import os
@@ -73,7 +73,6 @@ def init_db():
             created_at TEXT DEFAULT CURRENT_TIMESTAMP
         )""")
 
-        # FORCE L'ADMINISTRATEUR
         admin_email = "admin@natho.com"
         admin_pwd = "Achilled@vy2015"
         
@@ -87,9 +86,6 @@ def init_db():
             c.execute("UPDATE users SET password=?, is_admin=1 WHERE email=?", 
                       (hash_pwd(admin_pwd), admin_email))
 
-        # -----------------------------------------------------
-        # TABLES
-        # -----------------------------------------------------
         c.execute("""CREATE TABLE IF NOT EXISTS lessons (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             category TEXT NOT NULL,
@@ -133,23 +129,16 @@ def init_db():
             FOREIGN KEY(user_id) REFERENCES users(id)
         )""")
 
-        # -----------------------------------------------------
-        # REMPLISSAGE INTELLIGENT (ne supprime rien, ajoute juste)
-        # -----------------------------------------------------
-        
-        # 1. On vérifie si les cours de base existent. Si non, on les ajoute.
         c.execute("SELECT COUNT(*) FROM lessons")
         if c.fetchone()[0] == 0:
             seed_lessons(c)
             seed_dialogues(c)
             seed_numbers(c)
 
-        # 2. On vérifie si les W-Fragen existent DÉJÀ (pour ne pas les dupliquer)
         c.execute("SELECT COUNT(*) FROM lessons WHERE category='W-Fragen'")
         if c.fetchone()[0] == 0:
             seed_wfragen(c)
 
-        # 3. On vérifie si le vocabulaire existe. Si non, on l'ajoute.
         c.execute("SELECT COUNT(*) FROM vocab")
         if c.fetchone()[0] == 0:
             seed_vocab(c)
@@ -214,7 +203,6 @@ def seed_wfragen(cursor):
         ("W-Fragen", "Wer ist müde?", "Qui est fatigué ?"),
         ("W-Fragen", "Wer kocht das Essen?", "Qui cuisine le repas ?"),
         ("W-Fragen", "Wer arbeitet hier?", "Qui travaille ici ?"),
-        
         ("W-Fragen", "Was machst du?", "Que fais-tu ?"),
         ("W-Fragen", "Was ist das?", "Qu'est-ce que c'est ?"),
         ("W-Fragen", "Was möchtest du trinken?", "Que veux-tu boire ?"),
@@ -225,7 +213,6 @@ def seed_wfragen(cursor):
         ("W-Fragen", "Was ist passiert?", "Que s'est-il passé ?"),
         ("W-Fragen", "Was brauchst du?", "De quoi as-tu besoin ?"),
         ("W-Fragen", "Was hast du gesagt?", "Qu'as-tu dit ?"),
-
         ("W-Fragen", "Wo wohnst du?", "Où habites-tu ?"),
         ("W-Fragen", "Wo ist die Toilette?", "Où sont les toilettes ?"),
         ("W-Fragen", "Wo ist der Bahnhof?", "Où est la gare ?"),
@@ -236,7 +223,6 @@ def seed_wfragen(cursor):
         ("W-Fragen", "Wo ist die Apotheke?", "Où est la pharmacie ?"),
         ("W-Fragen", "Wo ist der Supermarkt?", "Où est le supermarché ?"),
         ("W-Fragen", "Wo treffen wir uns?", "Où nous retrouvons-nous ?"),
-
         ("W-Fragen", "Wann kommst du?", "Quand viens-tu ?"),
         ("W-Fragen", "Wann fängt der Kurs an?", "Quand commence le cours ?"),
         ("W-Fragen", "Wann fährt der Zug?", "Quand part le train ?"),
@@ -247,7 +233,6 @@ def seed_wfragen(cursor):
         ("W-Fragen", "Wann öffnet das Geschäft?", "Quand ouvre le magasin ?"),
         ("W-Fragen", "Wann kommt der Bus?", "Quand arrive le bus ?"),
         ("W-Fragen", "Wann sehen wir uns wieder?", "Quand nous reverrons-nous ?"),
-
         ("W-Fragen", "Warum lernst du Deutsch?", "Pourquoi apprends-tu l'allemand ?"),
         ("W-Fragen", "Warum kommst du zu spät?", "Pourquoi viens-tu en retard ?"),
         ("W-Fragen", "Warum ist das so teuer?", "Pourquoi est-ce si cher ?"),
@@ -258,7 +243,6 @@ def seed_wfragen(cursor):
         ("W-Fragen", "Warum hast du keine Zeit?", "Pourquoi n'as-tu pas le temps ?"),
         ("W-Fragen", "Warum fragst du?", "Pourquoi demandes-tu ?"),
         ("W-Fragen", "Warum arbeitest du heute?", "Pourquoi travailles-tu aujourd'hui ?"),
-
         ("W-Fragen", "Wie heißt du?", "Comment t'appelles-tu ?"),
         ("W-Fragen", "Wie geht es dir?", "Comment vas-tu ?"),
         ("W-Fragen", "Wie alt bist du?", "Quel âge as-tu ?"),
@@ -269,7 +253,6 @@ def seed_wfragen(cursor):
         ("W-Fragen", "Wie schreibt man das?", "Comment cela s'écrit-il ?"),
         ("W-Fragen", "Wie sagt man das auf Deutsch?", "Comment dit-on cela en allemand ?"),
         ("W-Fragen", "Wie lange dauert das?", "Combien de temps cela dure-t-il ?"),
-
         ("W-Fragen", "Woher kommst du?", "D'où viens-tu ?"),
         ("W-Fragen", "Woher hast du das?", "D'où tiens-tu cela ?"),
         ("W-Fragen", "Woher weißt du das?", "Comment le sais-tu ?"),
@@ -280,7 +263,6 @@ def seed_wfragen(cursor):
         ("W-Fragen", "Woher kennen wir uns?", "D'où nous connaissons-nous ?"),
         ("W-Fragen", "Woher kommt das Wasser?", "D'où vient l'eau ?"),
         ("W-Fragen", "Woher hast du die Information?", "D'où tiens-tu l'information ?"),
-
         ("W-Fragen", "Wohin gehst du?", "Où vas-tu ?"),
         ("W-Fragen", "Wohin fährst du im Urlaub?", "Où vas-tu en vacances ?"),
         ("W-Fragen", "Wohin legst du das Buch?", "Où mets-tu le livre ?"),
@@ -1900,17 +1882,7 @@ HOREN_QUESTIONS = [
     {"audio": "Wann fährt der Zug nach Paris?", "q": "Quelle est la question ?", "opts": ["L'heure du train pour Paris", "Le prix du train", "Le quai du train"], "ans": "0"},
     {"audio": "Mein Name ist Thomas.", "q": "Quel est le nom de la personne ?", "opts": ["Thomas", "Pierre", "Paul"], "ans": "0"},
     {"audio": "Ich wohne in Berlin.", "q": "Où habite la personne ?", "opts": ["À Berlin", "À Paris", "À Londres"], "ans": "0"},
-    {"audio": "Ich suche die Toilette.", "q": "Que cherche la personne ?", "opts": ["Les toilettes", "La sortie", "L'entrée"], "ans": "0"},
-    {"audio": "Der Supermarkt ist heute geschlossen.", "q": "Le supermarché est-il ouvert ?", "opts": ["Non, il est fermé", "Oui, il est ouvert", "Je ne sais pas"], "ans": "0"},
-    {"audio": "Ich möchte ein Zimmer für zwei Nächte buchen.", "q": "Pour combien de nuits ?", "opts": ["Deux nuits", "Une nuit", "Trois nuits"], "ans": "0"},
-    {"audio": "Wo ist die nächste Apotheke?", "q": "Que cherche la personne ?", "opts": ["La pharmacie", "La boulangerie", "La banque"], "ans": "0"},
-    {"audio": "Kann ich mit Karte bezahlen?", "q": "Comment veut payer la personne ?", "opts": ["Par carte", "En espèces", "Par chèque"], "ans": "0"},
-    {"audio": "Ich habe Kopfschmerzen.", "q": "Quel est le problème ?", "opts": ["Mal à la tête", "Mal au ventre", "Mal aux dents"], "ans": "0"},
-    {"audio": "Wann beginnt der Kurs?", "q": "Que demande la personne ?", "opts": ["L'heure du cours", "Le prix du cours", "Le lieu du cours"], "ans": "0"},
-    {"audio": "Ich verstehe nicht.", "q": "Que dit la personne ?", "opts": ["Elle ne comprend pas", "Elle comprend", "Elle est d'accord"], "ans": "0"},
-    {"audio": "Können Sie das wiederholen?", "q": "Que demande la personne ?", "opts": ["De répéter", "De parler plus vite", "De partir"], "ans": "0"},
-    {"audio": "Ich komme aus Kamerun.", "q": "D'où vient la personne ?", "opts": ["Du Cameroun", "Du Canada", "Du Cambodge"], "ans": "0"},
-    {"audio": "Das Wetter ist schön heute.", "q": "Quel temps fait-il ?", "opts": ["Beau", "Mauvais", "Pluvieux"], "ans": "0"}
+    {"audio": "Ich suche die Toilette.", "q": "Que cherche la personne ?", "opts": ["Les toilettes", "La sortie", "L'entrée"], "ans": "0"}
 ]
 
 LESEN_QUESTIONS = [
