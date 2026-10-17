@@ -1,7 +1,7 @@
 # =========================================================
 # NATHO — Plateforme d'apprentissage de l'allemand A1
 # Fichier unique • Python + Flask + SQLite
-# Version 3.5 : Sidebar conditionnelle, 300+ phrases, Cookies, Politique
+# Version finale : Code complet restauré + Admin corrigé
 # =========================================================
 
 import os
@@ -11,6 +11,7 @@ import secrets
 import json
 import random
 import re
+import stat
 from html import escape as h
 from datetime import datetime
 from functools import wraps
@@ -27,10 +28,17 @@ except Exception:
     TTS_OK = False
 
 # ---------------------------------------------------------
-# CONFIG
+# CONFIG (Volume persistant Railway)
 # ---------------------------------------------------------
 APP_SECRET = os.environ.get("NATHO_SECRET", "change-me-in-prod-" + secrets.token_hex(8))
-DB_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "natho.db")
+DATA_DIR = "/app/data"
+DB_PATH = os.path.join(DATA_DIR, "natho_v2.db")
+
+try:
+    os.makedirs(DATA_DIR, exist_ok=True)
+    os.chmod(DATA_DIR, stat.S_IRWXU | stat.S_IRWXG | stat.S_IRWXO)
+except Exception as e:
+    print("Attention dossier data :", e)
 
 app = Flask(__name__)
 app.secret_key = APP_SECRET
@@ -54,82 +62,100 @@ def hash_pwd(pwd: str) -> str:
     return hashlib.sha256(pwd.encode("utf-8")).hexdigest()
 
 def init_db():
-    db = sqlite3.connect(DB_PATH)
-    c = db.cursor()
+    try:
+        db = sqlite3.connect(DB_PATH)
+        c = db.cursor()
 
-    c.execute("""CREATE TABLE IF NOT EXISTS users (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        name TEXT NOT NULL,
-        email TEXT UNIQUE NOT NULL,
-        password TEXT NOT NULL,
-        is_admin INTEGER DEFAULT 0,
-        created_at TEXT DEFAULT CURRENT_TIMESTAMP
-    )""")
+        c.execute("""CREATE TABLE IF NOT EXISTS users (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL,
+            email TEXT UNIQUE NOT NULL,
+            password TEXT NOT NULL,
+            is_admin INTEGER DEFAULT 0,
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP
+        )""")
 
-    c.execute("""CREATE TABLE IF NOT EXISTS lessons (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        category TEXT NOT NULL,
-        level TEXT DEFAULT 'A1',
-        title TEXT NOT NULL,
-        french TEXT NOT NULL,
-        german TEXT NOT NULL,
-        order_index INTEGER DEFAULT 0
-    )""")
+        # FORCE L'ADMINISTRATEUR AVEC TON NOUVEAU MOT DE PASSE
+        admin_email = "admin@natho.com"
+        admin_pwd = "Achilled@vy2015"
+        
+        c.execute("SELECT * FROM users WHERE email=?", (admin_email,))
+        admin_row = c.fetchone()
+        
+        if not admin_row:
+            c.execute("INSERT INTO users(name,email,password,is_admin) VALUES(?,?,?,1)",
+                      ("Admin NATHO", admin_email, hash_pwd(admin_pwd)))
+            print("✅ Compte Admin créé.")
+        else:
+            c.execute("UPDATE users SET password=?, is_admin=1 WHERE email=?", 
+                      (hash_pwd(admin_pwd), admin_email))
+            print("✅ Compte Admin mis à jour avec ton mot de passe.")
 
-    c.execute("""CREATE TABLE IF NOT EXISTS vocab (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        category TEXT NOT NULL,
-        german TEXT NOT NULL,
-        french TEXT NOT NULL
-    )""")
-    
-    c.execute("""CREATE TABLE IF NOT EXISTS dialogues (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        title TEXT NOT NULL,
-        lines_json TEXT NOT NULL
-    )""")
+        # -----------------------------------------------------
+        # TABLES ET CONTENU
+        # -----------------------------------------------------
+        c.execute("""CREATE TABLE IF NOT EXISTS lessons (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            category TEXT NOT NULL,
+            level TEXT DEFAULT 'A1',
+            title TEXT NOT NULL,
+            french TEXT NOT NULL,
+            german TEXT NOT NULL,
+            order_index INTEGER DEFAULT 0
+        )""")
 
-    c.execute("""CREATE TABLE IF NOT EXISTS progress (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        user_id INTEGER NOT NULL,
-        lesson_id INTEGER NOT NULL,
-        listened INTEGER DEFAULT 0,
-        completed INTEGER DEFAULT 0,
-        updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
-        UNIQUE(user_id, lesson_id),
-        FOREIGN KEY(user_id) REFERENCES users(id),
-        FOREIGN KEY(lesson_id) REFERENCES lessons(id)
-    )""")
+        c.execute("""CREATE TABLE IF NOT EXISTS vocab (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            category TEXT NOT NULL,
+            german TEXT NOT NULL,
+            french TEXT NOT NULL
+        )""")
+        
+        c.execute("""CREATE TABLE IF NOT EXISTS dialogues (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            title TEXT NOT NULL,
+            lines_json TEXT NOT NULL
+        )""")
 
-    c.execute("""CREATE TABLE IF NOT EXISTS goethe_exam (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        user_id INTEGER NOT NULL,
-        result_json TEXT NOT NULL,
-        taken_at TEXT DEFAULT CURRENT_TIMESTAMP,
-        FOREIGN KEY(user_id) REFERENCES users(id)
-    )""")
+        c.execute("""CREATE TABLE IF NOT EXISTS progress (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            lesson_id INTEGER NOT NULL,
+            listened INTEGER DEFAULT 0,
+            completed INTEGER DEFAULT 0,
+            updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE(user_id, lesson_id),
+            FOREIGN KEY(user_id) REFERENCES users(id),
+            FOREIGN KEY(lesson_id) REFERENCES lessons(id)
+        )""")
 
-    # Admin par défaut
-    c.execute("SELECT * FROM users WHERE is_admin=1")
-    if not c.fetchone():
-        c.execute("INSERT INTO users(name,email,password,is_admin) VALUES(?,?,?,1)",
-                  ("Admin NATHO", "admin@natho.com", hash_pwd("admin123")))
+        c.execute("""CREATE TABLE IF NOT EXISTS goethe_exam (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            result_json TEXT NOT NULL,
+            taken_at TEXT DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY(user_id) REFERENCES users(id)
+        )""")
 
-    # Remplissage initial
-    c.execute("SELECT COUNT(*) FROM lessons")
-    if c.fetchone()[0] == 0:
-        seed_lessons(c)
-        seed_vocab(c)
-        seed_dialogues(c)
-        seed_numbers(c)
+        # Remplissage initial
+        c.execute("SELECT COUNT(*) FROM lessons")
+        if c.fetchone()[0] == 0:
+            seed_lessons(c)
+            seed_vocab(c)
+            seed_dialogues(c)
+            seed_numbers(c)
 
-    db.commit()
-    db.close()
+        db.commit()
+        db.close()
+        print("✅ Base de données initialisée.")
+    except Exception as e:
+        print("❌ Erreur d'initialisation :", e)
 
+# ---------------------------------------------------------
+# CONTENU PÉDAGOGIQUE (Tes 300 phrases et 320 mots)
+# ---------------------------------------------------------
 def seed_lessons(cursor):
-    # 300+ phrases de la vie quotidienne
     data = [
-        # Salutations
         ("Salutations", "Hallo!", "Salut ! / Bonjour !"), ("Salutations", "Guten Morgen!", "Bonjour ! (le matin)"),
         ("Salutations", "Guten Tag!", "Bonjour !"), ("Salutations", "Guten Abend!", "Bonsoir !"),
         ("Salutations", "Gute Nacht!", "Bonne nuit !"), ("Salutations", "Wie geht es dir?", "Comment vas-tu ?"),
@@ -139,8 +165,6 @@ def seed_lessons(cursor):
         ("Salutations", "Hallo, wie geht's?", "Salut, ça va ?"), ("Salutations", "Danke, sehr gut.", "Merci, très bien."),
         ("Salutations", "Es geht so.", "Comme ci, comme ça."), ("Salutations", "Bis später!", "À tout à l'heure !"),
         ("Salutations", "Tschüs!", "Salut ! (au revoir)"), ("Salutations", "Schönen Tag noch!", "Bonne journée !"),
-        
-        # Se présenter
         ("Se présenter", "Ich heiße Davy.", "Je m'appelle Davy."), ("Se présenter", "Wie heißt du?", "Comment t'appelles-tu ?"),
         ("Se présenter", "Mein Name ist Davy.", "Mon nom est Davy."), ("Se présenter", "Freut mich.", "Enchanté."),
         ("Se présenter", "Ich komme aus Kamerun.", "Je viens du Cameroun."), ("Se présenter", "Woher kommst du?", "D'où viens-tu ?"),
@@ -151,8 +175,6 @@ def seed_lessons(cursor):
         ("Se présenter", "Ich komme aus Yaoundé.", "Je viens de Yaoundé."), ("Se présenter", "Ich bin ledig.", "Je suis célibataire."),
         ("Se présenter", "Sehr erfreut, Sie kennenzulernen.", "Très heureux de faire votre connaissance."), ("Se présenter", "Darf ich mich vorstellen?", "Puis-je me présenter ?"),
         ("Se présenter", "Das ist mein Freund Paul.", "Voici mon ami Paul."),
-
-        # Comprendre
         ("Comprendre", "Ich verstehe.", "Je comprends."), ("Comprendre", "Ich verstehe nicht.", "Je ne comprends pas."),
         ("Comprendre", "Bitte wiederholen Sie.", "Veuillez répéter, s'il vous plaît."), ("Comprendre", "Kannst du das wiederholen?", "Peux-tu répéter ?"),
         ("Comprendre", "Langsamer, bitte.", "Plus lentement, s'il vous plaît."), ("Comprendre", "Was bedeutet das?", "Qu'est-ce que cela signifie ?"),
@@ -162,8 +184,6 @@ def seed_lessons(cursor):
         ("Comprendre", "Das ist richtig.", "C'est correct."), ("Comprendre", "Das ist falsch.", "C'est faux."),
         ("Comprendre", "Ich weiß nicht.", "Je ne sais pas."), ("Comprendre", "Ich habe verstanden.", "J'ai compris."),
         ("Comprendre", "Was heißt das auf Französisch?", "Que veut dire cela en français ?"),
-
-        # Questions
         ("Questions", "Was ist das?", "Qu'est-ce que c'est ?"), ("Questions", "Wer ist das?", "Qui est-ce ?"),
         ("Questions", "Wo ist die Toilette?", "Où sont les toilettes ?"), ("Questions", "Wann kommst du?", "Quand viens-tu ?"),
         ("Questions", "Warum?", "Pourquoi ?"), ("Questions", "Wie viel kostet das?", "Combien cela coûte-t-il ?"),
@@ -173,8 +193,6 @@ def seed_lessons(cursor):
         ("Questions", "Wem gehört das?", "À qui est-ce ?"), ("Questions", "Was möchten Sie trinken?", "Que souhaitez-vous boire ?"),
         ("Questions", "Gibt es hier ein Café?", "Y a-t-il un café ici ?"), ("Questions", "Ist hier noch frei?", "Est-ce libre ici ?"),
         ("Questions", "Wohin gehst du?", "Où vas-tu ?"),
-
-        # Famille
         ("Famille", "Das ist meine Familie.", "Voici ma famille."), ("Famille", "Das ist mein Bruder.", "Voici mon frère."),
         ("Famille", "Das ist meine Schwester.", "Voici ma sœur."), ("Famille", "Ich habe zwei Kinder.", "J'ai deux enfants."),
         ("Famille", "Bist du verheiratet?", "Es-tu marié(e) ?"), ("Famille", "Meine Eltern wohnen hier.", "Mes parents habitent ici."),
@@ -182,8 +200,6 @@ def seed_lessons(cursor):
         ("Famille", "Mein Onkel wohnt in Berlin.", "Mon oncle habite à Berlin."), ("Famille", "Meine Tante ist Ärztin.", "Ma tante est médecin."),
         ("Famille", "Ich habe einen Cousin.", "J'ai un cousin."), ("Famille", "Wie viele Geschwister hast du?", "Combien de frères et sœurs as-tu ?"),
         ("Famille", "Mein Sohn ist fünf Jahre alt.", "Mon fils a cinq ans."),
-
-        # Maison
         ("Maison", "Ich bin zu Hause.", "Je suis à la maison."), ("Maison", "Komm bitte herein.", "Entre, s'il te plaît."),
         ("Maison", "Mach die Tür zu.", "Ferme la porte."), ("Maison", "Öffne bitte das Fenster.", "Ouvre la fenêtre, s'il te plaît."),
         ("Maison", "Die Küche ist sauber.", "La cuisine est propre."), ("Maison", "Wo ist mein Schlüssel?", "Où est ma clé ?"),
@@ -191,8 +207,6 @@ def seed_lessons(cursor):
         ("Maison", "Ich wohne in einem Haus.", "J'habite dans une maison."), ("Maison", "Mach bitte das Licht an.", "Allume la lumière, s'il te plaît."),
         ("Maison", "Mach bitte das Licht aus.", "Éteins la lumière, s'il te plaît."), ("Maison", "Die Miete ist zu hoch.", "Le loyer est trop élevé."),
         ("Maison", "Wo ist der Kühlschrank?", "Où est le réfrigérateur ?"),
-
-        # Repas
         ("Repas", "Ich habe Hunger.", "J'ai faim."), ("Repas", "Ich habe Durst.", "J'ai soif."),
         ("Repas", "Guten Appetit!", "Bon appétit !"), ("Repas", "Möchtest du Wasser?", "Veux-tu de l'eau ?"),
         ("Repas", "Ich trinke Kaffee.", "Je bois du café."), ("Repas", "Die Rechnung, bitte.", "L'addition, s'il vous plaît."),
@@ -200,15 +214,11 @@ def seed_lessons(cursor):
         ("Repas", "Ich esse kein Fleisch.", "Je ne mange pas de viande."), ("Repas", "Ich koche heute Abend.", "Je cuisine ce soir."),
         ("Repas", "Noch ein Glas Wasser, bitte.", "Encore un verre d'eau, s'il vous plaît."), ("Repas", "Ich bin satt.", "Je n'ai plus faim."),
         ("Repas", "Das Essen ist fertig.", "Le repas est prêt."), ("Repas", "Ich möchte einen Tee, bitte.", "Je voudrais un thé, s'il vous plaît."),
-
-        # Restaurant
         ("Restaurant", "Haben Sie einen Tisch frei?", "Avez-vous une table libre ?"), ("Restaurant", "Ich hätte gern die Speisekarte.", "Je voudrais le menu."),
         ("Restaurant", "Was empfehlen Sie?", "Que recommandez-vous ?"), ("Restaurant", "Ist das vegetarisch?", "Est-ce végétarien ?"),
         ("Restaurant", "Kann ich mit Karte bezahlen?", "Puis-je payer par carte ?"), ("Restaurant", "Einen Tisch für zwei Personen, bitte.", "Une table pour deux personnes, s'il vous plaît."),
         ("Restaurant", "Ich nehme die Suppe.", "Je prends la soupe."), ("Restaurant", "Zahlen, bitte!", "L'addition, s'il vous plaît !"),
         ("Restaurant", "Zusammen oder getrennt?", "Ensemble ou séparément ?"), ("Restaurant", "Das Essen war sehr lecker.", "Le repas était très délicieux."),
-
-        # Achats
         ("Achats", "Ich möchte das kaufen.", "Je voudrais acheter cela."), ("Achats", "Das ist zu teuer.", "C'est trop cher."),
         ("Achats", "Kann ich das anprobieren?", "Puis-je essayer cela ?"), ("Achats", "Wo ist die Kasse?", "Où est la caisse ?"),
         ("Achats", "Ich nehme das.", "Je prends cela."), ("Achats", "Was kostet das Brot?", "Combien coûte le pain ?"),
@@ -216,37 +226,27 @@ def seed_lessons(cursor):
         ("Achats", "Das ist zu klein.", "C'est trop petit."), ("Achats", "Ich suche eine Jacke.", "Je cherche une veste."),
         ("Achats", "Ich zahle bar.", "Je paie en espèces."), ("Achats", "Wann öffnet das Geschäft?", "Quand le magasin ouvre-t-il ?"),
         ("Achats", "Kann ich eine Quittung haben?", "Puis-je avoir un reçu ?"),
-
-        # Transport
         ("Transport", "Wo ist die Bushaltestelle?", "Où est l'arrêt de bus ?"), ("Transport", "Wann fährt der Zug?", "Quand part le train ?"),
         ("Transport", "Eine Fahrkarte nach Berlin, bitte.", "Un billet pour Berlin, s'il vous plaît."), ("Transport", "Wo muss ich umsteigen?", "Où dois-je changer ?"),
         ("Transport", "Der Zug hat Verspätung.", "Le train a du retard."), ("Transport", "Ich fahre mit dem Bus.", "Je prends le bus."),
         ("Transport", "Ich gehe zu Fuß.", "Je vais à pied."), ("Transport", "Von welchem Gleis fährt der Zug?", "De quel quai part le train ?"),
         ("Transport", "Wann kommt der Bus an?", "Quand le bus arrive-t-il ?"), ("Transport", "Einmal hin und zurück, bitte.", "Un aller-retour, s'il vous plaît."),
         ("Transport", "Ist dieser Platz frei?", "Cette place est-elle libre ?"), ("Transport", "Wo ist der Flughafen?", "Où est l'aéroport ?"),
-
-        # Orientation
         ("Orientation", "Entschuldigung, wo ist das Zentrum?", "Excusez-moi, où est le centre ?"), ("Orientation", "Gehen Sie geradeaus.", "Allez tout droit."),
         ("Orientation", "Biegen Sie links ab.", "Tournez à gauche."), ("Orientation", "Biegen Sie rechts ab.", "Tournez à droite."),
         ("Orientation", "Es ist in der Nähe.", "C'est à proximité."), ("Orientation", "Wie komme ich zur Post?", "Comment aller à la poste ?"),
         ("Orientation", "Die Bank ist neben dem Supermarkt.", "La banque est à côté du supermarché."), ("Orientation", "Gehen Sie die erste Straße links.", "Prenez la première rue à gauche."),
         ("Orientation", "Es ist nicht weit von hier.", "Ce n'est pas loin d'ici."), ("Orientation", "Die Apotheke ist an der Ecke.", "La pharmacie est au coin."),
-
-        # Travail
         ("Travail", "Was machst du beruflich?", "Quelle est ta profession ?"), ("Travail", "Ich arbeite heute.", "Je travaille aujourd'hui."),
         ("Travail", "Ich suche Arbeit.", "Je cherche du travail."), ("Travail", "Ich habe eine Frage.", "J'ai une question."),
         ("Travail", "Ich mache meine Hausaufgaben.", "Je fais mes devoirs."), ("Travail", "Ich arbeite in einem Büro.", "Je travaille dans un bureau."),
         ("Travail", "Mein Chef ist nett.", "Mon chef est sympa."), ("Travail", "Ich habe heute frei.", "Je suis en congé aujourd'hui."),
         ("Travail", "Ich habe viel Arbeit.", "J'ai beaucoup de travail."), ("Travail", "Die Arbeit beginnt um acht Uhr.", "Le travail commence à huit heures."),
         ("Travail", "Ich bin Ingenieur.", "Je suis ingénieur."), ("Travail", "Ich schreibe eine E-Mail.", "J'écris un e-mail."),
-
-        # École
         ("École", "Ich gehe in die Schule.", "Je vais à l'école."), ("École", "Ich besuche einen Deutschkurs.", "Je suis un cours d'allemand."),
         ("École", "Der Lehrer erklärt die Grammatik.", "L'enseignant explique la grammaire."), ("École", "Öffnet bitte das Buch auf Seite zehn.", "Ouvrez le livre à la page dix."),
         ("École", "Hört bitte zu.", "Écoutez, s'il vous plaît."), ("École", "Ich habe morgen eine Prüfung.", "J'ai un examen demain."),
         ("École", "Ich lerne jeden Tag Vokabeln.", "J'apprends du vocabulaire tous les jours."),
-
-        # Temps & Dates
         ("Temps", "Es ist acht Uhr.", "Il est huit heures."), ("Temps", "Heute habe ich Zeit.", "Aujourd'hui, j'ai le temps."),
         ("Temps", "Morgen bin ich frei.", "Demain, je suis libre."), ("Temps", "Bis morgen!", "À demain !"),
         ("Temps", "Wann treffen wir uns?", "Quand nous retrouvons-nous ?"), ("Temps", "Heute ist Montag.", "Aujourd'hui, c'est lundi."),
@@ -254,16 +254,12 @@ def seed_lessons(cursor):
         ("Temps", "Am Wochenende habe ich frei.", "Le week-end, je suis libre."), ("Temps", "Wann hast du Geburtstag?", "Quand est ton anniversaire ?"),
         ("Temps", "Gestern war ich zu Hause.", "Hier, j'étais à la maison."), ("Temps", "Es ist Viertel nach zehn.", "Il est dix heures et quart."),
         ("Temps", "Es ist halb drei.", "Il est deux heures et demie."), ("Temps", "Um wie viel Uhr beginnt der Film?", "À quelle heure commence le film ?"),
-
-        # Météo
         ("Météo", "Wie ist das Wetter heute?", "Quel temps fait-il aujourd'hui ?"), ("Météo", "Es ist sonnig.", "Il y a du soleil."),
         ("Météo", "Es regnet.", "Il pleut."), ("Météo", "Es ist kalt.", "Il fait froid."),
         ("Météo", "Es schneit.", "Il neige."), ("Météo", "Es ist heiß.", "Il fait chaud."),
         ("Météo", "Es ist windig.", "Il y a du vent."), ("Météo", "Die Sonne scheint.", "Le soleil brille."),
         ("Météo", "Heute sind zwanzig Grad.", "Aujourd'hui, il fait vingt degrés."), ("Météo", "Nimm einen Regenschirm mit.", "Prends un parapluie."),
         ("Météo", "Im Winter ist es sehr kalt.", "En hiver, il fait très froid."),
-
-        # Émotions & Santé
         ("Émotions", "Wie fühlst du dich?", "Comment te sens-tu ?"), ("Émotions", "Ich bin müde.", "Je suis fatigué(e)."),
         ("Émotions", "Ich bin krank.", "Je suis malade."), ("Émotions", "Ich habe Kopfschmerzen.", "J'ai mal à la tête."),
         ("Émotions", "Ich brauche einen Arzt.", "J'ai besoin d'un médecin."), ("Émotions", "Mir ist schlecht.", "J'ai mal au cœur."),
@@ -275,8 +271,6 @@ def seed_lessons(cursor):
         ("Émotions", "Ich bin wütend.", "Je suis en colère."), ("Émotions", "Ich bin nervös.", "Je suis nerveux/nerveuse."),
         ("Émotions", "Ich freue mich.", "Je me réjouis."), ("Émotions", "Das ist toll!", "C'est génial !"),
         ("Émotions", "Das ist schrecklich.", "C'est terrible."),
-
-        # Téléphone & Internet
         ("Téléphone", "Hallo, wer ist da?", "Allô, qui est à l'appareil ?"), ("Téléphone", "Kann ich mit Anna sprechen?", "Puis-je parler à Anna ?"),
         ("Téléphone", "Ich rufe später zurück.", "Je rappellerai plus tard."), ("Téléphone", "Schick mir eine Nachricht.", "Envoie-moi un message."),
         ("Téléphone", "Ich rufe dich morgen an.", "Je t'appelle demain."), ("Téléphone", "Kannst du mich zurückrufen?", "Peux-tu me rappeler ?"),
@@ -285,8 +279,6 @@ def seed_lessons(cursor):
         ("Internet", "Wo ist das WLAN?", "Où est le Wi-Fi ?"), ("Internet", "Ich habe kein Netz.", "Je n'ai pas de réseau."),
         ("Internet", "Ich schicke dir ein Foto.", "Je t'envoie une photo."), ("Internet", "Wie ist das Passwort?", "Quel est le mot de passe ?"),
         ("Internet", "Mein Handy ist kaputt.", "Mon téléphone est cassé."), ("Internet", "Ich lade mein Handy auf.", "Je recharge mon téléphone."),
-
-        # Invitations & Politesse
         ("Invitations", "Hast du heute Zeit?", "As-tu le temps aujourd'hui ?"), ("Invitations", "Möchtest du mitkommen?", "Veux-tu venir avec moi ?"),
         ("Invitations", "Gern!", "Avec plaisir !"), ("Invitations", "Leider kann ich nicht.", "Malheureusement, je ne peux pas."),
         ("Invitations", "Lass uns ins Kino gehen.", "Allons au cinéma."), ("Invitations", "Hast du Lust auf einen Kaffee?", "As-tu envie d'un café ?"),
@@ -300,8 +292,6 @@ def seed_lessons(cursor):
         ("Politesse", "Darf ich?", "Puis-je ?"), ("Politesse", "Gesundheit!", "À vos souhaits !"),
         ("Politesse", "Viel Glück!", "Bonne chance !"), ("Politesse", "Alles Gute!", "Tous mes vœux !"),
         ("Politesse", "Gern geschehen.", "Avec plaisir. / De rien."),
-
-        # Opinions & Habitudes
         ("Opinions", "Das gefällt mir.", "Cela me plaît."), ("Opinions", "Ich mag Musik.", "J'aime la musique."),
         ("Opinions", "Das ist interessant.", "C'est intéressant."), ("Opinions", "Ich bin einverstanden.", "Je suis d'accord."),
         ("Opinions", "Das gefällt mir nicht.", "Cela ne me plaît pas."), ("Opinions", "Ich finde das gut.", "Je trouve ça bien."),
@@ -315,8 +305,6 @@ def seed_lessons(cursor):
         ("Habitudes", "Ich esse um zwölf Uhr zu Mittag.", "Je déjeune à midi."), ("Habitudes", "Ich komme um sechs Uhr nach Hause.", "Je rentre à la maison à dix-huit heures."),
         ("Habitudes", "Ich gehe um elf Uhr schlafen.", "Je vais dormir à vingt-trois heures."), ("Habitudes", "Am Samstag gehe ich einkaufen.", "Le samedi, je fais les courses."),
         ("Habitudes", "Ich mache jeden Tag Sport.", "Je fais du sport tous les jours."),
-
-        # Loisirs & Vêtements
         ("Loisirs", "Was machst du gern?", "Qu'aimes-tu faire ?"), ("Loisirs", "Ich höre gern Musik.", "J'aime écouter de la musique."),
         ("Loisirs", "Ich spiele Fußball.", "Je joue au football."), ("Loisirs", "Ich lese gern.", "J'aime lire."),
         ("Loisirs", "Das macht Spaß.", "C'est amusant."), ("Loisirs", "Ich tanze gern.", "J'aime danser."),
@@ -325,8 +313,6 @@ def seed_lessons(cursor):
         ("Loisirs", "Hast du ein Hobby?", "As-tu un passe-temps ?"),
         ("Vêtements", "Was soll ich anziehen?", "Que dois-je mettre ?"), ("Vêtements", "Das Hemd ist schön.", "La chemise est belle."),
         ("Vêtements", "Die Schuhe sind bequem.", "Les chaussures sont confortables."), ("Vêtements", "Das passt mir gut.", "Cela me va bien."),
-
-        # Hôtel & Urgences
         ("Hôtel", "Ich habe eine Reservierung.", "J'ai une réservation."), ("Hôtel", "Ich möchte ein Zimmer buchen.", "Je voudrais réserver une chambre."),
         ("Hôtel", "Wann ist das Frühstück?", "À quelle heure est le petit-déjeuner ?"), ("Hôtel", "Ich bleibe zwei Nächte.", "Je reste deux nuits."),
         ("Hôtel", "Ist das Frühstück inklusive?", "Le petit-déjeuner est-il inclus ?"), ("Hôtel", "Das Zimmer ist sehr sauber.", "La chambre est très propre."),
@@ -336,8 +322,6 @@ def seed_lessons(cursor):
         ("Urgences", "Es ist ein Notfall.", "C'est une urgence."), ("Urgences", "Rufen Sie einen Krankenwagen!", "Appelez une ambulance !"),
         ("Urgences", "Ich habe mich verlaufen.", "Je me suis perdu(e)."), ("Urgences", "Mein Portemonnaie ist weg.", "Mon portefeuille a disparu."),
         ("Urgences", "Vorsicht!", "Attention !"),
-
-        # Banque, Poste, Projets
         ("Banque & poste", "Ich möchte Geld abheben.", "Je voudrais retirer de l'argent."), ("Banque & poste", "Wo ist der Geldautomat?", "Où est le distributeur ?"),
         ("Banque & poste", "Ich möchte ein Konto eröffnen.", "Je voudrais ouvrir un compte."), ("Banque & poste", "Ich möchte einen Brief schicken.", "Je voudrais envoyer une lettre."),
         ("Banque & poste", "Eine Briefmarke, bitte.", "Un timbre, s'il vous plaît."),
@@ -548,7 +532,6 @@ def seed_dialogues(cursor):
         ]),
     ]
     
-    # 45 autres dialogues générés pour atteindre 50
     for i in range(5, 50):
         dialogues.append((f"Dialogue quotidien {i}", [
             ("A", f"Guten Tag! Wie geht es dir heute am Tag {i}?", f"Bonjour ! Comment vas-tu aujourd'hui, jour {i} ?"),
@@ -641,7 +624,7 @@ def playlist_btn(label, kind, key, css="btn"):
             f'data-kind="{h(kind, quote=True)}" data-key="{h(key, quote=True)}">{label}</button>')
 
 # ---------------------------------------------------------
-# FAVICON & STYLES & SCRIPTS
+# FAVICON & STYLES & SCRIPTS (Correction Mobile/PC)
 # ---------------------------------------------------------
 FAVICON_SVG = """data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='%2387CEEB'/><path d='M30 65V45c0-15 10-25 20-25s20 10 20 25v20' stroke='white' stroke-width='8' fill='none' stroke-linecap='round'/><rect x='25' y='60' width='12' height='20' rx='4' fill='white'/><rect x='63' y='60' width='12' height='20' rx='4' fill='white'/><text x='50' y='58' font-family='Arial' font-size='28' font-weight='bold' fill='white' text-anchor='middle'>N</text></svg>"""
 
@@ -744,7 +727,10 @@ footer a { color: var(--muted); text-decoration: underline; margin: 0 10px;}
 
 @media (max-width: 800px) {
   body { margin-left: 0; }
-  .nav { margin-left: 0; }
+  .nav { margin-left: 0; padding: 10px 15px; flex-direction: column; align-items: flex-start; gap: 10px;}
+  .nav .brand { font-size: 18px; }
+  .nav div:nth-child(2) { display: flex; flex-wrap: wrap; gap: 10px; margin-left: 0; }
+  .nav a { margin-left: 0; font-size: 13px; }
   .sidebar { display: none; }
 }
 
@@ -796,9 +782,6 @@ footer a { color: var(--muted); text-decoration: underline; margin: 0 10px;}
 </style>
 """
 
-# ---------------------------------------------------------
-# MOTEUR AUDIO (Ton code v2.8 corrigé, laissé intact)
-# ---------------------------------------------------------
 AUDIO_JS = r"""
 (function () {
   'use strict';
@@ -1410,7 +1393,6 @@ AUDIO_JS = r"""
 """
 
 def layout(title, body, user=None):
-    # Vérification si l'utilisateur est connecté pour afficher ou non la sidebar
     show_sidebar = bool(user)
     
     nav_links = ""
@@ -1519,7 +1501,12 @@ def layout(title, body, user=None):
 # ---------------------------------------------------------
 # VOIX SERVEUR (MP3)
 # ---------------------------------------------------------
-TTS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "tts_cache")
+TTS_DIR = "/app/data/tts_cache"
+try:
+    os.makedirs(TTS_DIR, exist_ok=True)
+    os.chmod(TTS_DIR, stat.S_IRWXU | stat.S_IRWXG | stat.S_IRWXO)
+except Exception as e:
+    print("Attention, impossible de créer le dossier audio :", e)
 
 @app.route("/tts")
 @login_required
@@ -1534,7 +1521,6 @@ def tts():
     path = os.path.join(TTS_DIR, key + ".mp3")
     if not os.path.exists(path):
         try:
-            os.makedirs(TTS_DIR, exist_ok=True)
             tmp = path + "." + secrets.token_hex(4) + ".tmp"
             gTTS(text=text, lang=lang).save(tmp)
             os.replace(tmp, path)
@@ -1646,6 +1632,7 @@ def login():
         pwd = request.form.get("password","")
         db = get_db()
         row = db.execute("SELECT * FROM users WHERE email=?", (email,)).fetchone()
+        
         if row and row["password"] == hash_pwd(pwd):
             session.clear()
             session["user_id"] = row["id"]
@@ -1653,6 +1640,7 @@ def login():
             session["is_admin"] = bool(row["is_admin"])
             flash(f"Bienvenue {row['name']} !","success")
             return redirect(url_for("admin") if row["is_admin"] else url_for("dashboard"))
+        
         flash("Email ou mot de passe incorrect.","danger")
     body = """
     <h1>Connexion</h1>
@@ -2114,7 +2102,7 @@ def mentions():
     return render_template_string(layout("Mentions légales", body, user))
 
 # ---------------------------------------------------------
-# EXAMEN GOETHE A1 (VERSION PRO - PLUS DE 200 QUESTIONS)
+# EXAMEN GOETHE A1
 # ---------------------------------------------------------
 HOREN_QUESTIONS = [
     {"audio": "Guten Tag! Ich möchte eine Fahrkarte nach Berlin kaufen.", "q": "Que veut acheter la personne ?", "opts": ["Un billet pour Berlin", "Un café", "Un livre"], "ans": "0"},
@@ -2580,7 +2568,7 @@ if __name__ == "__main__":
     print("  NATHO — Plateforme d'apprentissage de l'allemand A1")
     print("="*60)
     print("  URL       : http://127.0.0.1:5000")
-    print("  Admin     : admin@natho.com / admin123")
+    print("  Admin     : admin@natho.com / Achilled@vy2015")
     print("  ⚠ Change le mot de passe admin dès que possible.")
     print("="*60 + "\n")
     app.run(debug=True, host="0.0.0.0", port=5000)
