@@ -1,7 +1,7 @@
 # =========================================================
 # NATHO — Plateforme d'apprentissage de l'allemand A1
 # Fichier unique • Python + Flask + SQLite
-# Version finale : Prêt pour le déploiement sur Railway
+# Version finale corrigée : Connexion, BDD, Responsive (PC/Mobile)
 # =========================================================
 
 import os
@@ -11,6 +11,7 @@ import secrets
 import json
 import random
 import re
+import stat
 from html import escape as h
 from datetime import datetime
 from functools import wraps
@@ -30,8 +31,15 @@ except Exception:
 # CONFIG (Volume persistant Railway)
 # ---------------------------------------------------------
 APP_SECRET = os.environ.get("NATHO_SECRET", "change-me-in-prod-" + secrets.token_hex(8))
-DB_PATH = "/app/data/natho.db"
-os.makedirs("/app/data", exist_ok=True)
+DATA_DIR = "/app/data"
+DB_PATH = os.path.join(DATA_DIR, "natho.db")
+
+# Création forcée du dossier avec droits d'écriture
+try:
+    os.makedirs(DATA_DIR, exist_ok=True)
+    os.chmod(DATA_DIR, stat.S_IRWXU | stat.S_IRWXG | stat.S_IRWXO)
+except Exception as e:
+    print("Attention, impossible de créer le dossier data :", e)
 
 app = Flask(__name__)
 app.secret_key = APP_SECRET
@@ -55,78 +63,83 @@ def hash_pwd(pwd: str) -> str:
     return hashlib.sha256(pwd.encode("utf-8")).hexdigest()
 
 def init_db():
-    db = sqlite3.connect(DB_PATH)
-    c = db.cursor()
+    try:
+        db = sqlite3.connect(DB_PATH)
+        c = db.cursor()
 
-    c.execute("""CREATE TABLE IF NOT EXISTS users (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        name TEXT NOT NULL,
-        email TEXT UNIQUE NOT NULL,
-        password TEXT NOT NULL,
-        is_admin INTEGER DEFAULT 0,
-        created_at TEXT DEFAULT CURRENT_TIMESTAMP
-    )""")
+        c.execute("""CREATE TABLE IF NOT EXISTS users (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL,
+            email TEXT UNIQUE NOT NULL,
+            password TEXT NOT NULL,
+            is_admin INTEGER DEFAULT 0,
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP
+        )""")
 
-    c.execute("""CREATE TABLE IF NOT EXISTS lessons (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        category TEXT NOT NULL,
-        level TEXT DEFAULT 'A1',
-        title TEXT NOT NULL,
-        french TEXT NOT NULL,
-        german TEXT NOT NULL,
-        order_index INTEGER DEFAULT 0
-    )""")
+        c.execute("""CREATE TABLE IF NOT EXISTS lessons (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            category TEXT NOT NULL,
+            level TEXT DEFAULT 'A1',
+            title TEXT NOT NULL,
+            french TEXT NOT NULL,
+            german TEXT NOT NULL,
+            order_index INTEGER DEFAULT 0
+        )""")
 
-    c.execute("""CREATE TABLE IF NOT EXISTS vocab (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        category TEXT NOT NULL,
-        german TEXT NOT NULL,
-        french TEXT NOT NULL
-    )""")
-    
-    c.execute("""CREATE TABLE IF NOT EXISTS dialogues (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        title TEXT NOT NULL,
-        lines_json TEXT NOT NULL
-    )""")
+        c.execute("""CREATE TABLE IF NOT EXISTS vocab (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            category TEXT NOT NULL,
+            german TEXT NOT NULL,
+            french TEXT NOT NULL
+        )""")
+        
+        c.execute("""CREATE TABLE IF NOT EXISTS dialogues (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            title TEXT NOT NULL,
+            lines_json TEXT NOT NULL
+        )""")
 
-    c.execute("""CREATE TABLE IF NOT EXISTS progress (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        user_id INTEGER NOT NULL,
-        lesson_id INTEGER NOT NULL,
-        listened INTEGER DEFAULT 0,
-        completed INTEGER DEFAULT 0,
-        updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
-        UNIQUE(user_id, lesson_id),
-        FOREIGN KEY(user_id) REFERENCES users(id),
-        FOREIGN KEY(lesson_id) REFERENCES lessons(id)
-    )""")
+        c.execute("""CREATE TABLE IF NOT EXISTS progress (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            lesson_id INTEGER NOT NULL,
+            listened INTEGER DEFAULT 0,
+            completed INTEGER DEFAULT 0,
+            updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE(user_id, lesson_id),
+            FOREIGN KEY(user_id) REFERENCES users(id),
+            FOREIGN KEY(lesson_id) REFERENCES lessons(id)
+        )""")
 
-    c.execute("""CREATE TABLE IF NOT EXISTS goethe_exam (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        user_id INTEGER NOT NULL,
-        result_json TEXT NOT NULL,
-        taken_at TEXT DEFAULT CURRENT_TIMESTAMP,
-        FOREIGN KEY(user_id) REFERENCES users(id)
-    )""")
+        c.execute("""CREATE TABLE IF NOT EXISTS goethe_exam (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            result_json TEXT NOT NULL,
+            taken_at TEXT DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY(user_id) REFERENCES users(id)
+        )""")
 
-    # Admin par défaut
-    c.execute("SELECT * FROM users WHERE is_admin=1")
-    if not c.fetchone():
-        c.execute("INSERT INTO users(name,email,password,is_admin) VALUES(?,?,?,1)",
-                  ("Admin NATHO", "admin@natho.com", hash_pwd("admin123")))
+        # Admin par défaut
+        c.execute("SELECT * FROM users WHERE email='admin@natho.com'")
+        if not c.fetchone():
+            c.execute("INSERT INTO users(name,email,password,is_admin) VALUES(?,?,?,1)",
+                      ("Admin NATHO", "admin@natho.com", hash_pwd("admin123")))
 
-    # Remplissage initial
-    c.execute("SELECT COUNT(*) FROM lessons")
-    if c.fetchone()[0] == 0:
-        seed_lessons(c)
-        seed_vocab(c)
-        seed_dialogues(c)
-        seed_numbers(c)
+        # Remplissage initial
+        c.execute("SELECT COUNT(*) FROM lessons")
+        if c.fetchone()[0] == 0:
+            seed_lessons(c)
+            seed_vocab(c)
+            seed_dialogues(c)
+            seed_numbers(c)
 
-    db.commit()
-    db.close()
+        db.commit()
+        db.close()
+        print("✅ Base de données initialisée avec succès.")
+    except Exception as e:
+        print("❌ Erreur d'initialisation de la BDD :", e)
 
+# (Le contenu des seeds reste identique à ton code précédent, pas besoin de le modifier)
 def seed_lessons(cursor):
     data = [
         ("Salutations", "Hallo!", "Salut ! / Bonjour !"), ("Salutations", "Guten Morgen!", "Bonjour ! (le matin)"),
@@ -597,7 +610,7 @@ def playlist_btn(label, kind, key, css="btn"):
             f'data-kind="{h(kind, quote=True)}" data-key="{h(key, quote=True)}">{label}</button>')
 
 # ---------------------------------------------------------
-# FAVICON & STYLES & SCRIPTS
+# FAVICON & STYLES & SCRIPTS (Correction Mobile/PC)
 # ---------------------------------------------------------
 FAVICON_SVG = """data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='%2387CEEB'/><path d='M30 65V45c0-15 10-25 20-25s20 10 20 25v20' stroke='white' stroke-width='8' fill='none' stroke-linecap='round'/><rect x='25' y='60' width='12' height='20' rx='4' fill='white'/><rect x='63' y='60' width='12' height='20' rx='4' fill='white'/><text x='50' y='58' font-family='Arial' font-size='28' font-weight='bold' fill='white' text-anchor='middle'>N</text></svg>"""
 
@@ -700,7 +713,10 @@ footer a { color: var(--muted); text-decoration: underline; margin: 0 10px;}
 
 @media (max-width: 800px) {
   body { margin-left: 0; }
-  .nav { margin-left: 0; }
+  .nav { margin-left: 0; padding: 10px 15px; flex-direction: column; align-items: flex-start; gap: 10px;}
+  .nav .brand { font-size: 18px; }
+  .nav div:nth-child(2) { display: flex; flex-wrap: wrap; gap: 10px; margin-left: 0; }
+  .nav a { margin-left: 0; font-size: 13px; }
   .sidebar { display: none; }
 }
 
@@ -752,9 +768,6 @@ footer a { color: var(--muted); text-decoration: underline; margin: 0 10px;}
 </style>
 """
 
-# ---------------------------------------------------------
-# MOTEUR AUDIO (Ton code v2.8 corrigé, laissé intact)
-# ---------------------------------------------------------
 AUDIO_JS = r"""
 (function () {
   'use strict';
@@ -1366,7 +1379,6 @@ AUDIO_JS = r"""
 """
 
 def layout(title, body, user=None):
-    # Vérification si l'utilisateur est connecté pour afficher ou non la sidebar
     show_sidebar = bool(user)
     
     nav_links = ""
@@ -1476,7 +1488,11 @@ def layout(title, body, user=None):
 # VOIX SERVEUR (MP3)
 # ---------------------------------------------------------
 TTS_DIR = "/app/data/tts_cache"
-os.makedirs(TTS_DIR, exist_ok=True)
+try:
+    os.makedirs(TTS_DIR, exist_ok=True)
+    os.chmod(TTS_DIR, stat.S_IRWXU | stat.S_IRWXG | stat.S_IRWXO)
+except Exception as e:
+    print("Attention, impossible de créer le dossier audio :", e)
 
 @app.route("/tts")
 @login_required
@@ -1602,6 +1618,7 @@ def login():
         pwd = request.form.get("password","")
         db = get_db()
         row = db.execute("SELECT * FROM users WHERE email=?", (email,)).fetchone()
+        
         if row and row["password"] == hash_pwd(pwd):
             session.clear()
             session["user_id"] = row["id"]
@@ -1609,6 +1626,7 @@ def login():
             session["is_admin"] = bool(row["is_admin"])
             flash(f"Bienvenue {row['name']} !","success")
             return redirect(url_for("admin") if row["is_admin"] else url_for("dashboard"))
+        
         flash("Email ou mot de passe incorrect.","danger")
     body = """
     <h1>Connexion</h1>
