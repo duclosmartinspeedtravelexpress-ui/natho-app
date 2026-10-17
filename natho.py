@@ -1,6 +1,6 @@
 # =========================================================
 # NATHO — Plateforme d'apprentissage de l'allemand A1
-# Version finale : W-Fragen + PWA (Correction définitive)
+# Version finale : Audio en arrière-plan (Serveur MP3)
 # =========================================================
 
 import os
@@ -1238,49 +1238,14 @@ def layout(title, body, user=None):
 <audio id="natho-audio" preload="auto" playsinline></audio>
 
 <footer>
-    © NATHO — Plateforme d'apprentissage de l'allemand A1 · Prototype v3.7<br>
+    © NATHO — Plateforme d'apprentissage de l'allemand A1 · Prototype v3.8<br>
     <a href="/politique">Politique de confidentialité</a> | 
     <a href="/cgu">Conditions d'utilisation</a> | 
     <a href="/mentions">Mentions légales</a>
 </footer>
 <script>window.NATHO_TTS = {'true' if TTS_OK else 'false'};</script>
 <script>{{% raw %}}{AUDIO_JS}{{% endraw %}}</script>
-<script>
-// NATHO : active le mode PWA nécessaire à la lecture en arrière-plan.
-// La lecture continue via l'élément HTMLAudio MP3 ; SpeechSynthesis seul n'est
-// pas fiable lorsque l'écran est verrouillé.
-if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) {{
-  window.addEventListener('load', function () {{
-    navigator.serviceWorker.register('/sw.js').catch(function (err) {{
-      console.warn('NATHO : service worker indisponible', err);
-    }});
-  }});
-}}
-</script>
 </body></html>"""
-
-# ---------------------------------------------------------
-# PWA SERVICE WORKER (Pour background audio)
-# ---------------------------------------------------------
-@app.route('/manifest.json')
-def manifest():
-    return jsonify({
-        "name": "NATHO - Allemand A1",
-        "short_name": "NATHO",
-        "start_url": "/",
-        "display": "standalone",
-        "background_color": "#E8F6FD",
-        "theme_color": "#87CEEB",
-        "icons": [{"src": FAVICON_SVG, "sizes": "192x192", "type": "image/svg+xml"}]
-    })
-
-@app.route('/sw.js')
-def service_worker():
-    return app.response_class(
-        "self.addEventListener('install', (e) => self.skipWaiting());\n"
-        "self.addEventListener('activate', (e) => self.clients.claim());\n",
-        mimetype="application/javascript"
-    )
 
 # ---------------------------------------------------------
 # VOIX SERVEUR (MP3)
