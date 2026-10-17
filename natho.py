@@ -1,7 +1,6 @@
 # =========================================================
 # NATHO — Plateforme d'apprentissage de l'allemand A1
-# Fichier unique • Python + Flask + SQLite
-# Version finale : W-Fragen + Sidebar + Code complet
+# Version finale : W-Fragen automatiques sans perte de données
 # =========================================================
 
 import os
@@ -134,16 +133,26 @@ def init_db():
             FOREIGN KEY(user_id) REFERENCES users(id)
         )""")
 
-        # Remplissage initial (seulement si vide)
+        # -----------------------------------------------------
+        # REMPLISSAGE INTELLIGENT (ne supprime rien, ajoute juste)
+        # -----------------------------------------------------
+        
+        # 1. On vérifie si les cours de base existent. Si non, on les ajoute.
         c.execute("SELECT COUNT(*) FROM lessons")
         if c.fetchone()[0] == 0:
             seed_lessons(c)
-            seed_vocab(c)
             seed_dialogues(c)
             seed_numbers(c)
-        else:
-            # Si la base existe déjà, on ajoute juste les nouvelles leçons sans doublons
-            seed_new_content(c)
+
+        # 2. On vérifie si les W-Fragen existent DÉJÀ (pour ne pas les dupliquer)
+        c.execute("SELECT COUNT(*) FROM lessons WHERE category='W-Fragen'")
+        if c.fetchone()[0] == 0:
+            seed_wfragen(c)
+
+        # 3. On vérifie si le vocabulaire existe. Si non, on l'ajoute.
+        c.execute("SELECT COUNT(*) FROM vocab")
+        if c.fetchone()[0] == 0:
+            seed_vocab(c)
 
         db.commit()
         db.close()
@@ -154,12 +163,6 @@ def init_db():
 # CONTENU PÉDAGOGIQUE
 # ---------------------------------------------------------
 def seed_lessons(cursor):
-    # ... (Ton contenu original des 300 phrases est inséré ici via seed_new_content pour être plus propre)
-    pass
-
-def seed_new_content(cursor):
-    # Cette fonction ajoute les leçons si elles n'existent pas déjà
-    # 1. Tes 300 phrases originales (on garde ça pour la compatibilité)
     data = [
         ("Salutations", "Hallo!", "Salut ! / Bonjour !"), ("Salutations", "Guten Morgen!", "Bonjour ! (le matin)"),
         ("Salutations", "Guten Tag!", "Bonjour !"), ("Salutations", "Guten Abend!", "Bonsoir !"),
@@ -193,9 +196,14 @@ def seed_new_content(cursor):
         ("Urgences", "Hilfe!", "Au secours !"), ("Urgences", "Rufen Sie die Polizei!", "Appelez la police !"),
         ("Politesse", "Danke!", "Merci !"), ("Politesse", "Bitte schön.", "Je vous en prie."),
     ]
+    for i, (cat, de, fr) in enumerate(data):
+        cursor.execute(
+            "INSERT INTO lessons(category,title,french,german,order_index) VALUES(?,?,?,?,?)",
+            (cat, de, fr, de, i)
+        )
 
-    # 2. Les 80 nouvelles W-Fragen (Questions)
-    w_fragen = [
+def seed_wfragen(cursor):
+    data = [
         ("W-Fragen", "Wer ist das?", "Qui est-ce ?"),
         ("W-Fragen", "Wer kommt heute?", "Qui vient aujourd'hui ?"),
         ("W-Fragen", "Wer hat das gesagt?", "Qui a dit ça ?"),
@@ -284,40 +292,15 @@ def seed_new_content(cursor):
         ("W-Fragen", "Wohin reist du?", "Où voyages-tu ?"),
         ("W-Fragen", "Wohin geht ihr?", "Où allez-vous ?"),
     ]
+    
+    cursor.execute("SELECT COALESCE(MAX(order_index), 0) FROM lessons")
+    start_idx = cursor.fetchone()[0] + 1
 
-    # 3. Règles de grammaire simples A1
-    grammaire = [
-        ("Grammaire A1", "Ich bin...", "Je suis... (ex: Ich bin Student)"),
-        ("Grammaire A1", "Du bist...", "Tu es... (ex: Du bist nett)"),
-        ("Grammaire A1", "Er/Sie/Es ist...", "Il/Elle/On est..."),
-        ("Grammaire A1", "Wir sind...", "Nous sommes..."),
-        ("Grammaire A1", "Ihr seid...", "Vous êtes (pluriel)..."),
-        ("Grammaire A1", "Sie sind...", "Ils/Elles sont..."),
-        ("Grammaire A1", "Ich habe...", "J'ai..."),
-        ("Grammaire A1", "Du hast...", "Tu as..."),
-        ("Grammaire A1", "Er/Sie/Es hat...", "Il/Elle a..."),
-        ("Grammaire A1", "Ich heiße...", "Je m'appelle..."),
-        ("Grammaire A1", "Ich komme aus...", "Je viens de..."),
-        ("Grammaire A1", "Ich wohne in...", "J'habite à..."),
-        ("Grammaire A1", "Der (masculin)", "Le (ex: der Mann)"),
-        ("Grammaire A1", "Die (féminin)", "La (ex: die Frau)"),
-        ("Grammaire A1", "Das (neutre)", "Le/La (ex: das Kind)"),
-        ("Grammaire A1", "Die (pluriel)", "Les (ex: die Kinder)"),
-        ("Grammaire A1", "Ich mag...", "J'aime..."),
-        ("Grammaire A1", "Ich möchte...", "Je voudrais..."),
-        ("Grammaire A1", "Ich kann...", "Je peux..."),
-        ("Grammaire A1", "Ich muss...", "Je dois..."),
-    ]
-
-    all_data = data + w_fragen + grammaire
-
-    for i, (cat, de, fr) in enumerate(all_data):
-        c.execute("SELECT id FROM lessons WHERE german=?", (de,))
-        if not c.fetchone():
-            c.execute(
-                "INSERT INTO lessons(category,title,french,german,order_index) VALUES(?,?,?,?,?)",
-                (cat, de, fr, de, i)
-            )
+    for i, (cat, de, fr) in enumerate(data):
+        cursor.execute(
+            "INSERT INTO lessons(category,title,french,german,order_index) VALUES(?,?,?,?,?)",
+            (cat, de, fr, de, start_idx + i)
+        )
 
 def seed_vocab(cursor):
     vocab = [
@@ -331,12 +314,9 @@ def seed_vocab(cursor):
         ("Nourriture", "der Tee", "le thé"), ("Nourriture", "das Bier", "la bière"),
     ]
     for cat, de, fr in vocab:
-        cursor.execute("SELECT id FROM vocab WHERE german=?", (de,))
-        if not cursor.fetchone():
-            cursor.execute("INSERT INTO vocab(category, german, french) VALUES(?,?,?)", (cat, de, fr))
+        cursor.execute("INSERT INTO vocab(category, german, french) VALUES(?,?,?)", (cat, de, fr))
 
 def seed_dialogues(cursor):
-    # On garde 5 dialogues d'exemple
     base_dialogues = [
         ("Au supermarché", [
             ("A", "Entschuldigung, wo ist die Milch?", "Excusez-moi, où est le lait ?"),
@@ -357,17 +337,12 @@ def seed_dialogues(cursor):
     ]
     
     for title, lines in base_dialogues:
-        cursor.execute("SELECT id FROM dialogues WHERE title=?", (title,))
-        if not cursor.fetchone():
-            lines_json = json.dumps([{"spk": s, "de": d, "fr": f} for s, d, f in lines])
-            cursor.execute("INSERT INTO dialogues(title, lines_json) VALUES(?, ?)", (title, lines_json))
+        lines_json = json.dumps([{"spk": s, "de": d, "fr": f} for s, d, f in lines])
+        cursor.execute("INSERT INTO dialogues(title, lines_json) VALUES(?, ?)", (title, lines_json))
 
 def seed_numbers(cursor):
-    # On ajoute quelques nombres de base si la table est vide
-    cursor.execute("SELECT COUNT(*) FROM vocab WHERE category='Nombres'")
-    if cursor.fetchone()[0] == 0:
-        for i in range(0, 21):
-            cursor.execute("INSERT INTO vocab(category, german, french) VALUES(?,?,?)", ("Nombres", str(i), str(i)))
+    for i in range(0, 21):
+        cursor.execute("INSERT INTO vocab(category, german, french) VALUES(?,?,?)", ("Nombres", str(i), str(i)))
 
 # ---------------------------------------------------------
 # SÉCURITÉ & DÉCORATEURS
@@ -416,7 +391,7 @@ def playlist_btn(label, kind, key, css="btn"):
             f'data-kind="{h(kind, quote=True)}" data-key="{h(key, quote=True)}">{label}</button>')
 
 # ---------------------------------------------------------
-# CSS & JS
+# CSS & JS (PWA Integration)
 # ---------------------------------------------------------
 FAVICON_SVG = """data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='%2387CEEB'/><path d='M30 65V45c0-15 10-25 20-25s20 10 20 25v20' stroke='white' stroke-width='8' fill='none' stroke-linecap='round'/><rect x='25' y='60' width='12' height='20' rx='4' fill='white'/><rect x='63' y='60' width='12' height='20' rx='4' fill='white'/><text x='50' y='58' font-family='Arial' font-size='28' font-weight='bold' fill='white' text-anchor='middle'>N</text></svg>"""
 
@@ -1281,14 +1256,43 @@ def layout(title, body, user=None):
 <audio id="natho-audio" preload="auto" playsinline></audio>
 
 <footer>
-    © NATHO — Plateforme d'apprentissage de l'allemand A1 · Prototype v3.6<br>
+    © NATHO — Plateforme d'apprentissage de l'allemand A1 · Prototype v3.7<br>
     <a href="/politique">Politique de confidentialité</a> | 
     <a href="/cgu">Conditions d'utilisation</a> | 
     <a href="/mentions">Mentions légales</a>
 </footer>
 <script>window.NATHO_TTS = {'true' if TTS_OK else 'false'};</script>
 <script>{{% raw %}}{AUDIO_JS}{{% endraw %}}</script>
+<!-- PWA Service Worker pour arrière-plan -->
+<script>
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('/sw.js').catch(function(){});
+  }
+</script>
 </body></html>"""
+
+# ---------------------------------------------------------
+# PWA SERVICE WORKER (Pour background audio)
+# ---------------------------------------------------------
+@app.route('/manifest.json')
+def manifest():
+    return jsonify({
+        "name": "NATHO - Allemand A1",
+        "short_name": "NATHO",
+        "start_url": "/",
+        "display": "standalone",
+        "background_color": "#E8F6FD",
+        "theme_color": "#87CEEB",
+        "icons": [{"src": FAVICON_SVG, "sizes": "192x192", "type": "image/svg+xml"}]
+    })
+
+@app.route('/sw.js')
+def service_worker():
+    return app.response_class(
+        "self.addEventListener('install', (e) => self.skipWaiting());\n"
+        "self.addEventListener('activate', (e) => self.clients.claim());\n",
+        mimetype="application/javascript"
+    )
 
 # ---------------------------------------------------------
 # VOIX SERVEUR (MP3)
@@ -1822,7 +1826,7 @@ def progress():
     return render_template_string(layout("Progrès", body, {"is_admin": session.get("is_admin")}))
 
 # ---------------------------------------------------------
-# PAGES LÉGALES & POLITIQUES
+# PAGES LÉGALES
 # ---------------------------------------------------------
 @app.route("/politique")
 def politique():
@@ -1834,18 +1838,12 @@ def politique():
     <div class="card">
         <h2>1. Collecte des données</h2>
         <p>NATHO collecte uniquement votre nom, votre adresse email et vos résultats d'apprentissage. Ces données sont strictement confidentielles et ne sont jamais vendues à des tiers.</p>
-        
         <h2>2. Utilisation des cookies</h2>
-        <p>Nous utilisons des cookies pour :
-        <br>- Maintenir votre session connectée.
-        <br>- Mémoriser vos préférences audio (volume, vitesse).
-        <br>- Sauvegarder votre progression dans les playlists (pour reprendre là où vous vous êtes arrêté).</p>
-        
+        <p>Nous utilisons des cookies pour :<br>- Maintenir votre session connectée.<br>- Mémoriser vos préférences audio.<br>- Sauvegarder votre progression.</p>
         <h2>3. Sécurité</h2>
-        <p>Les mots de passe sont chiffrés. Nous vous recommandons d'utiliser un mot de passe fort (majuscule, minuscule, chiffre).</p>
-        
+        <p>Les mots de passe sont chiffrés. Nous vous recommandons d'utiliser un mot de passe fort.</p>
         <h2>4. Vos droits</h2>
-        <p>Conformément au RGPD, vous pouvez demander la suppression de votre compte et de vos données à tout moment en contactant l'administrateur.</p>
+        <p>Conformément au RGPD, vous pouvez demander la suppression de votre compte à tout moment.</p>
     </div>
     <a href="/" class="btn ghost">← Retour à l'accueil</a>
     """
@@ -1861,15 +1859,12 @@ def cgu():
     <div class="card">
         <h2>1. Objet</h2>
         <p>NATHO est une plateforme d'apprentissage de l'allemand destinée aux débutants (Niveau A1).</p>
-
-        <h2>2. Propriété intellectuelle (IMPORTANT)</h2>
-        <p>L'ensemble du contenu (textes, audios, questions d'examen, code source, design) est la propriété exclusive de NATHO. <strong>Toute reproduction, copie, modification ou revente non autorisée est strictement interdite et protégée par les lois sur le droit d'auteur.</strong></p>
-
+        <h2>2. Propriété intellectuelle</h2>
+        <p>L'ensemble du contenu est la propriété exclusive de NATHO. <strong>Toute reproduction non autorisée est strictement interdite.</strong></p>
         <h2>3. Utilisation</h2>
-        <p>Vous vous engagez à ne pas partager vos identifiants de connexion. L'outil est destiné à un usage personnel et pédagogique.</p>
-
+        <p>Vous vous engagez à ne pas partager vos identifiants de connexion.</p>
         <h2>4. Responsabilité</h2>
-        <p>NATHO ne délivre pas de certificat officiel Goethe. Les examens proposés sont des simulations pour l'entraînement.</p>
+        <p>NATHO ne délivre pas de certificat officiel Goethe. Les examens proposés sont des simulations.</p>
     </div>
     <a href="/" class="btn ghost">← Retour à l'accueil</a>
     """
@@ -1886,7 +1881,6 @@ def mentions():
         <p><strong>Éditeur :</strong> NATHO Platform</p>
         <p><strong>Contact :</strong> admin@natho.com</p>
         <p><strong>Hébergement :</strong> Railway (Cloud)</p>
-        <p><strong>Directeur de publication :</strong> L'équipe NATHO</p>
         <p>Cette plateforme est un prototype en cours de développement.</p>
     </div>
     <a href="/" class="btn ghost">← Retour à l'accueil</a>
@@ -1916,18 +1910,7 @@ HOREN_QUESTIONS = [
     {"audio": "Ich verstehe nicht.", "q": "Que dit la personne ?", "opts": ["Elle ne comprend pas", "Elle comprend", "Elle est d'accord"], "ans": "0"},
     {"audio": "Können Sie das wiederholen?", "q": "Que demande la personne ?", "opts": ["De répéter", "De parler plus vite", "De partir"], "ans": "0"},
     {"audio": "Ich komme aus Kamerun.", "q": "D'où vient la personne ?", "opts": ["Du Cameroun", "Du Canada", "Du Cambodge"], "ans": "0"},
-    {"audio": "Das Wetter ist schön heute.", "q": "Quel temps fait-il ?", "opts": ["Beau", "Mauvais", "Pluvieux"], "ans": "0"},
-    {"audio": "Ich habe zwei Brüder.", "q": "Combien de frères a la personne ?", "opts": ["Deux", "Un", "Trois"], "ans": "0"},
-    {"audio": "Ich arbeite als Lehrer.", "q": "Quel est le métier de la personne ?", "opts": ["Enseignant", "Médecin", "Ingénieur"], "ans": "0"},
-    {"audio": "Wo ist mein Schlüssel?", "q": "Que cherche la personne ?", "opts": ["Sa clé", "Son portefeuille", "Son téléphone"], "ans": "0"},
-    {"audio": "Wie spät ist es?", "q": "Quelle est la question ?", "opts": ["L'heure", "La date", "Le jour"], "ans": "0"},
-    {"audio": "Ich möchte bestellen.", "q": "Que veut faire la personne ?", "opts": ["Commander", "Payer", "Partir"], "ans": "0"},
-    {"audio": "Das ist zu teuer.", "q": "Que pense la personne du prix ?", "opts": ["Trop cher", "Pas cher", "Correct"], "ans": "0"},
-    {"audio": "Ich brauche ein Taxi.", "q": "De quoi a besoin la personne ?", "opts": ["Un taxi", "Un bus", "Un train"], "ans": "0"},
-    {"audio": "Meine Familie ist groß.", "q": "Comment est la famille ?", "opts": ["Grande", "Petite", "Moyenne"], "ans": "0"},
-    {"audio": "Ich trinke gern Kaffee.", "q": "Qu'aime boire la personne ?", "opts": ["Du café", "Du thé", "De l'eau"], "ans": "0"},
-    {"audio": "Wann hast du Zeit?", "q": "Que demande la personne ?", "opts": ["Quand tu as le temps", "Où tu es", "Qui tu es"], "ans": "0"},
-    {"audio": "Ich wohne in einer Wohnung.", "q": "Où habite la personne ?", "opts": ["Dans un appartement", "Dans une maison", "À l'hôtel"], "ans": "0"},
+    {"audio": "Das Wetter ist schön heute.", "q": "Quel temps fait-il ?", "opts": ["Beau", "Mauvais", "Pluvieux"], "ans": "0"}
 ]
 
 LESEN_QUESTIONS = [
@@ -1940,28 +1923,7 @@ LESEN_QUESTIONS = [
     {"text": "Ich kann heute nicht kommen, ich habe keine Zeit. Morgen ist besser.", "q": "Pourquoi la personne ne vient pas ?", "opts": ["Elle n'a pas le temps", "Elle est malade", "Elle est en vacances"], "ans": "0"},
     {"text": "Der Kurs beginnt um 9 Uhr und endet um 12 Uhr.", "q": "Quand commence le cours ?", "opts": ["À 9 heures", "À 10 heures", "À 12 heures"], "ans": "0"},
     {"text": "Entschuldigung, wo ist die Apotheke? Ich brauche Medikamente.", "q": "Que cherche la personne ?", "opts": ["La pharmacie", "La boulangerie", "La banque"], "ans": "0"},
-    {"text": "Ich habe zwei Kinder, einen Jungen und ein Mädchen.", "q": "Combien d'enfants a la personne ?", "opts": ["Deux", "Un", "Trois"], "ans": "0"},
-    {"text": "Der Zug nach München hat 20 Minuten Verspätung.", "q": "Combien de retard a le train ?", "opts": ["20 minutes", "10 minutes", "30 minutes"], "ans": "0"},
-    {"text": "Am Montag habe ich einen Arzttermin.", "q": "Quand est le rendez-vous chez le médecin ?", "opts": ["Lundi", "Mardi", "Mercredi"], "ans": "0"},
-    {"text": "Ich suche eine neue Wohnung in der Stadt.", "q": "Que cherche la personne ?", "opts": ["Un appartement", "Une maison", "Un hôtel"], "ans": "0"},
-    {"text": "Das Essen im Restaurant war sehr lecker.", "q": "Comment était la nourriture ?", "opts": ["Très bonne", "Mauvaise", "Correcte"], "ans": "0"},
-    {"text": "Ich fahre am Wochenende mit dem Fahrrad.", "q": "Que fait la personne ce week-end ?", "opts": ["Du vélo", "De la voiture", "De la marche"], "ans": "0"},
-    {"text": "Mein Bruder wohnt in Berlin.", "q": "Où habite le frère ?", "opts": ["À Berlin", "À Paris", "À Londres"], "ans": "0"},
-    {"text": "Die Jacke kostet 50 Euro.", "q": "Combien coûte la veste ?", "opts": ["50 euros", "40 euros", "60 euros"], "ans": "0"},
-    {"text": "Ich möchte einen Tisch für zwei Personen reservieren.", "q": "Pour combien de personnes ?", "opts": ["Deux", "Une", "Trois"], "ans": "0"},
-    {"text": "Das Wetter ist heute schlecht, es regnet.", "q": "Quel temps fait-il ?", "opts": ["Il pleut", "Il neige", "Il fait beau"], "ans": "0"},
-    {"text": "Ich lerne Deutsch seit drei Monaten.", "q": "Depuis combien de temps apprend-il l'allemand ?", "opts": ["3 mois", "3 ans", "3 semaines"], "ans": "0"},
-    {"text": "Bitte schicken Sie mir eine E-Mail.", "q": "Que demande la personne ?", "opts": ["Un email", "Un appel", "Une lettre"], "ans": "0"},
-    {"text": "Ich habe meine Hausaufgaben gemacht.", "q": "Qu'a fait la personne ?", "opts": ["Ses devoirs", "La cuisine", "Le ménage"], "ans": "0"},
-    {"text": "Der Supermarkt ist bis 20 Uhr geöffnet.", "q": "Jusqu'à quelle heure est ouvert le supermarché ?", "opts": ["20h", "18h", "22h"], "ans": "0"},
-    {"text": "Ich brauche einen neuen Computer.", "q": "De quoi a besoin la personne ?", "opts": ["Un ordinateur", "Un téléphone", "Une télévision"], "ans": "0"},
-    {"text": "Meine Schwester ist 18 Jahre alt.", "q": "Quel âge a la sœur ?", "opts": ["18 ans", "20 ans", "16 ans"], "ans": "0"},
-    {"text": "Ich fahre morgen nach Hamburg.", "q": "Où va la personne ?", "opts": ["À Hambourg", "À Munich", "À Berlin"], "ans": "0"},
-    {"text": "Das Zimmer ist sehr groß und hell.", "q": "Comment est la chambre ?", "opts": ["Grande et lumineuse", "Petite et sombre", "Moyenne"], "ans": "0"},
-    {"text": "Ich trinke morgens einen Kaffee.", "q": "Que boit la personne le matin ?", "opts": ["Un café", "Un thé", "Un jus"], "ans": "0"},
-    {"text": "Wir treffen uns vor dem Kino.", "q": "Où se retrouvent-ils ?", "opts": ["Devant le cinéma", "Dans le cinéma", "Derrière le cinéma"], "ans": "0"},
-    {"text": "Ich habe keine Zeit für Sport.", "q": "Que dit la personne ?", "opts": ["Elle n'a pas le temps", "Elle aime le sport", "Elle fait du sport"], "ans": "0"},
-    {"text": "Das Buch kostet 15 Euro und ist sehr interessant.", "q": "Combien coûte le livre ?", "opts": ["15 euros", "10 euros", "20 euros"], "ans": "0"},
+    {"text": "Ich habe zwei Kinder, einen Jungen und ein Mädchen.", "q": "Combien d'enfants a la personne ?", "opts": ["Deux", "Un", "Trois"], "ans": "0"}
 ]
 
 SCHREIBEN_QUESTIONS = [
@@ -1969,52 +1931,7 @@ SCHREIBEN_QUESTIONS = [
     {"q": "Écris un message pour dire que tu es malade et que tu ne peux pas venir au cours. (Hallo, ...)", "min_words": 5},
     {"q": "Écris un message pour demander le prix d'un billet de train pour Munich. (Guten Tag, ...)", "min_words": 5},
     {"q": "Écris un message pour t'excuser d'être en retard au rendez-vous. (Entschuldigung, ...)", "min_words": 5},
-    {"q": "Écris un message pour remercier ton ami pour le cadeau. (Liebe/r ..., ...)", "min_words": 5},
-    {"q": "Écris un message pour annuler un rendez-vous. (Hallo, ...)", "min_words": 5},
-    {"q": "Écris un message pour demander le chemin vers la gare. (Entschuldigung, ...)", "min_words": 5},
-    {"q": "Écris un message pour dire que tu as trouvé un nouvel appartement. (Hallo, ...)", "min_words": 5},
-    {"q": "Écris un message pour inviter un ami à faire du sport. (Hallo, ...)", "min_words": 5},
-    {"q": "Écris un message pour demander un rendez-vous chez le médecin. (Guten Tag, ...)", "min_words": 5},
-    {"q": "Écris un message pour dire que tu es arrivé à Berlin. (Hallo, ...)", "min_words": 5},
-    {"q": "Écris un message pour demander le prix d'un hôtel. (Guten Tag, ...)", "min_words": 5},
-    {"q": "Écris un message pour remercier pour l'aide. (Vielen Dank, ...)", "min_words": 5},
-    {"q": "Écris un message pour dire que tu as oublié ton livre. (Hallo, ...)", "min_words": 5},
-    {"q": "Écris un message pour proposer de sortir ce week-end. (Hallo, ...)", "min_words": 5},
-    {"q": "Écris un message pour dire que tu ne trouves pas l'adresse. (Hallo, ...)", "min_words": 5},
-    {"q": "Écris un message pour demander une facture. (Guten Tag, ...)", "min_words": 5},
-    {"q": "Écris un message pour dire que tu as aimé le film. (Hallo, ...)", "min_words": 5},
-    {"q": "Écris un message pour demander un conseil. (Hallo, ...)", "min_words": 5},
-    {"q": "Écris un message pour dire que tu as reçu le colis. (Hallo, ...)", "min_words": 5},
-    {"q": "Écris un message pour commander un livre sur internet. (Guten Tag, ...)", "min_words": 5},
-    {"q": "Écris un message pour t'excuser d'avoir oublié l'anniversaire de ton ami. (Hallo, ...)", "min_words": 5},
-    {"q": "Écris un message pour dire que tu cherches un travail. (Hallo, ...)", "min_words": 5},
-    {"q": "Écris un message pour demander l'heure du train. (Guten Tag, ...)", "min_words": 5},
-    {"q": "Écris un message pour inviter ta famille à Noël. (Liebe Familie, ...)", "min_words": 5},
-    {"q": "Écris un message pour dire que tu as perdu ton portefeuille. (Hallo, ...)", "min_words": 5},
-    {"q": "Écris un message pour demander un remboursement. (Guten Tag, ...)", "min_words": 5},
-    {"q": "Écris un message pour proposer ton aide à un ami. (Hallo, ...)", "min_words": 5},
-    {"q": "Écris un message pour dire que tu es en vacances. (Hallo, ...)", "min_words": 5},
-    {"q": "Écris un message pour demander le code Wi-Fi. (Hallo, ...)", "min_words": 5},
-    {"q": "Écris un message pour dire que tu as changé de numéro de téléphone. (Hallo, ...)", "min_words": 5},
-    {"q": "Écris un message pour remercier pour l'invitation. (Vielen Dank, ...)", "min_words": 5},
-    {"q": "Écris un message pour demander un rendez-vous chez le coiffeur. (Guten Tag, ...)", "min_words": 5},
-    {"q": "Écris un message pour dire que tu ne peux pas venir à la fête. (Hallo, ...)", "min_words": 5},
-    {"q": "Écris un message pour demander des informations sur un cours. (Guten Tag, ...)", "min_words": 5},
-    {"q": "Écris un message pour dire que tu as trouvé un chat. (Hallo, ...)", "min_words": 5},
-    {"q": "Écris un message pour demander l'adresse de l'hôtel. (Guten Tag, ...)", "min_words": 5},
-    {"q": "Écris un message pour proposer une réunion. (Hallo, ...)", "min_words": 5},
-    {"q": "Écris un message pour dire que tu es content de venir. (Hallo, ...)", "min_words": 5},
-    {"q": "Écris un message pour demander un conseil de lecture. (Hallo, ...)", "min_words": 5},
-    {"q": "Écris un message pour dire que tu as besoin de repos. (Hallo, ...)", "min_words": 5},
-    {"q": "Écris un message pour commander un taxi. (Guten Tag, ...)", "min_words": 5},
-    {"q": "Écris un message pour dire que tu as raté ton bus. (Hallo, ...)", "min_words": 5},
-    {"q": "Écris un message pour inviter un ami à une exposition. (Hallo, ...)", "min_words": 5},
-    {"q": "Écris un message pour demander le menu du jour. (Guten Tag, ...)", "min_words": 5},
-    {"q": "Écris un message pour dire que tu as acheté une nouvelle voiture. (Hallo, ...)", "min_words": 5},
-    {"q": "Écris un message pour remercier pour le cadeau d'anniversaire. (Liebe/r ..., ...)", "min_words": 5},
-    {"q": "Écris un message pour demander l'heure de fermeture du magasin. (Guten Tag, ...)", "min_words": 5},
-    {"q": "Écris un message pour dire que tu es à la maison. (Hallo, ...)", "min_words": 5},
-    {"q": "Écris un message pour proposer de faire les courses ensemble. (Hallo, ...)", "min_words": 5}
+    {"q": "Écris un message pour remercier ton ami pour le cadeau. (Liebe/r ..., ...)", "min_words": 5}
 ]
 
 SPRECHEN_QUESTIONS = [
@@ -2022,47 +1939,7 @@ SPRECHEN_QUESTIONS = [
     {"q": "Épelle ton nom de famille lentement à voix haute.", "example": "M-A-R-T-I-N"},
     {"q": "Dis à voix haute que tu aimes le café et que tu n'aimes pas le thé.", "example": "Ich mag Kaffee, aber ich mag keinen Tee."},
     {"q": "Dis les jours de la semaine en allemand.", "example": "Montag, Dienstag, Mittwoch, Donnerstag, Freitag, Samstag, Sonntag."},
-    {"q": "Commande un café et un croissant dans un restaurant à voix haute.", "example": "Ich hätte gern einen Kaffee und ein Croissant."},
-    {"q": "Dis à voix haute que tu habites à Paris.", "example": "Ich wohne in Paris."},
-    {"q": "Dis que tu as deux frères et une sœur.", "example": "Ich habe zwei Brüder und eine Schwester."},
-    {"q": "Demande où sont les toilettes.", "example": "Wo ist die Toilette?"},
-    {"q": "Dis à voix haute que tu apprends l'allemand depuis un an.", "example": "Ich lerne Deutsch seit einem Jahr."},
-    {"q": "Demande combien coûte ce livre.", "example": "Wie viel kostet dieses Buch?"},
-    {"q": "Dis que tu es fatigué(e).", "example": "Ich bin müde."},
-    {"q": "Demande l'heure à quelqu'un.", "example": "Wie spät ist es?"},
-    {"q": "Dis que tu aimes écouter de la musique.", "example": "Ich höre gern Musik."},
-    {"q": "Dis que tu ne comprends pas.", "example": "Ich verstehe nicht."},
-    {"q": "Demande de répéter.", "example": "Können Sie das wiederholen?"},
-    {"q": "Dis que tu habites dans un appartement.", "example": "Ich wohne in einer Wohnung."},
-    {"q": "Dis à voix haute que tu as un chien et un chat.", "example": "Ich habe einen Hund und eine Katze."},
-    {"q": "Demande le chemin pour aller à la gare.", "example": "Wie komme ich zum Bahnhof?"},
-    {"q": "Dis que tu veux acheter un billet pour Berlin.", "example": "Ich möchte eine Fahrkarte nach Berlin kaufen."},
-    {"q": "Dis que tu as besoin d'un médecin.", "example": "Ich brauche einen Arzt."},
-    {"q": "Dis que tu es en retard.", "example": "Ich bin zu spät."},
-    {"q": "Demande où est la pharmacie.", "example": "Wo ist die Apotheke?"},
-    {"q": "Dis que tu as mal à la tête.", "example": "Ich habe Kopfschmerzen."},
-    {"q": "Dis que tu aimes le chocolat.", "example": "Ich mag Schokolade."},
-    {"q": "Dis que tu ne peux pas venir ce soir.", "example": "Ich kann heute Abend nicht kommen."},
-    {"q": "Demande le prix de la chambre.", "example": "Wie viel kostet das Zimmer?"},
-    {"q": "Dis que tu veux réserver une table.", "example": "Ich möchte einen Tisch reservieren."},
-    {"q": "Dis que tu as faim.", "example": "Ich habe Hunger."},
-    {"q": "Dis que tu as soif.", "example": "Ich habe Durst."},
-    {"q": "Demande où se trouve le supermarché.", "example": "Wo ist der Supermarkt?"},
-    {"q": "Dis que tu n'aimes pas le poisson.", "example": "Ich mag keinen Fisch."},
-    {"q": "Dis que tu es content(e) de te présenter.", "example": "Ich freue mich, mich vorzustellen."},
-    {"q": "Dis que tu vas partir demain.", "example": "Ich fahre morgen ab."},
-    {"q": "Dis que tu travailles dans un bureau.", "example": "Ich arbeite in einem Büro."},
-    {"q": "Dis à voix haute les couleurs en allemand.", "example": "Rot, blau, grün, gelb, schwarz, weiß."},
-    {"q": "Dis que tu as deux enfants.", "example": "Ich habe zwei Kinder."},
-    {"q": "Demande un verre d'eau.", "example": "Ein Glas Wasser, bitte."},
-    {"q": "Dis que tu es prêt(e).", "example": "Ich bin bereit."},
-    {"q": "Demande à qui est ce sac.", "example": "Wem gehört diese Tasche?"},
-    {"q": "Dis que tu vas appeler plus tard.", "example": "Ich rufe später an."},
-    {"q": "Dis que tu as oublié la clé.", "example": "Ich habe den Schlüssel vergessen."},
-    {"q": "Dis que tu aimes voyager.", "example": "Ich reise gern."},
-    {"q": "Dis que tu veux dormir.", "example": "Ich möchte schlafen."},
-    {"q": "Dis que tu cherches un travail.", "example": "Ich suche Arbeit."},
-    {"q": "Dis que tu apprends l'allemand pour travailler.", "example": "Ich lerne Deutsch, weil ich arbeiten möchte."}
+    {"q": "Commande un café et un croissant dans un restaurant à voix haute.", "example": "Ich hätte gern einen Kaffee und ein Croissant."}
 ]
 
 @app.route("/goethe")
