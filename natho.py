@@ -1,6 +1,6 @@
 # =========================================================
 # NATHO — Plateforme d'apprentissage de l'allemand A1
-# Version finale : Audio en arrière-plan (Serveur MP3)
+# Version finale stable : Sidebar + W-Fragen + Audio
 # =========================================================
 
 import os
@@ -129,6 +129,7 @@ def init_db():
             FOREIGN KEY(user_id) REFERENCES users(id)
         )""")
 
+        # Remplissage
         c.execute("SELECT COUNT(*) FROM lessons")
         if c.fetchone()[0] == 0:
             seed_lessons(c)
@@ -373,7 +374,7 @@ def playlist_btn(label, kind, key, css="btn"):
             f'data-kind="{h(kind, quote=True)}" data-key="{h(key, quote=True)}">{label}</button>')
 
 # ---------------------------------------------------------
-# CSS & JS (PWA Integration)
+# CSS & JS
 # ---------------------------------------------------------
 FAVICON_SVG = """data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='%2387CEEB'/><path d='M30 65V45c0-15 10-25 20-25s20 10 20 25v20' stroke='white' stroke-width='8' fill='none' stroke-linecap='round'/><rect x='25' y='60' width='12' height='20' rx='4' fill='white'/><rect x='63' y='60' width='12' height='20' rx='4' fill='white'/><text x='50' y='58' font-family='Arial' font-size='28' font-weight='bold' fill='white' text-anchor='middle'>N</text></svg>"""
 
@@ -1238,7 +1239,7 @@ def layout(title, body, user=None):
 <audio id="natho-audio" preload="auto" playsinline></audio>
 
 <footer>
-    © NATHO — Plateforme d'apprentissage de l'allemand A1 · Prototype v3.8<br>
+    © NATHO — Plateforme d'apprentissage de l'allemand A1 · Prototype v4.0<br>
     <a href="/politique">Politique de confidentialité</a> | 
     <a href="/cgu">Conditions d'utilisation</a> | 
     <a href="/mentions">Mentions légales</a>
