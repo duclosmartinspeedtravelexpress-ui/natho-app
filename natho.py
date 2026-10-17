@@ -32,7 +32,7 @@ except Exception:
 # ---------------------------------------------------------
 APP_SECRET = os.environ.get("NATHO_SECRET", "change-me-in-prod-" + secrets.token_hex(8))
 DATA_DIR = "/app/data"
-DB_PATH = os.path.join(DATA_DIR, "natho.db")
+DB_PATH = os.path.join(DATA_DIR, "natho_v2.db")
 
 try:
     os.makedirs(DATA_DIR, exist_ok=True)
