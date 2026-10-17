@@ -1,0 +1,1 @@
+web: gunicorn natho:app --bind 0.0.0.0:$PORT
