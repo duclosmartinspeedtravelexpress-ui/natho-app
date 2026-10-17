@@ -1,7 +1,7 @@
 # =========================================================
 # NATHO — Plateforme d'apprentissage de l'allemand A1
 # Fichier unique • Python + Flask + SQLite
-# Version finale : Code complet restauré + Admin corrigé
+# Version finale : Code complet avec toutes tes données
 # =========================================================
 
 import os
@@ -19,7 +19,6 @@ from flask import (Flask, request, session, redirect, url_for,
                    render_template_string, g, flash, jsonify,
                    get_flashed_messages, send_file, make_response)
 
-# Voix serveur optionnelle (pip install gTTS)
 try:
     from gtts import gTTS
     TTS_OK = True
@@ -28,11 +27,11 @@ except Exception:
     TTS_OK = False
 
 # ---------------------------------------------------------
-# CONFIG (Volume persistant Railway)
+# CONFIG
 # ---------------------------------------------------------
 APP_SECRET = os.environ.get("NATHO_SECRET", "change-me-in-prod-" + secrets.token_hex(8))
 DATA_DIR = "/app/data"
-DB_PATH = os.path.join(DATA_DIR, "natho_v2.db")
+DB_PATH = os.path.join(DATA_DIR, "natho.db")
 
 try:
     os.makedirs(DATA_DIR, exist_ok=True)
@@ -75,7 +74,7 @@ def init_db():
             created_at TEXT DEFAULT CURRENT_TIMESTAMP
         )""")
 
-        # FORCE L'ADMINISTRATEUR AVEC TON NOUVEAU MOT DE PASSE
+        # FORCE L'ADMINISTRATEUR AVEC TON MOT DE PASSE
         admin_email = "admin@natho.com"
         admin_pwd = "Achilled@vy2015"
         
@@ -89,7 +88,7 @@ def init_db():
         else:
             c.execute("UPDATE users SET password=?, is_admin=1 WHERE email=?", 
                       (hash_pwd(admin_pwd), admin_email))
-            print("✅ Compte Admin mis à jour avec ton mot de passe.")
+            print("✅ Compte Admin mis à jour.")
 
         # -----------------------------------------------------
         # TABLES ET CONTENU
