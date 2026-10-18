@@ -1,6 +1,7 @@
 # =========================================================
 # NATHO — Plateforme d'apprentissage de l'allemand A1
 # Version finale stable : Sidebar + W-Fragen + Audio
+# + Apprendre à parler + Essentiels A1 + Mode nuit + Menu mobile
 # =========================================================
 
 import os
@@ -129,7 +130,37 @@ def init_db():
             FOREIGN KEY(user_id) REFERENCES users(id)
         )""")
 
-        # Remplissage
+        # =========================================================
+        # === AJOUT : TABLES POUR "APPRENDRE À PARLER" & "ESSENTIELS A1" ===
+        # Migrations idempotentes : ne détruisent JAMAIS la DB existante
+        # =========================================================
+        c.execute("""CREATE TABLE IF NOT EXISTS speak_phrases (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            theme TEXT NOT NULL,
+            theme_order INTEGER DEFAULT 0,
+            fr TEXT NOT NULL,
+            de TEXT NOT NULL,
+            UNIQUE(fr, de)
+        )""")
+
+        c.execute("""CREATE TABLE IF NOT EXISTS essentials_cards (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            fiche_num INTEGER NOT NULL UNIQUE,
+            title TEXT NOT NULL,
+            content TEXT NOT NULL,
+            explanation TEXT NOT NULL DEFAULT ''
+        )""")
+
+        c.execute("""CREATE TABLE IF NOT EXISTS speak_playlists (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            kind TEXT NOT NULL,
+            key TEXT NOT NULL,
+            title TEXT NOT NULL,
+            items_json TEXT NOT NULL,
+            UNIQUE(kind, key)
+        )""")
+
+        # Remplissage (idempotent)
         c.execute("SELECT COUNT(*) FROM lessons")
         if c.fetchone()[0] == 0:
             seed_lessons(c)
@@ -143,6 +174,17 @@ def init_db():
         c.execute("SELECT COUNT(*) FROM vocab")
         if c.fetchone()[0] == 0:
             seed_vocab(c)
+
+        # === AJOUT : seeds idempotents pour les nouvelles tables ===
+        c.execute("SELECT COUNT(*) FROM speak_phrases")
+        if c.fetchone()[0] == 0:
+            seed_speak_phrases(c)
+
+        c.execute("SELECT COUNT(*) FROM essentials_cards")
+        if c.fetchone()[0] == 0:
+            seed_essentials_cards(c)
+
+        seed_speak_playlists(c)  # idempotent via INSERT OR IGNORE
 
         db.commit()
         db.close()
@@ -327,6 +369,422 @@ def seed_numbers(cursor):
     for i in range(0, 21):
         cursor.execute("INSERT INTO vocab(category, german, french) VALUES(?,?,?)", ("Nombres", str(i), str(i)))
 
+# =========================================================
+# === AJOUT : SEED "APPRENDRE À PARLER" (260 phrases complètes) ===
+# Sujet + Verbe + Complément, TOUTES différentes de l'existant.
+# =========================================================
+SPEAK_PHRASES_DATA = [
+    # (theme, [(fr, de), ...])
+    ("Se présenter et parler de soi", [
+        ("Je m'appelle Marie.", "Ich heiße Marie."),
+        ("Je viens du Cameroun.", "Ich komme aus Kamerun."),
+        ("J'habite à Douala.", "Ich wohne in Douala."),
+        ("J'ai 25 ans.", "Ich bin 25 Jahre alt."),
+        ("Je suis étudiant.", "Ich bin Student."),
+        ("Je suis étudiante.", "Ich bin Studentin."),
+        ("Je travaille dans un bureau.", "Ich arbeite in einem Büro."),
+        ("Je parle français et anglais.", "Ich spreche Französisch und Englisch."),
+        ("J'apprends l'allemand.", "Ich lerne Deutsch."),
+        ("Ma langue maternelle est le français.", "Meine Muttersprache ist Französisch."),
+        ("Je suis célibataire.", "Ich bin ledig."),
+        ("Je suis marié(e).", "Ich bin verheiratet."),
+        ("J'ai deux frères.", "Ich habe zwei Brüder."),
+        ("J'ai une sœur.", "Ich habe eine Schwester."),
+        ("Je suis nouveau ici.", "Ich bin neu hier."),
+        ("Je suis content de te rencontrer.", "Ich freue mich, dich kennenzulernen."),
+        ("Comment tu t'appelles ?", "Wie heißt du?"),
+        ("Quel âge as-tu ?", "Wie alt bist du?"),
+        ("D'où viens-tu ?", "Woher kommst du?"),
+        ("Où habites-tu ?", "Wo wohnst du?"),
+    ]),
+    ("La famille et les amis", [
+        ("Voici ma mère.", "Das ist meine Mutter."),
+        ("Voici mon père.", "Das ist mein Vater."),
+        ("J'ai deux enfants.", "Ich habe zwei Kinder."),
+        ("Mon fils a cinq ans.", "Mein Sohn ist fünf Jahre alt."),
+        ("Ma fille est à l'école.", "Meine Tochter ist in der Schule."),
+        ("Mon frère habite à Berlin.", "Mein Bruder wohnt in Berlin."),
+        ("Ma sœur est médecin.", "Meine Schwester ist Ärztin."),
+        ("Mes parents habitent ici.", "Meine Eltern wohnen hier."),
+        ("J'ai un cousin en Allemagne.", "Ich habe einen Cousin in Deutschland."),
+        ("Ma famille est grande.", "Meine Familie ist groß."),
+        ("Mon ami s'appelle Paul.", "Mein Freund heißt Paul."),
+        ("Mon amie s'appelle Anna.", "Meine Freundin heißt Anna."),
+        ("Nous sommes une famille de quatre.", "Wir sind eine Familie von vier."),
+        ("Tu es marié(e) ?", "Bist du verheiratet?"),
+        ("Je rends visite à mes grands-parents.", "Ich besuche meine Großeltern."),
+        ("Mon oncle est médecin.", "Mein Onkel ist Arzt."),
+        ("Ma tante est professeure.", "Meine Tante ist Lehrerin."),
+        ("Nous sommes amis depuis longtemps.", "Wir sind seit langem Freunde."),
+        ("Mes grands-parents habitent à la campagne.", "Meine Großeltern wohnen auf dem Land."),
+        ("J'aime ma famille.", "Ich liebe meine Familie."),
+    ]),
+    ("La maison et le logement", [
+        ("J'habite dans une maison.", "Ich wohne in einem Haus."),
+        ("J'habite dans un appartement.", "Ich wohne in einer Wohnung."),
+        ("Ma chambre est grande.", "Mein Zimmer ist groß."),
+        ("La cuisine est propre.", "Die Küche ist sauber."),
+        ("La salle de bains est petite.", "Das Bad ist klein."),
+        ("J'ai un jardin.", "Ich habe einen Garten."),
+        ("La clé est sur la table.", "Der Schlüssel ist auf dem Tisch."),
+        ("Ferme la porte, s'il te plaît.", "Mach die Tür zu, bitte."),
+        ("Ouvre la fenêtre, s'il te plaît.", "Öffne bitte das Fenster."),
+        ("Allume la lumière, s'il te plaît.", "Mach bitte das Licht an."),
+        ("Éteins la lumière, s'il te plaît.", "Mach bitte das Licht aus."),
+        ("Le loyer est trop élevé.", "Die Miete ist zu hoch."),
+        ("J'ai besoin d'une serviette.", "Ich brauche ein Handtuch."),
+        ("Où est la télévision ?", "Wo ist der Fernseher?"),
+        ("Le lit est très confortable.", "Das Bett ist sehr bequem."),
+        ("Je nettoie ma chambre.", "Ich räume mein Zimmer auf."),
+        ("Le frigo est vide.", "Der Kühlschrank ist leer."),
+        ("Le canapé est dans le salon.", "Das Sofa ist im Wohnzimmer."),
+        ("Il y a une table dans la cuisine.", "Es gibt einen Tisch in der Küche."),
+        ("Ma maison est belle.", "Mein Haus ist schön."),
+    ]),
+    ("Les repas et la nourriture", [
+        ("J'ai faim.", "Ich habe Hunger."),
+        ("J'ai soif.", "Ich habe Durst."),
+        ("Je mange du pain.", "Ich esse Brot."),
+        ("Je bois de l'eau.", "Ich trinke Wasser."),
+        ("Je bois du café.", "Ich trinke Kaffee."),
+        ("Je mange du riz.", "Ich esse Reis."),
+        ("Je n'aime pas le poisson.", "Ich mag keinen Fisch."),
+        ("J'aime les fruits.", "Ich mag Obst."),
+        ("Le repas est prêt.", "Das Essen ist fertig."),
+        ("C'est très bon.", "Das schmeckt sehr gut."),
+        ("Je mange à midi.", "Ich esse zu Mittag."),
+        ("Je mange le soir à 19h.", "Ich esse am Abend um 19 Uhr."),
+        ("Je prépare le dîner.", "Ich koche das Abendessen."),
+        ("Je prends le petit-déjeuner.", "Ich frühstücke."),
+        ("Passe-moi le sel, s'il te plaît.", "Gib mir bitte das Salz."),
+        ("Passe-moi le poivre, s'il te plaît.", "Gib mir bitte den Pfeffer."),
+        ("Un verre d'eau, s'il te plaît.", "Ein Glas Wasser, bitte."),
+        ("Je suis végétarien.", "Ich bin Vegetarier."),
+        ("Je mange de la viande.", "Ich esse Fleisch."),
+        ("Le gâteau est délicieux.", "Der Kuchen ist lecker."),
+    ]),
+    ("Les achats et l'argent", [
+        ("Je voudrais acheter ceci.", "Ich möchte das kaufen."),
+        ("Combien cela coûte-t-il ?", "Wie viel kostet das?"),
+        ("C'est trop cher.", "Das ist zu teuer."),
+        ("Avez-vous quelque chose de moins cher ?", "Haben Sie etwas Günstigeres?"),
+        ("Où est la caisse ?", "Wo ist die Kasse?"),
+        ("Je peux payer par carte ?", "Kann ich mit Karte bezahlen?"),
+        ("Je paie en espèces.", "Ich zahle bar."),
+        ("Je prends cela.", "Ich nehme das."),
+        ("Je cherche une chemise.", "Ich suche ein Hemd."),
+        ("Je peux essayer cela ?", "Kann ich das anprobieren?"),
+        ("Quelle taille faites-vous ?", "Welche Größe haben Sie?"),
+        ("Cela me va bien.", "Das passt mir gut."),
+        ("C'est trop grand.", "Das ist zu groß."),
+        ("C'est trop petit.", "Das ist zu klein."),
+        ("Puis-je avoir un reçu ?", "Kann ich eine Quittung bekommen?"),
+        ("J'ai besoin d'argent.", "Ich brauche Geld."),
+        ("Où est le distributeur ?", "Wo ist der Geldautomat?"),
+        ("Je voudrais retirer de l'argent.", "Ich möchte Geld abheben."),
+        ("La carte ne fonctionne pas.", "Die Karte funktioniert nicht."),
+        ("C'est gratuit.", "Das ist kostenlos."),
+    ]),
+    ("Le transport et les déplacements", [
+        ("Où est l'arrêt de bus ?", "Wo ist die Bushaltestelle?"),
+        ("Quand part le train ?", "Wann fährt der Zug?"),
+        ("Un billet pour Berlin, s'il vous plaît.", "Eine Fahrkarte nach Berlin, bitte."),
+        ("Où dois-je changer ?", "Wo muss ich umsteigen?"),
+        ("Le train a du retard.", "Der Zug hat Verspätung."),
+        ("Je prends le bus.", "Ich nehme den Bus."),
+        ("Je vais à pied.", "Ich gehe zu Fuß."),
+        ("De quel quai part le train ?", "Von welchem Gleis fährt der Zug?"),
+        ("Quand arrive le bus ?", "Wann kommt der Bus an?"),
+        ("Un aller-retour, s'il vous plaît.", "Einmal hin und zurück, bitte."),
+        ("Cette place est-elle libre ?", "Ist dieser Platz frei?"),
+        ("Où est l'aéroport ?", "Wo ist der Flughafen?"),
+        ("Je voudrais un taxi.", "Ich brauche ein Taxi."),
+        ("Combien de temps dure le trajet ?", "Wie lange dauert die Fahrt?"),
+        ("Je me suis perdu.", "Ich habe mich verlaufen."),
+        ("Je prends le métro.", "Ich nehme die U-Bahn."),
+        ("Le bus arrive dans 5 minutes.", "Der Bus kommt in 5 Minuten."),
+        ("Où est la gare ?", "Wo ist der Bahnhof?"),
+        ("Je vais à l'hôtel.", "Ich gehe zum Hotel."),
+        ("Je voyage en train.", "Ich reise mit dem Zug."),
+    ]),
+    ("À l'hôtel et en voyage", [
+        ("J'ai une réservation.", "Ich habe eine Reservierung."),
+        ("Je voudrais réserver une chambre.", "Ich möchte ein Zimmer buchen."),
+        ("Avez-vous une chambre libre ?", "Haben Sie ein freies Zimmer?"),
+        ("À quelle heure est le petit-déjeuner ?", "Wann ist das Frühstück?"),
+        ("Où est ma chambre ?", "Wo ist mein Zimmer?"),
+        ("La clé ne fonctionne pas.", "Der Schlüssel funktioniert nicht."),
+        ("Je reste deux nuits.", "Ich bleibe zwei Nächte."),
+        ("Je peux partir plus tard ?", "Kann ich später auschecken?"),
+        ("Où puis-je laisser mes bagages ?", "Wo kann ich mein Gepäck lassen?"),
+        ("Bon voyage !", "Gute Reise!"),
+        ("Le petit-déjeuner est inclus.", "Das Frühstück ist inklusive."),
+        ("La chambre est très propre.", "Das Zimmer ist sehr sauber."),
+        ("Où est l'ascenseur ?", "Wo ist der Aufzug?"),
+        ("Quand dois-je libérer la chambre ?", "Wann muss ich auschecken?"),
+        ("J'ai perdu mon passeport.", "Ich habe meinen Pass verloren."),
+        ("Ma valise est lourde.", "Mein Koffer ist schwer."),
+        ("Je voudrais annuler ma réservation.", "Ich möchte meine Reservierung stornieren."),
+        ("Je suis en vacances.", "Ich bin im Urlaub."),
+        ("Je voyage pour le travail.", "Ich reise geschäftlich."),
+        ("Je visite la ville.", "Ich besichtige die Stadt."),
+    ]),
+    ("La santé et les urgences", [
+        ("Je suis malade.", "Ich bin krank."),
+        ("J'ai mal à la tête.", "Ich habe Kopfschmerzen."),
+        ("J'ai mal au ventre.", "Ich habe Bauchschmerzen."),
+        ("J'ai de la fièvre.", "Ich habe Fieber."),
+        ("J'ai mal à la gorge.", "Ich habe Halsschmerzen."),
+        ("J'ai besoin d'un médecin.", "Ich brauche einen Arzt."),
+        ("Je dois aller chez le médecin.", "Ich muss zum Arzt gehen."),
+        ("J'ai besoin d'un rendez-vous.", "Ich brauche einen Termin."),
+        ("Où est la pharmacie ?", "Wo ist die Apotheke?"),
+        ("J'ai besoin de médicaments.", "Ich brauche Medikamente."),
+        ("Au secours !", "Hilfe!"),
+        ("Appelez la police !", "Rufen Sie die Polizei!"),
+        ("Appelez une ambulance !", "Rufen Sie einen Krankenwagen!"),
+        ("C'est une urgence.", "Es ist ein Notfall."),
+        ("Je ne me sens pas bien.", "Ich fühle mich nicht gut."),
+        ("J'ai mal au dos.", "Mein Rücken tut weh."),
+        ("Je suis fatigué.", "Ich bin müde."),
+        ("Je me sens mieux.", "Ich fühle mich besser."),
+        ("Bon rétablissement !", "Gute Besserung!"),
+        ("Je prends ce médicament.", "Ich nehme dieses Medikament."),
+    ]),
+    ("Le travail et les études", [
+        ("Quelle est ta profession ?", "Was machst du beruflich?"),
+        ("Je travaille dans un bureau.", "Ich arbeite in einem Büro."),
+        ("Je suis étudiant.", "Ich bin Student."),
+        ("Je suis à l'école.", "Ich bin in der Schule."),
+        ("Je suis un cours d'allemand.", "Ich besuche einen Deutschkurs."),
+        ("Le professeur explique la grammaire.", "Der Lehrer erklärt die Grammatik."),
+        ("J'ai un examen demain.", "Ich habe morgen eine Prüfung."),
+        ("J'ai une question.", "Ich habe eine Frage."),
+        ("Je fais mes devoirs.", "Ich mache meine Hausaufgaben."),
+        ("J'ai terminé.", "Ich bin fertig."),
+        ("Je cherche du travail.", "Ich suche Arbeit."),
+        ("Mon chef est sympa.", "Mein Chef ist nett."),
+        ("Je suis en congé aujourd'hui.", "Ich habe heute frei."),
+        ("J'ai beaucoup de travail.", "Ich habe viel Arbeit."),
+        ("Le travail commence à huit heures.", "Die Arbeit beginnt um acht Uhr."),
+        ("J'apprends l'allemand pour travailler.", "Ich lerne Deutsch, weil ich arbeiten möchte."),
+        ("Je voudrais travailler à Berlin.", "Ich möchte in Berlin arbeiten."),
+        ("L'école commence en septembre.", "Die Schule beginnt im September."),
+        ("J'étudie à l'université.", "Ich studiere an der Universität."),
+        ("Je lis un livre en allemand.", "Ich lese ein Buch auf Deutsch."),
+    ]),
+    ("Les loisirs et le temps libre", [
+        ("Qu'aimes-tu faire ?", "Was machst du gern?"),
+        ("J'aime écouter de la musique.", "Ich höre gern Musik."),
+        ("J'aime lire.", "Ich lese gern."),
+        ("Je joue au football.", "Ich spiele Fußball."),
+        ("Je regarde un film.", "Ich sehe einen Film."),
+        ("Je vais au cinéma.", "Ich gehe ins Kino."),
+        ("Je vais me promener.", "Ich gehe spazieren."),
+        ("Je danse.", "Ich tanze."),
+        ("Je chante.", "Ich singe."),
+        ("Je nage.", "Ich schwimme."),
+        ("Je fais du sport.", "Ich mache Sport."),
+        ("Je joue de la guitare.", "Ich spiele Gitarre."),
+        ("C'est amusant.", "Das macht Spaß."),
+        ("Je n'ai pas envie.", "Ich habe keine Lust."),
+        ("Allons au parc.", "Lass uns in den Park gehen."),
+        ("Tu veux venir avec moi ?", "Möchtest du mitkommen?"),
+        ("Avec plaisir !", "Gern!"),
+        ("Malheureusement, je ne peux pas.", "Leider kann ich nicht."),
+        ("Le week-end, je suis libre.", "Am Wochenende habe ich frei."),
+        ("J'ai un passe-temps.", "Ich habe ein Hobby."),
+    ]),
+    ("La météo et les saisons", [
+        ("Quel temps fait-il aujourd'hui ?", "Wie ist das Wetter heute?"),
+        ("Il fait beau.", "Das Wetter ist schön."),
+        ("Il pleut.", "Es regnet."),
+        ("Il neige.", "Es schneit."),
+        ("Il fait froid.", "Es ist kalt."),
+        ("Il fait chaud.", "Es ist heiß."),
+        ("Il y a du vent.", "Es ist windig."),
+        ("Le soleil brille.", "Die Sonne scheint."),
+        ("Il fait 20 degrés.", "Es sind 20 Grad."),
+        ("Prends un parapluie.", "Nimm einen Regenschirm mit."),
+        ("En hiver, il fait très froid.", "Im Winter ist es sehr kalt."),
+        ("En été, il fait chaud.", "Im Sommer ist es heiß."),
+        ("C'est le printemps.", "Es ist Frühling."),
+        ("C'est l'automne.", "Es ist Herbst."),
+        ("Il fait mauvais.", "Das Wetter ist schlecht."),
+        ("Le ciel est bleu.", "Der Himmel ist blau."),
+        ("Il y a des nuages.", "Es gibt Wolken."),
+        ("Le temps est agréable.", "Das Wetter ist angenehm."),
+        ("Il fait nuit.", "Es ist Nacht."),
+        ("Demain, il fera beau.", "Morgen wird das Wetter schön."),
+    ]),
+    ("Les rendez-vous et les projets", [
+        ("Qu'est-ce qu'on fait demain ?", "Was machen wir morgen?"),
+        ("J'ai un plan.", "Ich habe einen Plan."),
+        ("Je voudrais étudier aujourd'hui.", "Ich möchte heute lernen."),
+        ("Je t'appellerai.", "Ich werde dich anrufen."),
+        ("Peut-être demain.", "Vielleicht morgen."),
+        ("On fera cela plus tard.", "Das machen wir später."),
+        ("J'ai du temps ce week-end.", "Ich habe am Wochenende Zeit."),
+        ("Quand es-tu libre ?", "Wann hast du frei?"),
+        ("Je viendrai volontiers.", "Ich komme gern mit."),
+        ("À la semaine prochaine !", "Bis nächste Woche!"),
+        ("On se retrouve à 18h.", "Wir treffen uns um 18 Uhr."),
+        ("Je suis en retard.", "Ich bin zu spät."),
+        ("Je suis à l'heure.", "Ich bin pünktlich."),
+        ("Je viendrai plus tard.", "Ich komme später."),
+        ("On se voit demain.", "Wir sehen uns morgen."),
+        ("Je suis occupé aujourd'hui.", "Ich bin heute beschäftigt."),
+        ("J'ai un rendez-vous.", "Ich habe einen Termin."),
+        ("On se retrouve devant le cinéma.", "Wir treffen uns vor dem Kino."),
+        ("À tout à l'heure !", "Bis später!"),
+        ("À bientôt !", "Bis bald!"),
+    ]),
+    ("Les questions et la conversation courante", [
+        ("Comment vas-tu ?", "Wie geht es dir?"),
+        ("Je vais bien, merci.", "Mir geht es gut, danke."),
+        ("Et toi ?", "Und dir?"),
+        ("Comment t'appelles-tu ?", "Wie heißt du?"),
+        ("Où habites-tu ?", "Wo wohnst du?"),
+        ("D'où viens-tu ?", "Woher kommst du?"),
+        ("Que fais-tu ?", "Was machst du?"),
+        ("Pourquoi ?", "Warum?"),
+        ("Quand ?", "Wann?"),
+        ("Où ?", "Wo?"),
+        ("Qui ?", "Wer?"),
+        ("Quoi ?", "Was?"),
+        ("Comment ?", "Wie?"),
+        ("Combien ?", "Wie viel?"),
+        ("Peux-tu m'aider ?", "Kannst du mir helfen?"),
+        ("Je ne comprends pas.", "Ich verstehe nicht."),
+        ("Peux-tu répéter ?", "Kannst du das wiederholen?"),
+        ("Plus lentement, s'il te plaît.", "Langsamer, bitte."),
+        ("Comment dit-on cela en allemand ?", "Wie sagt man das auf Deutsch?"),
+        ("Merci beaucoup.", "Vielen Dank."),
+    ]),
+]
+
+def seed_speak_phrases(cursor):
+    for theme_order, (theme, items) in enumerate(SPEAK_PHRASES_DATA, start=1):
+        for fr, de in items:
+            cursor.execute(
+                "INSERT OR IGNORE INTO speak_phrases(theme, theme_order, fr, de) VALUES(?,?,?,?)",
+                (theme, theme_order, fr, de)
+            )
+
+# =========================================================
+# === AJOUT : SEED "LES ESSENTIELS A1" (24 fiches + explications) ===
+# =========================================================
+ESSENTIALS_DATA = [
+    (1, "Les pronoms personnels (sujets)",
+     "Je = ich\nTu = du\nIl = er\nElle = sie\nIl/Elle (neutre) = es\nNous = wir\nVous (pluriel) = ihr\nVous (poli) = Sie\nIls/Elles = sie",
+     "Le pronom sujet se place toujours avant le verbe. 'Sie' avec majuscule = vouvoiement ; 'sie' minuscule = ils/elles."),
+    (2, "Le verbe 'sein' (être) au présent",
+     "Je suis = ich bin\nTu es = du bist\nIl/Elle est = er/sie/es ist\nNous sommes = wir sind\nVous êtes = ihr seid\nIls/Elles sont = sie sind\nVous êtes (poli) = Sie sind",
+     "'sein' est irrégulier : il faut le mémoriser. C'est le verbe le plus utilisé en allemand."),
+    (3, "Le verbe 'haben' (avoir) au présent",
+     "J'ai = ich habe\nTu as = du hast\nIl/Elle a = er/sie/es hat\nNous avons = wir haben\nVous avez = ihr habt\nIls/Elles ont = sie haben\nVous avez (poli) = Sie haben",
+     "'haben' est aussi irrégulier au singulier (du hast, er hat). Indispensable pour parler."),
+    (4, "Les articles définis (le, la, les)",
+     "Masculin : der (ex: der Mann)\nFéminin : die (ex: die Frau)\nNeutre : das (ex: das Kind)\nPluriel : die (ex: die Kinder)",
+     "Il existe 3 genres en allemand. Le pluriel est toujours 'die'. Apprends toujours le nom AVEC son article."),
+    (5, "Les articles indéfinis (un, une)",
+     "Masculin : ein (ex: ein Mann)\nFéminin : eine (ex: eine Frau)\nNeutre : ein (ex: ein Kind)",
+     "'ein' pour masculin et neutre, 'eine' pour féminin. Pas d'article indéfini au pluriel."),
+    (6, "Les questions avec 'W'",
+     "Qui ? = Wer?\nQuoi ? = Was?\nOù ? = Wo?\nD'où ? = Woher?\nOù (direction) ? = Wohin?\nQuand ? = Wann?\nPourquoi ? = Warum?\nComment ? = Wie?",
+     "Les mots interrogatifs allemands commencent presque tous par W. Le verbe reste en 2e position."),
+    (7, "La négation",
+     "Ne pas = nicht (ex: Ich verstehe nicht. = Je ne comprends pas.)\nAucun/Ne...pas de = kein/keine (ex: Ich habe keinen Hund. = Je n'ai pas de chien.)",
+     "'nicht' nie un verbe/adj. 'kein' nie un nom (avec l'article indéfini)."),
+    (8, "Les verbes réguliers au présent (exemple: lernen)",
+     "J'apprends = ich lerne\nTu apprends = du lernst\nIl/Elle apprend = er/sie/es lernt\nNous apprenons = wir lernen\nVous apprenez = ihr lernt\nIls/Elles apprennent = sie lernen",
+     "Verbes réguliers : radical + terminaison (-e, -st, -t, -en, -t, -en)."), 
+    (9, "Les verbes irréguliers courants au présent",
+     "Je parle = ich spreche\nTu parles = du sprichst\nIl/Elle parle = er/sie/es spricht\nJe lis = ich lese\nTu lis = du liest\nIl/Elle lit = er/sie/es liest\nJe mange = ich esse\nTu manges = du isst\nIl/Elle mange = er/sie/es isst",
+     "Certains verbes changent de voyelle au singulier (e → i, a → ä). Il faut les mémoriser."),
+    (10, "Les nombres de 0 à 20",
+     "0 null, 1 eins, 2 zwei, 3 drei, 4 vier, 5 fünf, 6 sechs, 7 sieben, 8 acht, 9 neun, 10 zehn, 11 elf, 12 zwölf, 13 dreizehn, 14 vierzehn, 15 fünfzehn, 16 sechzehn, 17 siebzehn, 18 achtzehn, 19 neunzehn, 20 zwanzig.",
+     "À partir de 13, on ajoute 'zehn' au chiffre de base. 6 = sechs, 7 = sieben (attention à l'orthographe)."),
+    (11, "Les jours de la semaine",
+     "Lundi = Montag\nMardi = Dienstag\nMercredi = Mittwoch\nJeudi = Donnerstag\nVendredi = Freitag\nSamedi = Samstag\nDimanche = Sonntag",
+     "Tous les jours se terminent par '-tag' sauf Mittwoch. Toujours avec une majuscule en allemand."),
+    (12, "Les mois de l'année",
+     "Janvier = Januar\nFévrier = Februar\nMars = März\nAvril = April\nMai = Mai\nJuin = Juni\nJuillet = Juli\nAoût = August\nSeptembre = September\nOctobre = Oktober\nNovembre = November\nDécembre = Dezember",
+     "Presque identiques au français sauf Januar, Februar, März, Juni, Juli. Majuscule obligatoire."),
+    (13, "Les couleurs",
+     "Rouge = rot\nBleu = blau\nVert = grün\nJaune = gelb\nNoir = schwarz\nBlanc = weiß\nGris = grau\nMarron = braun\nRose = rosa",
+     "Les couleurs sont des adjectifs. Elles se placent avant le nom et prennent une terminaison."),
+    (14, "Les salutations",
+     "Bonjour = Guten Tag\nBonjour (matin) = Guten Morgen\nBonsoir = Guten Abend\nBonne nuit = Gute Nacht\nSalut = Hallo\nAu revoir = Auf Wiedersehen\nÀ bientôt = Bis bald\nÀ demain = Bis morgen",
+     "'Guten' change en 'Gute' devant Nacht (féminin). Utilise 'Hallo' entre amis, 'Guten Tag' en formel."),
+    (15, "Les formules de politesse",
+     "Merci = Danke\nMerci beaucoup = Vielen Dank\nS'il te plaît / Je t'en prie = Bitte\nExcusez-moi = Entschuldigung\nPardon = Verzeihung\nJe suis désolé = Es tut mir leid\nPas de problème = Kein Problem",
+     "'Bitte' a plusieurs sens : s'il te plaît, je t'en prie, de rien. Indispensable."),
+    (16, "Les mots de temps",
+     "Aujourd'hui = heute\nDemain = morgen\nHier = gestern\nMaintenant = jetzt\nPlus tard = später\nToujours = immer\nJamais = nie\nSouvent = oft\nParfois = manchmal",
+     "Ces adverbes se placent en général après le verbe. 'nie' est l'opposé de 'immer'."),
+    (17, "Les adverbes de lieu",
+     "Ici = hier\nLà-bas = dort\nÀ gauche = links\nÀ droite = rechts\nTout droit = geradeaus\nEn haut = oben\nEn bas = unten\nDevant = vorne\nDerrière = hinten",
+     "Très utiles pour demander le chemin : 'links', 'rechts', 'geradeaus'."),
+    (18, "Les verbes de base (infinitif)",
+     "Être = sein\nAvoir = haben\nFaire = machen\nAller = gehen\nVenir = kommen\nManger = essen\nBoire = trinken\nDormir = schlafen\nLire = lesen\nÉcrire = schreiben\nParler = sprechen\nÉcouter = hören\nVoir = sehen\nAcheter = kaufen\nTravailler = arbeiten\nHabiter = wohnen\nJouer = spielen\nConduire = fahren\nAttendre = warten\nAider = helfen",
+     "À l'infinitif, les verbes se terminent en '-en' ou '-n'. Base de tout le vocabulaire."),
+    (19, "Les adjectifs courants",
+     "Grand = groß\nPetit = klein\nLong = lang\nCourt = kurz\nVieux = alt\nNouveau = neu\nJeune = jung\nBon = gut\nMauvais = schlecht\nBeau = schön\nChaud = heiß\nFroid = kalt\nRapide = schnell\nLent = langsam\nCher = teuer\nBon marché = billig",
+     "Pour les adjectifs, apprends aussi la forme de base sans terminaison."),
+    (20, "Les prépositions de lieu",
+     "Dans = in\nSur = auf\nSous = unter\nÀ côté de = neben\nDevant = vor\nDerrière = hinter\nEntre = zwischen\nÀ = zu\nAvec = mit\nSans = ohne",
+     "Attention : 'in' + datif pour la position, 'in' + accusatif pour la direction."),
+    (21, "La structure d'une phrase simple",
+     "Sujet + Verbe + Complément.\nExemple : Ich lerne heute Deutsch.\n(Je + apprends + aujourd'hui + l'allemand)",
+     "Le verbe est toujours en deuxième position dans une phrase simple. Règle absolue."),
+    (22, "Les possessifs (mon, ton, son...)",
+     "Mon (masculin) = mein (ex: mein Vater)\nMa (féminin) = meine (ex: meine Mutter)\nMes (pluriel) = meine (ex: meine Eltern)\nTon (masculin) = dein (ex: dein Bruder)\nTa (féminin) = deine (ex: deine Schwester)",
+     "'mein' / 'dein' au masculin-neutre. 'meine' / 'deine' au féminin et au pluriel."),
+    (23, "Les nombres de 20 à 100",
+     "Vingt = zwanzig\nTrente = dreißig\nQuarante = vierzig\nCinquante = fünfzig\nSoixante = sechzig\nSoixante-dix = siebzig\nQuatre-vingts = achtzig\nQuatre-vingt-dix = neunzig\nCent = hundert",
+     "Après 20, on ajoute '-zig' sauf trente = dreißig (avec ß)."),
+    (24, "Les phrases utiles pour l'examen",
+     "Je m'appelle... = Ich heiße...\nJ'habite à... = Ich wohne in...\nJe viens de... = Ich komme aus...\nJ'ai... ans = Ich bin... Jahre alt\nJe parle... = Ich spreche...\nJe ne comprends pas = Ich verstehe nicht\nPouvez-vous répéter ? = Können Sie das wiederholen?\nComment dit-on... en allemand ? = Wie sagt man... auf Deutsch?",
+     "Ces 8 phrases suffisent pour réussir la partie Sprechen de l'examen A1."),
+]
+
+def seed_essentials_cards(cursor):
+    for num, title, content, explanation in ESSENTIALS_DATA:
+        cursor.execute(
+            "INSERT OR IGNORE INTO essentials_cards(fiche_num, title, content, explanation) VALUES(?,?,?,?)",
+            (num, title, content, explanation)
+        )
+
+# =========================================================
+# === AJOUT : Playlists séparées (idempotent) ===
+# =========================================================
+def seed_speak_playlists(cursor):
+    # Playlist "Apprendre à parler" par thème
+    for theme_order, (theme, items) in enumerate(SPEAK_PHRASES_DATA, start=1):
+        payload = json.dumps([{"fr": fr, "de": de} for fr, de in items], ensure_ascii=False)
+        cursor.execute(
+            "INSERT OR IGNORE INTO speak_playlists(kind, key, title, items_json) VALUES(?,?,?,?)",
+            ("speak", theme, theme, payload)
+        )
+    # Playlist "Essentiels A1" (une seule playlist avec toutes les fiches lues)
+    essentials_items = []
+    for num, title, content, explanation in ESSENTIALS_DATA:
+        # On lit le titre puis chaque ligne français → allemand
+        # Ici, on lit simplement la fiche en allemand (contenu condensé)
+        for line in content.split("\n"):
+            if "=" in line:
+                left, right = line.split("=", 1)
+                essentials_items.append({
+                    "fr": left.strip() + " : " + right.strip(),
+                    "de": right.strip()
+                })
+    payload = json.dumps(essentials_items, ensure_ascii=False)
+    cursor.execute(
+        "INSERT OR IGNORE INTO speak_playlists(kind, key, title, items_json) VALUES(?,?,?,?)",
+        ("essentials", "all", "Les essentiels A1", payload)
+    )
+
 # ---------------------------------------------------------
 # SÉCURITÉ & DÉCORATEURS
 # ---------------------------------------------------------
@@ -378,28 +836,45 @@ def playlist_btn(label, kind, key, css="btn"):
 # ---------------------------------------------------------
 FAVICON_SVG = """data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='%2387CEEB'/><path d='M30 65V45c0-15 10-25 20-25s20 10 20 25v20' stroke='white' stroke-width='8' fill='none' stroke-linecap='round'/><rect x='25' y='60' width='12' height='20' rx='4' fill='white'/><rect x='63' y='60' width='12' height='20' rx='4' fill='white'/><text x='50' y='58' font-family='Arial' font-size='28' font-weight='bold' fill='white' text-anchor='middle'>N</text></svg>"""
 
+# === AJOUT : variables CSS mode nuit ===
 BASE_CSS = """
 <style>
 :root{
   --sky:#87CEEB; --sky-dark:#4AA5D0; --sky-light:#E8F6FD;
   --ink:#0F2A3F; --muted:#5B7A90; --white:#FFFFFF;
   --ok:#2ECC71; --warn:#F39C12; --danger:#E74C3C;
+  --bg-gradient: linear-gradient(180deg,#E8F6FD 0%,#F7FCFE 100%);
+  --card-bg: #FFFFFF;
+  --nav-bg: #87CEEB;
+  --sidebar-bg: #1a2a35;
+  --input-bg: #fbfdff;
+  --border-light: #EAF3F8;
+}
+html[data-theme="dark"]{
+  --sky:#4AA5D0; --sky-dark:#2F8CBB; --sky-light:#1e3a4d;
+  --ink:#E8F6FD; --muted:#9BB8C9; --white:#0F2A3F;
+  --bg-gradient: linear-gradient(180deg,#0F2A3F 0%,#152F44 100%);
+  --card-bg: #16304a;
+  --nav-bg: #0d2233;
+  --sidebar-bg: #071722;
+  --input-bg: #1a3a52;
+  --border-light: #1f4560;
 }
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:'Segoe UI',system-ui,Arial,sans-serif;
-     background:linear-gradient(180deg,#E8F6FD 0%,#F7FCFE 100%);
-     color:var(--ink);min-height:100vh; padding-bottom: 90px; margin-left: 200px; transition: margin-left 0.3s;}
+     background:var(--bg-gradient);
+     color:var(--ink);min-height:100vh; padding-bottom: 90px; margin-left: 200px; transition: margin-left 0.3s, background 0.3s, color 0.3s;}
 body.no-sidebar { margin-left: 0; }
-.nav{background:var(--sky);color:white;padding:14px 22px;
+.nav{background:var(--nav-bg);color:white;padding:14px 22px;
      display:flex;justify-content:space-between;align-items:center;
-     box-shadow:0 2px 8px rgba(0,0,0,.08);position:sticky;top:0;z-index:50; margin-left: -200px; transition: margin-left 0.3s;}
+     box-shadow:0 2px 8px rgba(0,0,0,.08);position:sticky;top:0;z-index:50; margin-left: -200px; transition: margin-left 0.3s, background 0.3s;}
 body.no-sidebar .nav { margin-left: 0; }
 .nav .brand{font-weight:800;font-size:22px;letter-spacing:1px;display:flex;align-items:center;gap:10px}
 .nav a{color:white;text-decoration:none;margin-left:16px;font-weight:500;opacity:.95}
 .nav a:hover{opacity:1;text-decoration:underline}
 .container{max-width:1100px;margin:0 auto;padding:24px 18px 60px}
-.card{background:var(--white);border-radius:16px;padding:22px;
-      box-shadow:0 6px 22px rgba(74,165,208,.12);margin-bottom:18px}
+.card{background:var(--card-bg);border-radius:16px;padding:22px;
+      box-shadow:0 6px 22px rgba(74,165,208,.12);margin-bottom:18px; transition: background 0.3s;}
 h1,h2,h3{color:var(--ink);margin-bottom:12px}
 h1{font-size:26px}
 h2{font-size:20px}
@@ -412,7 +887,7 @@ h2{font-size:20px}
 .btn.ok{background:var(--ok)}
 input,select,textarea{width:100%;padding:11px 13px;border:2px solid var(--sky-light);
      border-radius:10px;font-size:15px;margin:6px 0 14px;outline:none;
-     transition:.2s;background:#fbfdff}
+     transition:.2s;background:var(--input-bg);color:var(--ink)}
 input:focus,select:focus,textarea:focus{border-color:var(--sky-dark)}
 label{font-weight:600;font-size:14px;color:var(--muted)}
 .flash{padding:12px 16px;border-radius:10px;margin-bottom:14px;font-weight:500}
@@ -420,7 +895,7 @@ label{font-weight:600;font-size:14px;color:var(--muted)}
 .flash.danger{background:#FBE1DE;color:#A02A1B}
 .flash.warning{background:#FFF1D6;color:#8A5C00}
 .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:16px}
-.lesson{background:white;border-radius:14px;padding:16px;
+.lesson{background:var(--card-bg);border-radius:14px;padding:16px;
         box-shadow:0 4px 14px rgba(74,165,208,.10);
         border-left:5px solid var(--sky);transition:.2s;position:relative}
 .lesson:hover{transform:translateY(-2px);box-shadow:0 8px 20px rgba(74,165,208,.20)}
@@ -441,23 +916,23 @@ label{font-weight:600;font-size:14px;color:var(--muted)}
 .player .ctrl button:hover{background:rgba(255,255,255,.35)}
 .player .ctrl button.primary{background:white;color:var(--sky-dark)}
 table{width:100%;border-collapse:collapse;font-size:14px}
-th,td{padding:10px 12px;text-align:left;border-bottom:1px solid #EAF3F8}
+th,td{padding:10px 12px;text-align:left;border-bottom:1px solid var(--border-light)}
 th{background:var(--sky-light);font-weight:700;color:var(--ink)}
 .hero{background:linear-gradient(135deg,var(--sky),#B8E2F5);color:white;
       border-radius:22px;padding:40px 30px;text-align:center;margin-bottom:22px}
 .hero h1{color:white;font-size:32px}
 .hero p{opacity:.95;margin:10px 0 22px;font-size:16px}
 .stat-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:14px}
-.stat{background:white;border-radius:14px;padding:18px;text-align:center;
+.stat{background:var(--card-bg);border-radius:14px;padding:18px;text-align:center;
       box-shadow:0 4px 14px rgba(74,165,208,.10)}
 .stat .num{font-size:28px;font-weight:800;color:var(--sky-dark)}
 .stat .lbl{font-size:13px;color:var(--muted);margin-top:4px}
-.quiz-opt{display:block;background:white;border:2px solid var(--sky-light);
+.quiz-opt{display:block;background:var(--card-bg);border:2px solid var(--sky-light);
       border-radius:10px;padding:13px 16px;margin:8px 0;cursor:pointer;transition:.15s}
 .quiz-opt:hover{border-color:var(--sky-dark)}
 .quiz-opt input{margin-right:10px;width:auto}
 .tabs{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px}
-.tabs a{padding:8px 16px;border-radius:20px;background:white;text-decoration:none;
+.tabs a{padding:8px 16px;border-radius:20px;background:var(--card-bg);text-decoration:none;
       font-size:13px;font-weight:600;color:var(--muted);border:2px solid var(--sky-light)}
 .tabs a.active{background:var(--sky-dark);color:white;border-color:var(--sky-dark)}
 footer{text-align:center;padding:24px;color:var(--muted);font-size:13px}
@@ -466,7 +941,7 @@ footer a { color: var(--muted); text-decoration: underline; margin: 0 10px;}
 /* --- SIDEBAR (Niveaux) --- */
 .sidebar {
   position: fixed; top: 0; left: 0; bottom: 0; width: 200px;
-  background: #1a2a35; color: white; padding: 20px 15px; z-index: 60;
+  background: var(--sidebar-bg); color: white; padding: 20px 15px; z-index: 60;
   display: flex; flex-direction: column; gap: 20px;
 }
 .sidebar h3 { color: #87CEEB; font-size: 14px; text-transform: uppercase; margin-bottom: 10px; letter-spacing: 1px;}
@@ -475,13 +950,59 @@ footer a { color: var(--muted); text-decoration: underline; margin: 0 10px;}
 .sidebar .level.active { background: #4AA5D0; opacity: 1; cursor: pointer;}
 .sidebar .level.active .tag { display: none;}
 
+/* === AJOUT : bouton menu mobile (3 points / hamburger) === */
+.mobile-menu-btn {
+  display: none;
+  background: rgba(255,255,255,0.2);
+  color: white;
+  border: none;
+  font-size: 22px;
+  width: 42px; height: 42px;
+  border-radius: 10px;
+  cursor: pointer;
+  margin-left: 8px;
+}
+.mobile-menu-btn:hover { background: rgba(255,255,255,0.35); }
+
+/* === AJOUT : drawer mobile === */
+.mobile-drawer {
+  position: fixed; top: 0; right: -280px; bottom: 0; width: 280px;
+  background: var(--sidebar-bg); color: white;
+  z-index: 200; padding: 20px; transition: right 0.3s ease;
+  box-shadow: -4px 0 20px rgba(0,0,0,0.3);
+}
+.mobile-drawer.open { right: 0; }
+.mobile-drawer h3 { color: #87CEEB; font-size: 13px; text-transform: uppercase; margin-bottom: 12px; }
+.mobile-drawer .close-x {
+  position: absolute; top: 12px; right: 14px; background: none; border: none;
+  color: white; font-size: 24px; cursor: pointer;
+}
+.mobile-drawer .level { padding: 12px; border-radius: 8px; background: rgba(255,255,255,0.06); margin-bottom: 10px; opacity: 0.7;}
+.mobile-drawer .level.active { background: #4AA5D0; opacity: 1;}
+.mobile-drawer .level .tag { font-size: 10px; background: #E74C3C; padding: 2px 6px; border-radius: 4px; float: right; font-weight: bold;}
+.mobile-drawer .level.active .tag { display: none;}
+
+/* === AJOUT : bouton mode nuit === */
+.theme-toggle {
+  background: rgba(255,255,255,0.2);
+  color: white;
+  border: none;
+  padding: 8px 12px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 14px;
+  margin-left: 8px;
+}
+.theme-toggle:hover { background: rgba(255,255,255,0.35); }
+
 @media (max-width: 800px) {
   body { margin-left: 0; }
-  .nav { margin-left: 0; padding: 10px 15px; flex-direction: column; align-items: flex-start; gap: 10px;}
-  .nav .brand { font-size: 18px; }
-  .nav div:nth-child(2) { display: flex; flex-wrap: wrap; gap: 10px; margin-left: 0; }
-  .nav a { margin-left: 0; font-size: 13px; }
+  .nav { margin-left: 0; padding: 10px 15px; flex-direction: row; align-items: center; gap: 8px; flex-wrap: wrap;}
+  .nav .brand { font-size: 16px; }
+  .nav > div:nth-child(2) { display: flex; flex-wrap: wrap; gap: 8px; margin-left: 0; width: 100%;}
+  .nav a { margin-left: 0; font-size: 12px; }
   .sidebar { display: none; }
+  .mobile-menu-btn { display: inline-block; }
 }
 
 /* --- COOKIES BANNER --- */
@@ -529,6 +1050,12 @@ footer a { color: var(--muted); text-decoration: underline; margin: 0 10px;}
 .pwd-wrapper input { padding-right: 40px; }
 .pwd-toggle { position: absolute; right: 12px; top: 14px; cursor: pointer; font-size: 18px; color: var(--muted); }
 .pwd-toggle:hover { color: var(--ink); }
+
+/* --- ESSENTIELS : style des fiches --- */
+.fiche { background: var(--card-bg); border-radius: 14px; padding: 18px; margin-bottom: 14px; border-left: 5px solid var(--sky); }
+.fiche h3 { color: var(--sky-dark); font-size: 16px; margin-bottom: 10px; }
+.fiche .content { font-family: 'Courier New', monospace; background: var(--input-bg); padding: 12px; border-radius: 8px; font-size: 13px; white-space: pre-wrap; line-height: 1.6; color: var(--ink); }
+.fiche .explanation { margin-top: 10px; font-size: 13px; color: var(--muted); font-style: italic; padding: 10px; background: rgba(135,206,235,0.12); border-radius: 8px; }
 </style>
 """
 
@@ -967,6 +1494,9 @@ AUDIO_JS = r"""
       if (key === 'numbers') return flat('numbers');
       return null;
     }
+    if (kind === 'speak' || kind === 'essentials') {
+      return d[kind] && d[kind][key];
+    }
     return d[kind] && d[kind][key];
   }
 
@@ -1142,6 +1672,38 @@ AUDIO_JS = r"""
 })();
 """
 
+# === AJOUT : JS pour le mode nuit + menu mobile ===
+THEME_MOBILE_JS = r"""
+<script>
+(function(){
+  // Mode nuit
+  function applyTheme(t){
+    document.documentElement.setAttribute('data-theme', t);
+    try { localStorage.setItem('natho_theme', t); } catch(e){}
+    var btns = document.querySelectorAll('.theme-toggle');
+    btns.forEach(function(b){ b.textContent = t === 'dark' ? '☀️' : '🌙'; });
+  }
+  window.toggleTheme = function(){
+    var cur = document.documentElement.getAttribute('data-theme') || 'light';
+    applyTheme(cur === 'dark' ? 'light' : 'dark');
+  };
+  var saved = null;
+  try { saved = localStorage.getItem('natho_theme'); } catch(e){}
+  applyTheme(saved === 'dark' ? 'dark' : 'light');
+
+  // Drawer mobile
+  window.openMobileMenu = function(){
+    var d = document.getElementById('mobile-drawer');
+    if (d) d.classList.add('open');
+  };
+  window.closeMobileMenu = function(){
+    var d = document.getElementById('mobile-drawer');
+    if (d) d.classList.remove('open');
+  };
+})();
+</script>
+"""
+
 def layout(title, body, user=None):
     show_sidebar = bool(user)
     
@@ -1152,6 +1714,8 @@ def layout(title, body, user=None):
             <a href="{url_for('vocabulaire')}">Vocabulaire 📖</a>
             <a href="{url_for('dialogues')}">Dialogues 🗣️</a>
             <a href="{url_for('playlists')}">Playlists 🎵</a>
+            <a href="{url_for('apprendre_parler')}">Parler 🗨️</a>
+            <a href="{url_for('essentiels_a1')}">Essentiels A1</a>
             <a href="{url_for('goethe')}">Examen Goethe</a>
             <a href="{url_for('progress')}">Progrès</a>
             {"<a href='"+url_for('admin')+"'>Admin</a>" if user['is_admin'] else ""}
@@ -1189,6 +1753,24 @@ def layout(title, body, user=None):
         
     body_class = "" if show_sidebar else "no-sidebar"
 
+    # === AJOUT : bouton theme + menu mobile dans la nav ===
+    theme_btn = '<button class="theme-toggle" onclick="toggleTheme()" title="Mode nuit">🌙</button>'
+    mobile_btn = '<button class="mobile-menu-btn" onclick="openMobileMenu()" title="Menu">☰</button>'
+
+    # === AJOUT : drawer mobile ===
+    mobile_drawer = ""
+    if show_sidebar:
+        mobile_drawer = """
+        <div class="mobile-drawer" id="mobile-drawer">
+            <button class="close-x" onclick="closeMobileMenu()">×</button>
+            <h3>Niveaux</h3>
+            <div class="level active"><strong>A1</strong> <span style="font-size:11px;display:block;">Actuel</span></div>
+            <div class="level"><strong>A2</strong> <span class="tag">Bientôt</span><span style="font-size:11px;display:block;margin-top:4px;">Élémentaire</span></div>
+            <div class="level"><strong>B1</strong> <span class="tag">Bientôt</span><span style="font-size:11px;display:block;margin-top:4px;">Intermédiaire</span></div>
+            <div class="level"><strong>B2</strong> <span class="tag">Bientôt</span><span style="font-size:11px;display:block;margin-top:4px;">Avancé</span></div>
+        </div>
+        """
+
     return f"""
 <!doctype html><html lang="fr"><head>
 <meta charset="utf-8">
@@ -1199,10 +1781,11 @@ def layout(title, body, user=None):
 </head><body class="{body_class}">
 
 {sidebar_html}
+{mobile_drawer}
 
 <div class="nav">
   <div class="brand"><img src="{FAVICON_SVG}" width="28" height="28" style="border-radius:6px;"> NATHO · Deutsch A1</div>
-  <div>{nav_links}</div>
+  <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">{nav_links} {theme_btn} {mobile_btn}</div>
 </div>
 <div class="container">
   {''.join(f'<div class="flash {k}">{m}</div>' for k,m in get_flashed_messages(with_categories=True))}
@@ -1246,6 +1829,7 @@ def layout(title, body, user=None):
 </footer>
 <script>window.NATHO_TTS = {'true' if TTS_OK else 'false'};</script>
 <script>{{% raw %}}{AUDIO_JS}{{% endraw %}}</script>
+{THEME_MOBILE_JS}
 </body></html>"""
 
 # ---------------------------------------------------------
@@ -1296,6 +1880,7 @@ def index():
     <div class="grid">
         <div class="card"><h3>🎧 Mode Audio</h3><p>Le français puis l'allemand, lu à voix haute. Idéal pour mémoriser.</p></div>
         <div class="card"><h3>📚 Bibliothèque A1</h3><p>300 expressions et 320 mots issus du programme Goethe A1.</p></div>
+        <div class="card"><h3>🗨️ Apprendre à parler</h3><p>260 phrases complètes classées par thème : Sujet + Verbe + Complément.</p></div>
         <div class="card"><h3>📝 Examen Goethe A1</h3><p>Hören, Lesen, Schreiben, Sprechen : un vrai simulateur d'examen.</p></div>
         <div class="card"><h3>📈 Suivi personnel</h3><p>Ton compte, tes progrès, tes résultats, à tout moment.</p></div>
     </div>
@@ -1569,7 +2154,7 @@ def dialogues():
             chat_html += f"""
             <div style="margin-bottom:10px; padding:10px; border-radius:10px; background:{color};">
                 <div style="font-size:11px; font-weight:bold; color:#5B7A90;">{speaker}</div>
-                <div style="font-size:16px; font-weight:bold;">{l['de']}</div>
+                <div style="font-size:16px; font-weight:bold; color:#0F2A3F;">{l['de']}</div>
                 <div style="font-size:13px; color:#5B7A90;">{l['fr']}</div>
             </div>
             """
@@ -1592,6 +2177,115 @@ def dialogues():
     {cards}
     """
     return render_template_string(layout("Dialogues", body, {"is_admin": session.get("is_admin")}))
+
+# =========================================================
+# === AJOUT : ROUTE "APPRENDRE À PARLER" ===
+# =========================================================
+@app.route("/apprendre-parler")
+@login_required
+def apprendre_parler():
+    db = get_db()
+    rows = db.execute(
+        "SELECT theme, theme_order, fr, de FROM speak_phrases ORDER BY theme_order, id"
+    ).fetchall()
+
+    # Regrouper par thème
+    themes = {}
+    for r in rows:
+        themes.setdefault((r["theme_order"], r["theme"]), []).append(r)
+
+    tabs = ""
+    sections = ""
+    first = True
+    for (order, theme_name), items in sorted(themes.items()):
+        active = "active" if first else ""
+        tabs += f'<a href="#theme-{order}" class="{active}" onclick="document.querySelectorAll(\'.tabs a\').forEach(a=>a.classList.remove(\'active\'));this.classList.add(\'active\');">{theme_name}</a>'
+        cards = ""
+        for it in items:
+            cards += f"""
+            <div class="lesson">
+              <div class="de">{it['de']}</div>
+              <div class="fr">{it['fr']}</div>
+              <div class="actions">
+                {say_btn("▶ Écouter", "pair", it['fr'], it['de'])}
+                {say_btn("🔊 Allemand", "de", it['fr'], it['de'], css="btn ghost")}
+              </div>
+            </div>"""
+        playlist = playlist_btn("▶ Playlist de ce thème", "speak", theme_name, css="btn ok")
+        sections += f"""
+        <div id="theme-{order}" style="margin-top:24px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:12px;">
+            <h2 style="margin:0;">{theme_name}</h2>
+            {playlist}
+          </div>
+          <div class="grid">{cards}</div>
+        </div>"""
+        first = False
+
+    n = len(rows)
+    body = f"""
+    <h1>Apprendre à parler 🗨️</h1>
+    <p style="margin-bottom:16px;color:#5B7A90;">
+      {n} phrases complètes classées par thème, construites sur le modèle <b>Sujet + Verbe + Complément</b>.
+      Chaque phrase est lue en français puis en allemand (lentement). Utilise les playlists pour tout enchaîner.
+    </p>
+    <div class="tabs">{tabs}</div>
+    {sections}
+    """
+    return render_template_string(layout("Apprendre à parler", body, {"is_admin": session.get("is_admin")}))
+
+# =========================================================
+# === AJOUT : ROUTE "LES ESSENTIELS A1" ===
+# =========================================================
+@app.route("/essentiels-a1")
+@login_required
+def essentiels_a1():
+    db = get_db()
+    fiches = db.execute(
+        "SELECT * FROM essentials_cards ORDER BY fiche_num"
+    ).fetchall()
+
+    cards_html = ""
+    for f in fiches:
+        # Générer un bouton audio par ligne "fr = de"
+        audio_lines = ""
+        for line in f["content"].split("\n"):
+            line = line.strip()
+            if "=" in line:
+                left, right = line.split("=", 1)
+                fr_part = left.strip()
+                de_part = right.strip()
+                audio_lines += f"""
+                <div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px dashed var(--border-light);gap:8px;">
+                  <div style="flex:1;font-size:13px;"><b>{h(de_part)}</b> <span style="color:var(--muted);">— {h(fr_part)}</span></div>
+                  {say_btn("▶", "pair", fr_part, de_part, css="btn ghost", style="padding:4px 10px;font-size:12px;")}
+                </div>
+                """
+        cards_html += f"""
+        <div class="fiche">
+          <h3>Fiche {f['fiche_num']} — {h(f['title'])}</h3>
+          <div class="content">{audio_lines if audio_lines else h(f['content'])}</div>
+          <div class="explanation">💡 {h(f['explanation'])}</div>
+        </div>
+        """
+
+    playlist_all = playlist_btn("▶ Playlist : toutes les fiches", "essentials", "all", css="btn ok")
+
+    body = f"""
+    <h1>Les essentiels A1 📌</h1>
+    <p style="margin-bottom:16px;color:#5B7A90;">
+      24 fiches de révision condensées pour réussir l'examen Goethe A1. Chaque fiche contient l'essentiel + une explication pédagogique.
+    </p>
+    <div class="card" style="display:flex;justify-content:space-between;align-items:center;">
+      <div>
+        <h3 style="margin:0">Écouter toutes les fiches</h3>
+        <p style="color:var(--muted);font-size:14px;margin:4px 0 0 0;">Toutes les paires français → allemand lues à la suite.</p>
+      </div>
+      {playlist_all}
+    </div>
+    {cards_html}
+    """
+    return render_template_string(layout("Les essentiels A1", body, {"is_admin": session.get("is_admin")}))
 
 @app.route("/playlists")
 @login_required
@@ -1619,6 +2313,17 @@ def playlists():
     num_rows = db.execute("SELECT french, german FROM vocab WHERE category='Nombres' ORDER BY id").fetchall()
     playlist_data_numbers = {"Nombres 0-1000": [{"fr": i["french"], "de": i["german"]} for i in num_rows]}
 
+    # === AJOUT : playlists "speak" et "essentials" ===
+    playlist_data_speak = {}
+    speak_rows = db.execute("SELECT key, title, items_json FROM speak_playlists WHERE kind='speak'").fetchall()
+    for r in speak_rows:
+        playlist_data_speak[r["title"]] = json.loads(r["items_json"])
+
+    playlist_data_essentials = {}
+    ess_rows = db.execute("SELECT key, title, items_json FROM speak_playlists WHERE kind='essentials'").fetchall()
+    for r in ess_rows:
+        playlist_data_essentials[r["title"]] = json.loads(r["items_json"])
+
     order_l = [r["category"] for r in db.execute(
         "SELECT category FROM lessons GROUP BY category ORDER BY MIN(order_index), MIN(id)").fetchall()]
     order_v = [r["category"] for r in db.execute(
@@ -1629,12 +2334,16 @@ def playlists():
     n_vocab = sum(len(v) for v in playlist_data_vocab.values())
     n_dialogues = sum(len(v) for v in playlist_data_dialogues.values())
     n_numbers = len(playlist_data_numbers["Nombres 0-1000"])
+    n_speak = sum(len(v) for v in playlist_data_speak.values())
+    n_ess = sum(len(v) for v in playlist_data_essentials.values())
 
     js_data = json.dumps({
         "lessons": playlist_data_lessons,
         "vocab": playlist_data_vocab,
         "dialogues": playlist_data_dialogues,
         "numbers": playlist_data_numbers,
+        "speak": playlist_data_speak,
+        "essentials": playlist_data_essentials,
         "order": {"lessons": order_l, "vocab": order_v, "dialogues": order_d}
     }, ensure_ascii=False).replace("</", "<\\/")
 
@@ -1642,28 +2351,28 @@ def playlists():
         <div class="card" style="display:flex; justify-content:space-between; align-items:center;">
             <div>
                 <h3 style="margin:0">Tous les cours</h3>
-                <p style="color:#5B7A90;font-size:14px;margin:4px 0 0 0">{n_lessons} phrases en un seul bloc.</p>
+                <p style="color:var(--muted);font-size:14px;margin:4px 0 0 0">{n_lessons} phrases en un seul bloc.</p>
             </div>
             {playlist_btn("▶ Lire tout", "all", "lessons", css="btn ok")}
         </div>
         <div class="card" style="display:flex; justify-content:space-between; align-items:center;">
             <div>
                 <h3 style="margin:0">Tout le vocabulaire</h3>
-                <p style="color:#5B7A90;font-size:14px;margin:4px 0 0 0">{n_vocab} mots en un seul bloc.</p>
+                <p style="color:var(--muted);font-size:14px;margin:4px 0 0 0">{n_vocab} mots en un seul bloc.</p>
             </div>
             {playlist_btn("▶ Lire tout", "all", "vocab", css="btn ok")}
         </div>
         <div class="card" style="display:flex; justify-content:space-between; align-items:center;">
             <div>
                 <h3 style="margin:0">Tous les dialogues</h3>
-                <p style="color:#5B7A90;font-size:14px;margin:4px 0 0 0">{n_dialogues} répliques (50 dialogues).</p>
+                <p style="color:var(--muted);font-size:14px;margin:4px 0 0 0">{n_dialogues} répliques (50 dialogues).</p>
             </div>
             {playlist_btn("▶ Lire tout", "all", "dialogues", css="btn ok")}
         </div>
         <div class="card" style="display:flex; justify-content:space-between; align-items:center;">
             <div>
                 <h3 style="margin:0">Les nombres 0 à 1000</h3>
-                <p style="color:#5B7A90;font-size:14px;margin:4px 0 0 0">{n_numbers} nombres lus à la suite.</p>
+                <p style="color:var(--muted);font-size:14px;margin:4px 0 0 0">{n_numbers} nombres lus à la suite.</p>
             </div>
             {playlist_btn("▶ Lire tout", "all", "numbers", css="btn ok")}
         </div>
@@ -1676,13 +2385,39 @@ def playlists():
         </div>
     """
 
+    # === AJOUT : section Playlists "Apprendre à parler" ===
+    cards_speak = ""
+    for theme_title, items in playlist_data_speak.items():
+        cards_speak += f"""
+        <div class="card" style="display:flex; justify-content:space-between; align-items:center;">
+            <div>
+                <h3 style="margin:0">{h(theme_title)}</h3>
+                <p style="color:var(--muted);font-size:14px;margin:4px 0 0 0">{len(items)} phrases complètes.</p>
+            </div>
+            {playlist_btn("▶ Playlist", "speak", theme_title, css="btn ok")}
+        </div>
+        """
+
+    # === AJOUT : section Playlist "Essentiels A1" ===
+    cards_ess = ""
+    for title, items in playlist_data_essentials.items():
+        cards_ess += f"""
+        <div class="card" style="display:flex; justify-content:space-between; align-items:center;">
+            <div>
+                <h3 style="margin:0">{h(title)}</h3>
+                <p style="color:var(--muted);font-size:14px;margin:4px 0 0 0">{len(items)} paires FR → DE.</p>
+            </div>
+            {playlist_btn("▶ Playlist", "essentials", title, css="btn ok")}
+        </div>
+        """
+
     cards_lessons = ""
     for c in cats_lessons:
         cards_lessons += f"""
         <div class="card" style="display:flex; justify-content:space-between; align-items:center;">
             <div>
                 <h3 style="margin:0">{c['category']}</h3>
-                <p style="color:#5B7A90;font-size:14px;margin:4px 0 0 0">Leçons de cours.</p>
+                <p style="color:var(--muted);font-size:14px;margin:4px 0 0 0">Leçons de cours.</p>
             </div>
             {playlist_btn("▶ Playlist", "lessons", c['category'], css="btn ok")}
         </div>
@@ -1694,7 +2429,7 @@ def playlists():
         <div class="card" style="display:flex; justify-content:space-between; align-items:center;">
             <div>
                 <h3 style="margin:0">{c['category']}</h3>
-                <p style="color:#5B7A90;font-size:14px;margin:4px 0 0 0">Mots de vocabulaire.</p>
+                <p style="color:var(--muted);font-size:14px;margin:4px 0 0 0">Mots de vocabulaire.</p>
             </div>
             {playlist_btn("▶ Playlist", "vocab", c['category'], css="btn")}
         </div>
@@ -1706,7 +2441,7 @@ def playlists():
         <div class="card" style="display:flex; justify-content:space-between; align-items:center;">
             <div>
                 <h3 style="margin:0">{c}</h3>
-                <p style="color:#5B7A90;font-size:14px;margin:4px 0 0 0">Dialogue.</p>
+                <p style="color:var(--muted);font-size:14px;margin:4px 0 0 0">Dialogue.</p>
             </div>
             {playlist_btn("▶ Playlist", "dialogues", c, css="btn")}
         </div>
@@ -1714,10 +2449,16 @@ def playlists():
 
     body = f"""
     <h1>Playlists Audio 🎵</h1>
-    <p style="margin-bottom:20px;color:#5B7A90;">Le mode Spotify de NATHO. Choisis ce que tu veux écouter.</p>
+    <p style="margin-bottom:20px;color:var(--muted);">Le mode Spotify de NATHO. Choisis ce que tu veux écouter.</p>
 
     <h2>🎧 Blocs complets</h2>
     {cards_all}
+
+    <h2 style="margin-top:30px;">🗨️ Apprendre à parler (par thème)</h2>
+    {cards_speak}
+
+    <h2 style="margin-top:30px;">📌 Essentiels A1</h2>
+    {cards_ess}
 
     <h2 style="margin-top:30px;">🗣️ Dialogues du quotidien</h2>
     {cards_dialogues}
@@ -1891,7 +2632,7 @@ SPRECHEN_QUESTIONS = [
 def goethe():
     body = """
     <h1>Examen Goethe A1 (Simulateur)</h1>
-    <p style="margin-bottom:20px;color:#5B7A90;">Cet examen blanc est structuré en 4 modules officiels. Il ne délivre pas de certificat officiel, mais il te prépare parfaitement aux conditions réelles.</p>
+    <p style="margin-bottom:20px;color:var(--muted);">Cet examen blanc est structuré en 4 modules officiels. Il ne délivre pas de certificat officiel, mais il te prépare parfaitement aux conditions réelles.</p>
 
     <div class="grid">
       <div class="card">
@@ -1947,7 +2688,7 @@ def goethe_horen():
     <h1>Hören (Écoute)</h1>
     <div class="card">
       <p>Écoute attentivement ce dialogue :</p>
-      <div style="background:#E8F6FD;padding:16px;border-radius:10px;margin:14px 0;">
+      <div style="background:var(--sky-light);padding:16px;border-radius:10px;margin:14px 0;">
         {say_btn("🔊 Écouter le dialogue", "de", "", q['audio'])}
       </div>
       <form method="post">
@@ -1988,7 +2729,7 @@ def goethe_lesen():
     <h1>Lesen (Lecture)</h1>
     <div class="card">
       <p>Lis ce message :</p>
-      <div style="background:#E8F6FD;padding:16px;border-radius:10px;margin:14px 0;font-style:italic;">
+      <div style="background:var(--sky-light);padding:16px;border-radius:10px;margin:14px 0;font-style:italic;">
         "{q['text']}"
       </div>
       <form method="post">
@@ -2020,7 +2761,7 @@ def goethe_schreiben():
         <div class="card">
           <div class="flash {'success' if score==1 else 'danger'}">{feedback}</div>
           <p><b>Ta réponse :</b> {h(rep)}</p>
-          <p style="color:#5B7A90;margin-top:10px;">Note : dans un vrai examen, un correcteur humain évalue la grammaire et le vocabulaire.</p>
+          <p style="color:var(--muted);margin-top:10px;">Note : dans un vrai examen, un correcteur humain évalue la grammaire et le vocabulaire.</p>
           <a href="/goethe/schreiben" class="btn">Exercice suivant</a>
           <a href="/goethe" class="btn ghost">Retour</a>
         </div>
@@ -2064,7 +2805,7 @@ def goethe_sprechen():
     <div class="card">
       <h2>Consigne</h2>
       <p>{q['q']}</p>
-      <div style="background:#E8F6FD;padding:16px;border-radius:10px;margin:14px 0;">
+      <div style="background:var(--sky-light);padding:16px;border-radius:10px;margin:14px 0;">
         <p style="margin-bottom:10px;"><i>Exemple : {q['example']}</i></p>
         {say_btn("🔊 Écouter l'exemple", "de", "", q['example'])}
       </div>
@@ -2087,6 +2828,8 @@ def admin():
     users = db.execute("SELECT id,name,email,is_admin,created_at FROM users ORDER BY id").fetchall()
     lessons_count = db.execute("SELECT COUNT(*) FROM lessons").fetchone()[0]
     quiz_count = db.execute("SELECT COUNT(*) FROM goethe_exam").fetchone()[0]
+    speak_count = db.execute("SELECT COUNT(*) FROM speak_phrases").fetchone()[0]
+    ess_count = db.execute("SELECT COUNT(*) FROM essentials_cards").fetchone()[0]
     users_html = "".join(
         f"<tr><td>{u['id']}</td><td>{u['name']}</td><td>{u['email']}</td>"
         f"<td>{'Oui' if u['is_admin'] else 'Non'}</td><td>{u['created_at']}</td></tr>"
@@ -2098,6 +2841,8 @@ def admin():
       <div class="stat"><div class="num">{len(users)}</div><div class="lbl">Étudiants</div></div>
       <div class="stat"><div class="num">{lessons_count}</div><div class="lbl">Leçons</div></div>
       <div class="stat"><div class="num">{quiz_count}</div><div class="lbl">Examens Goethe passés</div></div>
+      <div class="stat"><div class="num">{speak_count}</div><div class="lbl">Phrases "Parler"</div></div>
+      <div class="stat"><div class="num">{ess_count}</div><div class="lbl">Fiches Essentiels</div></div>
     </div>
     <div class="card">
       <h2>Ajouter une leçon</h2>
