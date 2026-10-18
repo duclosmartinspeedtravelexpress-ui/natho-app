@@ -2,6 +2,7 @@
 # NATHO — Plateforme d'apprentissage de l'allemand A1
 # Version finale stable : Sidebar + W-Fragen + Audio
 # + Apprendre à parler + Essentiels A1 + Mode nuit + Menu mobile
+# + NOM/AKK (Nominativ vs Akkusativ)
 # =========================================================
 
 import os
@@ -160,6 +161,22 @@ def init_db():
             UNIQUE(kind, key)
         )""")
 
+        # === AJOUT : table NOM/AKK ===
+        c.execute("""CREATE TABLE IF NOT EXISTS nomakk_sections (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            sec_num INTEGER NOT NULL UNIQUE,
+            title TEXT NOT NULL,
+            content TEXT NOT NULL,
+            explanation TEXT NOT NULL DEFAULT ''
+        )""")
+
+        c.execute("""CREATE TABLE IF NOT EXISTS nomakk_playlist (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            key TEXT NOT NULL UNIQUE,
+            title TEXT NOT NULL,
+            items_json TEXT NOT NULL
+        )""")
+
         # Remplissage (idempotent)
         c.execute("SELECT COUNT(*) FROM lessons")
         if c.fetchone()[0] == 0:
@@ -185,6 +202,12 @@ def init_db():
             seed_essentials_cards(c)
 
         seed_speak_playlists(c)  # idempotent via INSERT OR IGNORE
+
+        # === AJOUT : seeds NOM/AKK ===
+        c.execute("SELECT COUNT(*) FROM nomakk_sections")
+        if c.fetchone()[0] == 0:
+            seed_nomakk_sections(c)
+        seed_nomakk_playlist(c)  # idempotent
 
         db.commit()
         db.close()
@@ -374,7 +397,6 @@ def seed_numbers(cursor):
 # Sujet + Verbe + Complément, TOUTES différentes de l'existant.
 # =========================================================
 SPEAK_PHRASES_DATA = [
-    # (theme, [(fr, de), ...])
     ("Se présenter et parler de soi", [
         ("Je m'appelle Marie.", "Ich heiße Marie."),
         ("Je viens du Cameroun.", "Ich komme aus Kamerun."),
@@ -757,6 +779,246 @@ def seed_essentials_cards(cursor):
         )
 
 # =========================================================
+# === AJOUT : SEED "NOM/AKK" — Nominatif vs Akkusativ ===
+# Contenu pédagogique complet du fichier fourni.
+# =========================================================
+NOMAKK_DATA = [
+    (1, "La technique la plus simple : QUI ? et QUI/QUOI ?",
+     "Le Nominatif désigne généralement la personne ou la chose qui fait l'action : le sujet.\n\n"
+     "Exemples :\n"
+     "Der Mann schläft. = L'homme dort.\n"
+     "Die Frau lernt. = La femme étudie.\n"
+     "Das Kind spielt. = L'enfant joue.\n\n"
+     "Pose-toi la question : QUI dort ? QUI étudie ? QUI joue ?\n\n"
+     "Tableau Nominatif :\n"
+     "Der Mann schläft. | L'homme dort. | der\n"
+     "Die Frau lernt. | La femme étudie. | die\n"
+     "Das Kind spielt. | L'enfant joue. | das\n"
+     "Ein Mann schläft. | Un homme dort. | ein\n"
+     "Eine Frau lernt. | Une femme étudie. | eine\n"
+     "Ein Kind spielt. | Un enfant joue. | ein\n\n"
+     "À retenir : le sujet est au Nominatif.\n\n"
+     "L'Akkusativ désigne généralement la personne ou la chose sur laquelle porte directement l'action.\n\n"
+     "Exemples :\n"
+     "Ich sehe den Mann. = Je vois l'homme.\n"
+     "Ich sehe die Frau. = Je vois la femme.\n"
+     "Ich sehe das Kind. = Je vois l'enfant.\n\n"
+     "Pose-toi deux questions :\n"
+     "1. Qui fait l'action ? → Ich = je.\n"
+     "2. Je vois qui ? → den Mann = l'homme.\n\n"
+     "Le sujet reste au Nominatif, tandis que le complément direct est à l'Akkusativ.",
+     "Règle d'or : QUI fait l'action → Nominatif. QUI/QUOI reçoit l'action → Akkusativ. C'est la base de tout."),
+    (2, "Le tableau magique pour retenir les articles",
+     "Genre | Nominatif | Akkusatif | Exemple\n"
+     "Masculin | der | den | Ich sehe den Mann.\n"
+     "Féminin | die | die | Ich sehe die Frau.\n"
+     "Neutre | das | das | Ich sehe das Kind.\n"
+     "Pluriel | die | die | Ich sehe die Kinder.\n\n"
+     "La règle d'or :\n"
+     "Au masculin, der devient den à l'Akkusativ.\n"
+     "Pour le féminin, le neutre et le pluriel, l'article défini ne change pas.\n\n"
+     "Mémorise cette phrase :\n"
+     "DER → DEN ; DIE → DIE ; DAS → DAS ; DIE → DIE.\n\n"
+     "C'est le premier réflexe à acquérir.",
+     "Un seul changement à retenir : der → den au masculin Akkusativ. Tout le reste est identique."),
+    (3, "Quand utiliser EIN, EINE et EINEN ?",
+     "En français :\n"
+     "ein = un\n"
+     "eine = une\n\n"
+     "Mais attention : en allemand, le masculin change à l'Akkusativ !\n\n"
+     "Genre | Nominatif | Akkusatif\n"
+     "Masculin | ein | einen\n"
+     "Féminin | eine | eine\n"
+     "Neutre | ein | ein\n"
+     "Pluriel | pas d'article indéfini | pas d'article indéfini\n\n"
+     "EIN : masculin au Nominatif ou neutre\n"
+     "Ein Mann kommt. = Un homme arrive.\n"
+     "Ein Kind spielt. = Un enfant joue.\n\n"
+     "EINE : féminin\n"
+     "Eine Frau kommt. = Une femme arrive.\n"
+     "Ich sehe eine Frau. = Je vois une femme.\n\n"
+     "EINEN : masculin à l'Akkusativ\n"
+     "Ein Mann kauft einen Tisch. = Un homme achète une table.\n"
+     "Ich sehe einen Hund. = Je vois un chien.\n"
+     "Ich habe einen Bruder. = J'ai un frère.\n\n"
+     "Dans Ich sehe einen Hund :\n"
+     "Qui voit ? → Ich.\n"
+     "Je vois quoi ? → einen Hund.\n"
+     "Hund est masculin : der Hund.\n"
+     "À l'Akkusativ, ein Hund devient einen Hund.\n\n"
+     "Astuce : si le nom est masculin et qu'il est le complément direct d'un verbe comme sehen (voir), haben (avoir) ou kaufen (acheter), pense à einen.",
+     "ein → einen UNIQUEMENT au masculin Akkusativ. eine et ein ne changent jamais."),
+    (4, "Et avec KEIN, KEINE, KEINEN ?",
+     "Kein sert à nier un nom. Il signifie généralement « pas de », « aucun » ou « aucune ».\n\n"
+     "Exemples :\n"
+     "Ich habe einen Hund. = J'ai un chien.\n"
+     "Ich habe keinen Hund. = Je n'ai pas de chien.\n\n"
+     "Genre | Nominatif | Akkusatif\n"
+     "Masculin | kein | keinen\n"
+     "Féminin | keine | keine\n"
+     "Neutre | kein | kein\n"
+     "Pluriel | keine | keine\n\n"
+     "KEIN au Nominatif masculin ou neutre :\n"
+     "Kein Mann ist hier. = Aucun homme n'est ici.\n"
+     "Kein Kind ist hier. = Aucun enfant n'est ici.\n\n"
+     "KEINE au féminin ou au pluriel :\n"
+     "Keine Frau ist hier. = Aucune femme n'est ici.\n"
+     "Keine Kinder sind hier. = Il n'y a aucun enfant ici.\n\n"
+     "KEINEN au masculin à l'Akkusativ :\n"
+     "Ich habe keinen Hund. = Je n'ai pas de chien.\n"
+     "Ich kaufe keinen Tisch. = Je n'achète pas de table.\n\n"
+     "Comparaison :\n"
+     "Ich habe einen Hund. ↔ Ich habe keinen Hund.\n"
+     "Ich sehe eine Frau. ↔ Ich sehe keine Frau.\n"
+     "Ich kaufe ein Auto. ↔ Ich kaufe kein Auto.\n\n"
+     "La technique : kein se comporte comme ein, mais permet de nier le nom.",
+     "kein → keinen au masculin Akkusativ, exactement comme ein → einen."),
+    (5, "Comment savoir si un nom est DER, DIE ou DAS ?",
+     "DER : masculin\n"
+     "der Mann = l'homme\n"
+     "der Vater = le père\n"
+     "der Bruder = le frère\n"
+     "der Hund = le chien\n"
+     "der Tisch = la table\n"
+     "der Apfel = la pomme\n\n"
+     "DIE : féminin\n"
+     "die Frau = la femme\n"
+     "die Mutter = la mère\n"
+     "die Schwester = la sœur\n"
+     "die Schule = l'école\n"
+     "die Tasche = le sac\n"
+     "die Lampe = la lampe\n\n"
+     "DAS : neutre\n"
+     "das Kind = l'enfant\n"
+     "das Haus = la maison\n"
+     "das Auto = la voiture\n"
+     "das Buch = le livre\n"
+     "das Wasser = l'eau\n"
+     "das Mädchen = la fille\n\n"
+     "Astuces pour deviner le genre :\n"
+     "-ung → Féminin : die Wohnung\n"
+     "-heit → Féminin : die Gesundheit\n"
+     "-keit → Féminin : die Möglichkeit\n"
+     "-chen → Neutre : das Mädchen\n"
+     "-lein → Neutre : das Büchlein\n"
+     "-ismus → Masculin : der Tourismus\n\n"
+     "Attention : ces indices ne permettent pas de deviner tous les genres.\n\n"
+     "La meilleure habitude : apprends toujours le nom avec son article.\n"
+     "Ne mémorise pas seulement Tisch. Apprends der Tisch.",
+     "Apprends TOUJOURS le nom avec son article. Les terminaisons donnent des indices mais pas de certitude."),
+    (6, "La méthode en trois étapes pour chaque phrase",
+     "Chaque fois que tu écris une phrase en allemand, suis ces trois étapes.\n\n"
+     "Étape 1 : trouve le sujet — Qui fait l'action ?\n"
+     "Étape 2 : cherche le complément direct — L'action porte sur qui ou sur quoi ?\n"
+     "Étape 3 : identifie le genre du nom — Masculin, féminin ou neutre ?\n\n"
+     "Exemple 1 : Ich kaufe einen Apfel. (J'achète une pomme.)\n"
+     "1. Qui achète ? → Ich.\n"
+     "2. J'achète quoi ? → Apfel.\n"
+     "3. Apfel est masculin : der Apfel.\n"
+     "4. Masculin à l'Akkusativ : einen Apfel.\n\n"
+     "Exemple 2 : Die Frau kauft eine Tasche. (La femme achète un sac.)\n"
+     "1. Qui achète ? → Die Frau.\n"
+     "2. Elle achète quoi ? → Tasche.\n"
+     "3. Tasche est féminin : die Tasche.\n"
+     "4. Féminin à l'Akkusativ : eine Tasche.\n\n"
+     "Exemple 3 : Das Kind hat ein Buch. (L'enfant a un livre.)\n"
+     "1. Qui a quelque chose ? → Das Kind.\n"
+     "2. Il a quoi ? → Buch.\n"
+     "3. Buch est neutre : das Buch.\n"
+     "4. Neutre à l'Akkusativ : ein Buch.\n\n"
+     "Exemple 4 : Der Mann hat keinen Bruder. (L'homme n'a pas de frère.)\n"
+     "1. Qui a quelque chose ? → Der Mann.\n"
+     "2. Il n'a pas quoi ? → Bruder.\n"
+     "3. Bruder est masculin : der Bruder.\n"
+     "4. Masculin à l'Akkusativ avec kein : keinen Bruder.",
+     "Méthode en 3 étapes : 1) Sujet (Nominatif), 2) Complément direct (Akkusativ), 3) Genre du nom → choisis l'article."),
+    (7, "Attention : tous les compléments ne sont pas à l'Akkusativ",
+     "Il faut connaître une petite nuance : certains verbes et certaines prépositions demandent un autre cas.\n\n"
+     "Par exemple, helfen (aider) s'utilise avec le datif :\n"
+     "Ich helfe dem Mann. = J'aide l'homme.\n\n"
+     "Même si tu peux demander « J'aide qui ? » en français, tu ne dois pas automatiquement employer l'Akkusativ en allemand.\n\n"
+     "Pour commencer au niveau A1, entraîne-toi surtout avec des verbes comme :\n"
+     "sehen = voir\n"
+     "haben = avoir\n"
+     "kaufen = acheter\n"
+     "brauchen = avoir besoin de\n"
+     "essen = manger\n"
+     "trinken = boire\n\n"
+     "Ils te permettront de pratiquer de nombreuses phrases avec l'Akkusativ.",
+     "Au niveau A1, concentre-toi sur les verbes qui prennent l'Akkusativ : sehen, haben, kaufen, brauchen, essen, trinken."),
+    (8, "Ton résumé à mémoriser",
+     "Tableau récapitulatif :\n"
+     "Genre | Défini Nominatif | Défini Akkusatif | Indéfini Nominatif | Indéfini Akkusatif | Négation Nominatif | Négation Akkusatif\n"
+     "Masculin | der | den | ein | einen | kein | keinen\n"
+     "Féminin | die | die | eine | eine | keine | keine\n"
+     "Neutre | das | das | ein | ein | kein | kein\n"
+     "Pluriel | die | die | — | — | keine | keine\n\n"
+     "La phrase à retenir absolument :\n"
+     "Au masculin, l'Akkusativ change l'article :\n"
+     "der → den\n"
+     "ein → einen\n"
+     "kein → keinen\n\n"
+     "Pour le féminin et le neutre, ces articles ne changent pas entre le Nominatif et l'Akkusativ. Au pluriel, die reste die, et keine reste keine.",
+     "Retiens juste : au masculin Akkusativ, der→den, ein→einen, kein→keinen. Tout le reste est identique."),
+    (9, "Petit exercice pour vérifier que tu as compris",
+     "Complète les phrases avec der, den, ein, einen, eine, kein, keinen ou keine.\n\n"
+     "1. ___ Mann trinkt Wasser. (L'homme boit de l'eau.)\n"
+     "2. Ich sehe ___ Hund. (Je vois un chien.)\n"
+     "3. Sie kauft ___ Tasche. (Elle achète un sac.)\n"
+     "4. Er hat ___ Auto. (Il n'a pas de voiture.)\n"
+     "5. Ich habe ___ Bruder. (Je n'ai pas de frère.)\n"
+     "6. ___ Frau lernt Deutsch. (Une femme apprend l'allemand.)\n"
+     "7. Ich sehe ___ Mann. (Je vois l'homme.)\n"
+     "8. Er hat ___ Schwester. (Il n'a pas de sœur.)\n\n"
+     "Réponses attendues :\n"
+     "1. Der — sujet, masculin Nominatif.\n"
+     "2. einen — complément direct masculin Akkusativ.\n"
+     "3. eine — complément direct féminin Akkusativ.\n"
+     "4. kein — complément direct neutre Akkusativ.\n"
+     "5. keinen — complément direct masculin Akkusativ nié.\n"
+     "6. Eine — sujet, féminin Nominatif.\n"
+     "7. den — complément direct masculin Akkusativ défini.\n"
+     "8. keine — complément direct féminin Akkusativ nié.",
+     "Fais l'exercice sans regarder les réponses. Vérifie ensuite chaque justification avec la règle QUI/QUOI."),
+]
+
+def seed_nomakk_sections(cursor):
+    for num, title, content, explanation in NOMAKK_DATA:
+        cursor.execute(
+            "INSERT OR IGNORE INTO nomakk_sections(sec_num, title, content, explanation) VALUES(?,?,?,?)",
+            (num, title, content, explanation)
+        )
+
+def seed_nomakk_playlist(cursor):
+    # Générer les paires fr/de à partir du contenu NOMAKK_DATA (les lignes avec "=")
+    items = []
+    for num, title, content, explanation in NOMAKK_DATA:
+        # On ajoute le titre
+        items.append({"fr": f"Section {num} : {title}", "de": f"Abschnitt {num}: {title}"})
+        # Et chaque paire avec "="
+        for line in content.split("\n"):
+            line = line.strip()
+            if "=" in line and "→" not in line and "|" not in line:
+                left, right = line.split("=", 1)
+                fr_part = left.strip()
+                de_part = right.strip()
+                if fr_part and de_part and len(fr_part) < 200 and len(de_part) < 200:
+                    items.append({"fr": fr_part, "de": de_part})
+            elif "|" in line and "=" in line:
+                # lignes de tableau "Der Mann schläft. | L'homme dort. | der"
+                parts = [p.strip() for p in line.split("|")]
+                if len(parts) >= 2:
+                    de_part = parts[0]
+                    fr_part = parts[1]
+                    if de_part and fr_part and len(de_part) < 200 and len(fr_part) < 200:
+                        items.append({"fr": fr_part, "de": de_part})
+    payload = json.dumps(items, ensure_ascii=False)
+    cursor.execute(
+        "INSERT OR IGNORE INTO nomakk_playlist(key, title, items_json) VALUES(?,?,?)",
+        ("all", "NOM/AKK — Nominatif vs Akkusativ", payload)
+    )
+
+# =========================================================
 # === AJOUT : Playlists séparées (idempotent) ===
 # =========================================================
 def seed_speak_playlists(cursor):
@@ -770,8 +1032,6 @@ def seed_speak_playlists(cursor):
     # Playlist "Essentiels A1" (une seule playlist avec toutes les fiches lues)
     essentials_items = []
     for num, title, content, explanation in ESSENTIALS_DATA:
-        # On lit le titre puis chaque ligne français → allemand
-        # Ici, on lit simplement la fiche en allemand (contenu condensé)
         for line in content.split("\n"):
             if "=" in line:
                 left, right = line.split("=", 1)
@@ -1056,6 +1316,12 @@ footer a { color: var(--muted); text-decoration: underline; margin: 0 10px;}
 .fiche h3 { color: var(--sky-dark); font-size: 16px; margin-bottom: 10px; }
 .fiche .content { font-family: 'Courier New', monospace; background: var(--input-bg); padding: 12px; border-radius: 8px; font-size: 13px; white-space: pre-wrap; line-height: 1.6; color: var(--ink); }
 .fiche .explanation { margin-top: 10px; font-size: 13px; color: var(--muted); font-style: italic; padding: 10px; background: rgba(135,206,235,0.12); border-radius: 8px; }
+
+/* === AJOUT : style NOM/AKK === */
+.nomakk-section { background: var(--card-bg); border-radius: 14px; padding: 18px; margin-bottom: 14px; border-left: 5px solid var(--warn); }
+.nomakk-section h3 { color: var(--warn); font-size: 16px; margin-bottom: 10px; }
+.nomakk-section .content { background: var(--input-bg); padding: 14px; border-radius: 8px; font-size: 13px; white-space: pre-wrap; line-height: 1.7; color: var(--ink); font-family: 'Segoe UI', sans-serif; }
+.nomakk-section .explanation { margin-top: 10px; font-size: 13px; color: var(--ink); font-style: italic; padding: 10px; background: rgba(243,156,18,0.12); border-radius: 8px; border-left: 3px solid var(--warn); }
 </style>
 """
 
@@ -1494,7 +1760,7 @@ AUDIO_JS = r"""
       if (key === 'numbers') return flat('numbers');
       return null;
     }
-    if (kind === 'speak' || kind === 'essentials') {
+    if (kind === 'speak' || kind === 'essentials' || kind === 'nomakk') {
       return d[kind] && d[kind][key];
     }
     return d[kind] && d[kind][key];
@@ -1676,7 +1942,6 @@ AUDIO_JS = r"""
 THEME_MOBILE_JS = r"""
 <script>
 (function(){
-  // Mode nuit
   function applyTheme(t){
     document.documentElement.setAttribute('data-theme', t);
     try { localStorage.setItem('natho_theme', t); } catch(e){}
@@ -1691,7 +1956,6 @@ THEME_MOBILE_JS = r"""
   try { saved = localStorage.getItem('natho_theme'); } catch(e){}
   applyTheme(saved === 'dark' ? 'dark' : 'light');
 
-  // Drawer mobile
   window.openMobileMenu = function(){
     var d = document.getElementById('mobile-drawer');
     if (d) d.classList.add('open');
@@ -1716,6 +1980,7 @@ def layout(title, body, user=None):
             <a href="{url_for('playlists')}">Playlists 🎵</a>
             <a href="{url_for('apprendre_parler')}">Parler 🗨️</a>
             <a href="{url_for('essentiels_a1')}">Essentiels A1</a>
+            <a href="{url_for('nom_akk')}">NOM/AKK</a>
             <a href="{url_for('goethe')}">Examen Goethe</a>
             <a href="{url_for('progress')}">Progrès</a>
             {"<a href='"+url_for('admin')+"'>Admin</a>" if user['is_admin'] else ""}
@@ -1753,11 +2018,9 @@ def layout(title, body, user=None):
         
     body_class = "" if show_sidebar else "no-sidebar"
 
-    # === AJOUT : bouton theme + menu mobile dans la nav ===
     theme_btn = '<button class="theme-toggle" onclick="toggleTheme()" title="Mode nuit">🌙</button>'
     mobile_btn = '<button class="mobile-menu-btn" onclick="openMobileMenu()" title="Menu">☰</button>'
 
-    # === AJOUT : drawer mobile ===
     mobile_drawer = ""
     if show_sidebar:
         mobile_drawer = """
@@ -1881,6 +2144,7 @@ def index():
         <div class="card"><h3>🎧 Mode Audio</h3><p>Le français puis l'allemand, lu à voix haute. Idéal pour mémoriser.</p></div>
         <div class="card"><h3>📚 Bibliothèque A1</h3><p>300 expressions et 320 mots issus du programme Goethe A1.</p></div>
         <div class="card"><h3>🗨️ Apprendre à parler</h3><p>260 phrases complètes classées par thème : Sujet + Verbe + Complément.</p></div>
+        <div class="card"><h3>⚖️ NOM/AKK</h3><p>Comprendre enfin Nominatif vs Akkusativ : der/den, ein/einen, kein/keinen.</p></div>
         <div class="card"><h3>📝 Examen Goethe A1</h3><p>Hören, Lesen, Schreiben, Sprechen : un vrai simulateur d'examen.</p></div>
         <div class="card"><h3>📈 Suivi personnel</h3><p>Ton compte, tes progrès, tes résultats, à tout moment.</p></div>
     </div>
@@ -2041,6 +2305,17 @@ def dashboard():
 
     intro_btn = say_btn("▶ Lire la phrase", "pair", "Prêt ? Allons-y !", "Bereit? Los geht's!", css="primary")
 
+    # === AJOUT : bouton NOM/AKK en évidence sur le dashboard ===
+    nomakk_card = f"""
+    <div class="card" style="display:flex;justify-content:space-between;align-items:center;border-left:5px solid var(--warn);">
+      <div>
+        <h3 style="margin:0">⚖️ NOM/AKK — Nominatif vs Akkusativ</h3>
+        <p style="color:var(--muted);font-size:14px;margin:4px 0 0 0;">Comprends enfin der/den, ein/einen, kein/keinen en 9 sections claires.</p>
+      </div>
+      <a href="{url_for('nom_akk')}" class="btn ok">Ouvrir</a>
+    </div>
+    """
+
     body = f"""
     <div class="player">
       <div class="fr">Mode audio · apprends en écoutant</div>
@@ -2054,6 +2329,7 @@ def dashboard():
       <div class="stat"><div class="num">{total}</div><div class="lbl">Leçons totales</div></div>
       <div class="stat"><div class="num">{pct}%</div><div class="lbl">Progression</div></div>
     </div>
+    {nomakk_card}
     <div class="tabs">{tabs}</div>
     <div class="grid">{cards}</div>
     """
@@ -2189,7 +2465,6 @@ def apprendre_parler():
         "SELECT theme, theme_order, fr, de FROM speak_phrases ORDER BY theme_order, id"
     ).fetchall()
 
-    # Regrouper par thème
     themes = {}
     for r in rows:
         themes.setdefault((r["theme_order"], r["theme"]), []).append(r)
@@ -2247,7 +2522,6 @@ def essentiels_a1():
 
     cards_html = ""
     for f in fiches:
-        # Générer un bouton audio par ligne "fr = de"
         audio_lines = ""
         for line in f["content"].split("\n"):
             line = line.strip()
@@ -2287,6 +2561,61 @@ def essentiels_a1():
     """
     return render_template_string(layout("Les essentiels A1", body, {"is_admin": session.get("is_admin")}))
 
+# =========================================================
+# === AJOUT : ROUTE "NOM/AKK" — Nominatif vs Akkusativ ===
+# =========================================================
+@app.route("/nom-akk")
+@login_required
+def nom_akk():
+    db = get_db()
+    sections = db.execute(
+        "SELECT * FROM nomakk_sections ORDER BY sec_num"
+    ).fetchall()
+
+    cards_html = ""
+    for s in sections:
+        # Générer les boutons audio pour les lignes avec "="
+        audio_lines = ""
+        for line in s["content"].split("\n"):
+            line_stripped = line.strip()
+            if "=" in line_stripped and "|" not in line_stripped and "→" not in line_stripped:
+                parts = line_stripped.split("=", 1)
+                left = parts[0].strip()
+                right = parts[1].strip()
+                if left and right and len(left) < 200 and len(right) < 200:
+                    audio_lines += f"""
+                    <div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px dashed var(--border-light);gap:8px;">
+                      <div style="flex:1;font-size:13px;"><b>{h(right)}</b> <span style="color:var(--muted);">— {h(left)}</span></div>
+                      {say_btn("▶", "pair", left, right, css="btn ghost", style="padding:4px 10px;font-size:12px;")}
+                    </div>
+                    """
+        cards_html += f"""
+        <div class="nomakk-section">
+          <h3>Section {s['sec_num']} — {h(s['title'])}</h3>
+          <div class="content">{audio_lines if audio_lines else h(s['content'])}</div>
+          <div class="explanation">💡 {h(s['explanation'])}</div>
+        </div>
+        """
+
+    playlist_all = playlist_btn("▶ Playlist : tout NOM/AKK", "nomakk", "all", css="btn ok")
+
+    body = f"""
+    <h1>NOM/AKK — Nominatif vs Akkusativ ⚖️</h1>
+    <p style="margin-bottom:16px;color:#5B7A90;">
+      La technique la plus simple pour comprendre der/den, ein/einen, kein/keinen.
+      9 sections progressives avec exemples et explications.
+    </p>
+    <div class="card" style="display:flex;justify-content:space-between;align-items:center;border-left:5px solid var(--warn);">
+      <div>
+        <h3 style="margin:0">Écouter tout NOM/AKK</h3>
+        <p style="color:var(--muted);font-size:14px;margin:4px 0 0 0;">Toutes les phrases d'exemple lues à la suite.</p>
+      </div>
+      {playlist_all}
+    </div>
+    {cards_html}
+    """
+    return render_template_string(layout("NOM/AKK", body, {"is_admin": session.get("is_admin")}))
+
 @app.route("/playlists")
 @login_required
 def playlists():
@@ -2313,7 +2642,6 @@ def playlists():
     num_rows = db.execute("SELECT french, german FROM vocab WHERE category='Nombres' ORDER BY id").fetchall()
     playlist_data_numbers = {"Nombres 0-1000": [{"fr": i["french"], "de": i["german"]} for i in num_rows]}
 
-    # === AJOUT : playlists "speak" et "essentials" ===
     playlist_data_speak = {}
     speak_rows = db.execute("SELECT key, title, items_json FROM speak_playlists WHERE kind='speak'").fetchall()
     for r in speak_rows:
@@ -2323,6 +2651,12 @@ def playlists():
     ess_rows = db.execute("SELECT key, title, items_json FROM speak_playlists WHERE kind='essentials'").fetchall()
     for r in ess_rows:
         playlist_data_essentials[r["title"]] = json.loads(r["items_json"])
+
+    # === AJOUT : playlist NOM/AKK ===
+    playlist_data_nomakk = {}
+    nomakk_rows = db.execute("SELECT key, title, items_json FROM nomakk_playlist").fetchall()
+    for r in nomakk_rows:
+        playlist_data_nomakk[r["title"]] = json.loads(r["items_json"])
 
     order_l = [r["category"] for r in db.execute(
         "SELECT category FROM lessons GROUP BY category ORDER BY MIN(order_index), MIN(id)").fetchall()]
@@ -2336,6 +2670,7 @@ def playlists():
     n_numbers = len(playlist_data_numbers["Nombres 0-1000"])
     n_speak = sum(len(v) for v in playlist_data_speak.values())
     n_ess = sum(len(v) for v in playlist_data_essentials.values())
+    n_nomakk = sum(len(v) for v in playlist_data_nomakk.values())
 
     js_data = json.dumps({
         "lessons": playlist_data_lessons,
@@ -2344,6 +2679,7 @@ def playlists():
         "numbers": playlist_data_numbers,
         "speak": playlist_data_speak,
         "essentials": playlist_data_essentials,
+        "nomakk": playlist_data_nomakk,
         "order": {"lessons": order_l, "vocab": order_v, "dialogues": order_d}
     }, ensure_ascii=False).replace("</", "<\\/")
 
@@ -2385,7 +2721,6 @@ def playlists():
         </div>
     """
 
-    # === AJOUT : section Playlists "Apprendre à parler" ===
     cards_speak = ""
     for theme_title, items in playlist_data_speak.items():
         cards_speak += f"""
@@ -2398,7 +2733,6 @@ def playlists():
         </div>
         """
 
-    # === AJOUT : section Playlist "Essentiels A1" ===
     cards_ess = ""
     for title, items in playlist_data_essentials.items():
         cards_ess += f"""
@@ -2408,6 +2742,19 @@ def playlists():
                 <p style="color:var(--muted);font-size:14px;margin:4px 0 0 0">{len(items)} paires FR → DE.</p>
             </div>
             {playlist_btn("▶ Playlist", "essentials", title, css="btn ok")}
+        </div>
+        """
+
+    # === AJOUT : section Playlist NOM/AKK ===
+    cards_nomakk = ""
+    for title, items in playlist_data_nomakk.items():
+        cards_nomakk += f"""
+        <div class="card" style="display:flex; justify-content:space-between; align-items:center; border-left:5px solid var(--warn);">
+            <div>
+                <h3 style="margin:0">{h(title)}</h3>
+                <p style="color:var(--muted);font-size:14px;margin:4px 0 0 0">{len(items)} phrases (sections + exemples).</p>
+            </div>
+            {playlist_btn("▶ Playlist", "nomakk", title, css="btn ok")}
         </div>
         """
 
@@ -2453,6 +2800,9 @@ def playlists():
 
     <h2>🎧 Blocs complets</h2>
     {cards_all}
+
+    <h2 style="margin-top:30px;">⚖️ NOM/AKK — Nominatif vs Akkusativ</h2>
+    {cards_nomakk}
 
     <h2 style="margin-top:30px;">🗨️ Apprendre à parler (par thème)</h2>
     {cards_speak}
@@ -2830,6 +3180,7 @@ def admin():
     quiz_count = db.execute("SELECT COUNT(*) FROM goethe_exam").fetchone()[0]
     speak_count = db.execute("SELECT COUNT(*) FROM speak_phrases").fetchone()[0]
     ess_count = db.execute("SELECT COUNT(*) FROM essentials_cards").fetchone()[0]
+    nomakk_count = db.execute("SELECT COUNT(*) FROM nomakk_sections").fetchone()[0]
     users_html = "".join(
         f"<tr><td>{u['id']}</td><td>{u['name']}</td><td>{u['email']}</td>"
         f"<td>{'Oui' if u['is_admin'] else 'Non'}</td><td>{u['created_at']}</td></tr>"
@@ -2843,6 +3194,7 @@ def admin():
       <div class="stat"><div class="num">{quiz_count}</div><div class="lbl">Examens Goethe passés</div></div>
       <div class="stat"><div class="num">{speak_count}</div><div class="lbl">Phrases "Parler"</div></div>
       <div class="stat"><div class="num">{ess_count}</div><div class="lbl">Fiches Essentiels</div></div>
+      <div class="stat"><div class="num">{nomakk_count}</div><div class="lbl">Sections NOM/AKK</div></div>
     </div>
     <div class="card">
       <h2>Ajouter une leçon</h2>
