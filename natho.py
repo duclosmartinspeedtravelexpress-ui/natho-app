@@ -2,7 +2,7 @@
 # NATHO — Plateforme d'apprentissage de l'allemand A1
 # Version finale stable : Sidebar + W-Fragen + Audio
 # + Apprendre à parler + Essentiels A1 + Mode nuit + Menu mobile
-# + NOM/AKK (Nominativ vs Akkusativ)
+# + NOM/AKK (Nominativ vs Akkusativ) + NEFERTI (bot Sprechen)
 # =========================================================
 
 import os
@@ -131,10 +131,6 @@ def init_db():
             FOREIGN KEY(user_id) REFERENCES users(id)
         )""")
 
-        # =========================================================
-        # === AJOUT : TABLES POUR "APPRENDRE À PARLER" & "ESSENTIELS A1" ===
-        # Migrations idempotentes : ne détruisent JAMAIS la DB existante
-        # =========================================================
         c.execute("""CREATE TABLE IF NOT EXISTS speak_phrases (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             theme TEXT NOT NULL,
@@ -161,7 +157,6 @@ def init_db():
             UNIQUE(kind, key)
         )""")
 
-        # === AJOUT : table NOM/AKK ===
         c.execute("""CREATE TABLE IF NOT EXISTS nomakk_sections (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             sec_num INTEGER NOT NULL UNIQUE,
@@ -175,6 +170,43 @@ def init_db():
             key TEXT NOT NULL UNIQUE,
             title TEXT NOT NULL,
             items_json TEXT NOT NULL
+        )""")
+
+        # === NEFERTI : tables (idempotentes, ne touchent pas l'existant) ===
+        c.execute("""CREATE TABLE IF NOT EXISTS neferti_scenarios (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            category TEXT NOT NULL,
+            step_key TEXT NOT NULL UNIQUE,
+            neferti_de TEXT NOT NULL,
+            neferti_fr TEXT NOT NULL,
+            expected_de TEXT NOT NULL DEFAULT '',
+            keywords TEXT NOT NULL DEFAULT '',
+            followup_yes TEXT DEFAULT '',
+            followup_no TEXT DEFAULT '',
+            memory_key TEXT DEFAULT '',
+            order_index INTEGER DEFAULT 0
+        )""")
+
+        c.execute("""CREATE TABLE IF NOT EXISTS neferti_memory (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            mem_key TEXT NOT NULL,
+            mem_value TEXT NOT NULL,
+            updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE(user_id, mem_key),
+            FOREIGN KEY(user_id) REFERENCES users(id)
+        )""")
+
+        c.execute("""CREATE TABLE IF NOT EXISTS neferti_history (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            role TEXT NOT NULL,
+            fr_text TEXT DEFAULT '',
+            de_text TEXT DEFAULT '',
+            heard_text TEXT DEFAULT '',
+            score INTEGER DEFAULT 0,
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY(user_id) REFERENCES users(id)
         )""")
 
         # Remplissage (idempotent)
@@ -192,7 +224,6 @@ def init_db():
         if c.fetchone()[0] == 0:
             seed_vocab(c)
 
-        # === AJOUT : seeds idempotents pour les nouvelles tables ===
         c.execute("SELECT COUNT(*) FROM speak_phrases")
         if c.fetchone()[0] == 0:
             seed_speak_phrases(c)
@@ -201,13 +232,17 @@ def init_db():
         if c.fetchone()[0] == 0:
             seed_essentials_cards(c)
 
-        seed_speak_playlists(c)  # idempotent via INSERT OR IGNORE
+        seed_speak_playlists(c)
 
-        # === AJOUT : seeds NOM/AKK ===
         c.execute("SELECT COUNT(*) FROM nomakk_sections")
         if c.fetchone()[0] == 0:
             seed_nomakk_sections(c)
-        seed_nomakk_playlist(c)  # idempotent
+        seed_nomakk_playlist(c)
+
+        # === NEFERTI : seed idempotent des scénarios ===
+        c.execute("SELECT COUNT(*) FROM neferti_scenarios")
+        if c.fetchone()[0] == 0:
+            seed_neferti_scenarios(c)
 
         db.commit()
         db.close()
@@ -259,86 +294,46 @@ def seed_lessons(cursor):
 
 def seed_wfragen(cursor):
     data = [
-        ("W-Fragen", "Wer ist das?", "Qui est-ce ?"),
-        ("W-Fragen", "Wer kommt heute?", "Qui vient aujourd'hui ?"),
-        ("W-Fragen", "Wer hat das gesagt?", "Qui a dit ça ?"),
-        ("W-Fragen", "Wer wohnt hier?", "Qui habite ici ?"),
-        ("W-Fragen", "Wer sind Sie?", "Qui êtes-vous ?"),
-        ("W-Fragen", "Wer ist dein Lehrer?", "Qui est ton professeur ?"),
-        ("W-Fragen", "Wer hat Zeit?", "Qui a le temps ?"),
-        ("W-Fragen", "Wer ist müde?", "Qui est fatigué ?"),
-        ("W-Fragen", "Wer kocht das Essen?", "Qui cuisine le repas ?"),
-        ("W-Fragen", "Wer arbeitet hier?", "Qui travaille ici ?"),
-        ("W-Fragen", "Was machst du?", "Que fais-tu ?"),
-        ("W-Fragen", "Was ist das?", "Qu'est-ce que c'est ?"),
-        ("W-Fragen", "Was möchtest du trinken?", "Que veux-tu boire ?"),
-        ("W-Fragen", "Was kostet das Buch?", "Combien coûte le livre ?"),
-        ("W-Fragen", "Was ist dein Name?", "Quel est ton nom ?"),
-        ("W-Fragen", "Was isst du gern?", "Qu'est-ce que tu aimes manger ?"),
-        ("W-Fragen", "Was machst du heute Abend?", "Que fais-tu ce soir ?"),
-        ("W-Fragen", "Was ist passiert?", "Que s'est-il passé ?"),
-        ("W-Fragen", "Was brauchst du?", "De quoi as-tu besoin ?"),
-        ("W-Fragen", "Was hast du gesagt?", "Qu'as-tu dit ?"),
-        ("W-Fragen", "Wo wohnst du?", "Où habites-tu ?"),
-        ("W-Fragen", "Wo ist die Toilette?", "Où sont les toilettes ?"),
-        ("W-Fragen", "Wo ist der Bahnhof?", "Où est la gare ?"),
-        ("W-Fragen", "Wo ist das Hotel?", "Où est l'hôtel ?"),
-        ("W-Fragen", "Wo arbeitest du?", "Où travailles-tu ?"),
-        ("W-Fragen", "Wo ist mein Schlüssel?", "Où est ma clé ?"),
-        ("W-Fragen", "Wo kann ich parken?", "Où puis-je me garer ?"),
-        ("W-Fragen", "Wo ist die Apotheke?", "Où est la pharmacie ?"),
-        ("W-Fragen", "Wo ist der Supermarkt?", "Où est le supermarché ?"),
-        ("W-Fragen", "Wo treffen wir uns?", "Où nous retrouvons-nous ?"),
-        ("W-Fragen", "Wann kommst du?", "Quand viens-tu ?"),
-        ("W-Fragen", "Wann fängt der Kurs an?", "Quand commence le cours ?"),
-        ("W-Fragen", "Wann fährt der Zug?", "Quand part le train ?"),
-        ("W-Fragen", "Wann hast du Geburtstag?", "Quand est ton anniversaire ?"),
-        ("W-Fragen", "Wann ist das Frühstück?", "À quelle heure est le petit-déjeuner ?"),
-        ("W-Fragen", "Wann gehen wir ins Kino?", "Quand allons-nous au cinéma ?"),
-        ("W-Fragen", "Wann bist du fertig?", "Quand as-tu fini ?"),
-        ("W-Fragen", "Wann öffnet das Geschäft?", "Quand ouvre le magasin ?"),
-        ("W-Fragen", "Wann kommt der Bus?", "Quand arrive le bus ?"),
-        ("W-Fragen", "Wann sehen wir uns wieder?", "Quand nous reverrons-nous ?"),
-        ("W-Fragen", "Warum lernst du Deutsch?", "Pourquoi apprends-tu l'allemand ?"),
-        ("W-Fragen", "Warum kommst du zu spät?", "Pourquoi viens-tu en retard ?"),
-        ("W-Fragen", "Warum ist das so teuer?", "Pourquoi est-ce si cher ?"),
-        ("W-Fragen", "Warum bist du traurig?", "Pourquoi es-tu triste ?"),
-        ("W-Fragen", "Warum lachst du?", "Pourquoi ris-tu ?"),
-        ("W-Fragen", "Warum nicht?", "Pourquoi pas ?"),
-        ("W-Fragen", "Warum ist die Tür zu?", "Pourquoi la porte est-elle fermée ?"),
-        ("W-Fragen", "Warum hast du keine Zeit?", "Pourquoi n'as-tu pas le temps ?"),
-        ("W-Fragen", "Warum fragst du?", "Pourquoi demandes-tu ?"),
-        ("W-Fragen", "Warum arbeitest du heute?", "Pourquoi travailles-tu aujourd'hui ?"),
-        ("W-Fragen", "Wie heißt du?", "Comment t'appelles-tu ?"),
-        ("W-Fragen", "Wie geht es dir?", "Comment vas-tu ?"),
-        ("W-Fragen", "Wie alt bist du?", "Quel âge as-tu ?"),
-        ("W-Fragen", "Wie kommt ich zum Bahnhof?", "Comment aller à la gare ?"),
-        ("W-Fragen", "Wie viel kostet das?", "Combien cela coûte-t-il ?"),
-        ("W-Fragen", "Wie spät ist es?", "Quelle heure est-il ?"),
-        ("W-Fragen", "Wie ist das Wetter?", "Quel temps fait-il ?"),
-        ("W-Fragen", "Wie schreibt man das?", "Comment cela s'écrit-il ?"),
-        ("W-Fragen", "Wie sagt man das auf Deutsch?", "Comment dit-on cela en allemand ?"),
-        ("W-Fragen", "Wie lange dauert das?", "Combien de temps cela dure-t-il ?"),
-        ("W-Fragen", "Woher kommst du?", "D'où viens-tu ?"),
-        ("W-Fragen", "Woher hast du das?", "D'où tiens-tu cela ?"),
-        ("W-Fragen", "Woher weißt du das?", "Comment le sais-tu ?"),
-        ("W-Fragen", "Woher kommt dieser Zug?", "D'où vient ce train ?"),
-        ("W-Fragen", "Woher sind Sie?", "D'où êtes-vous ?"),
-        ("W-Fragen", "Woher hast du dieses Buch?", "D'où as-tu ce livre ?"),
-        ("W-Fragen", "Woher kommt der Lärm?", "D'où vient le bruit ?"),
-        ("W-Fragen", "Woher kennen wir uns?", "D'où nous connaissons-nous ?"),
-        ("W-Fragen", "Woher kommt das Wasser?", "D'où vient l'eau ?"),
-        ("W-Fragen", "Woher hast du die Information?", "D'où tiens-tu l'information ?"),
-        ("W-Fragen", "Wohin gehst du?", "Où vas-tu ?"),
-        ("W-Fragen", "Wohin fährst du im Urlaub?", "Où vas-tu en vacances ?"),
-        ("W-Fragen", "Wohin legst du das Buch?", "Où mets-tu le livre ?"),
-        ("W-Fragen", "Wohin gehen wir heute Abend?", "Où allons-nous ce soir ?"),
-        ("W-Fragen", "Wohin fährt dieser Bus?", "Où va ce bus ?"),
-        ("W-Fragen", "Wohin hast du es gelegt?", "Où l'as-tu mis ?"),
-        ("W-Fragen", "Wohin läufst du?", "Où cours-tu ?"),
-        ("W-Fragen", "Wohin stellst du die Flasche?", "Où poses-tu la bouteille ?"),
-        ("W-Fragen", "Wohin reist du?", "Où voyages-tu ?"),
-        ("W-Fragen", "Wohin geht ihr?", "Où allez-vous ?"),
+        ("W-Fragen", "Wer ist das?", "Qui est-ce ?"), ("W-Fragen", "Wer kommt heute?", "Qui vient aujourd'hui ?"),
+        ("W-Fragen", "Wer hat das gesagt?", "Qui a dit ça ?"), ("W-Fragen", "Wer wohnt hier?", "Qui habite ici ?"),
+        ("W-Fragen", "Wer sind Sie?", "Qui êtes-vous ?"), ("W-Fragen", "Wer ist dein Lehrer?", "Qui est ton professeur ?"),
+        ("W-Fragen", "Wer hat Zeit?", "Qui a le temps ?"), ("W-Fragen", "Wer ist müde?", "Qui est fatigué ?"),
+        ("W-Fragen", "Wer kocht das Essen?", "Qui cuisine le repas ?"), ("W-Fragen", "Wer arbeitet hier?", "Qui travaille ici ?"),
+        ("W-Fragen", "Was machst du?", "Que fais-tu ?"), ("W-Fragen", "Was ist das?", "Qu'est-ce que c'est ?"),
+        ("W-Fragen", "Was möchtest du trinken?", "Que veux-tu boire ?"), ("W-Fragen", "Was kostet das Buch?", "Combien coûte le livre ?"),
+        ("W-Fragen", "Was ist dein Name?", "Quel est ton nom ?"), ("W-Fragen", "Was isst du gern?", "Qu'est-ce que tu aimes manger ?"),
+        ("W-Fragen", "Was machst du heute Abend?", "Que fais-tu ce soir ?"), ("W-Fragen", "Was ist passiert?", "Que s'est-il passé ?"),
+        ("W-Fragen", "Was brauchst du?", "De quoi as-tu besoin ?"), ("W-Fragen", "Was hast du gesagt?", "Qu'as-tu dit ?"),
+        ("W-Fragen", "Wo wohnst du?", "Où habites-tu ?"), ("W-Fragen", "Wo ist die Toilette?", "Où sont les toilettes ?"),
+        ("W-Fragen", "Wo ist der Bahnhof?", "Où est la gare ?"), ("W-Fragen", "Wo ist das Hotel?", "Où est l'hôtel ?"),
+        ("W-Fragen", "Wo arbeitest du?", "Où travailles-tu ?"), ("W-Fragen", "Wo ist mein Schlüssel?", "Où est ma clé ?"),
+        ("W-Fragen", "Wo kann ich parken?", "Où puis-je me garer ?"), ("W-Fragen", "Wo ist die Apotheke?", "Où est la pharmacie ?"),
+        ("W-Fragen", "Wo ist der Supermarkt?", "Où est le supermarché ?"), ("W-Fragen", "Wo treffen wir uns?", "Où nous retrouvons-nous ?"),
+        ("W-Fragen", "Wann kommst du?", "Quand viens-tu ?"), ("W-Fragen", "Wann fängt der Kurs an?", "Quand commence le cours ?"),
+        ("W-Fragen", "Wann fährt der Zug?", "Quand part le train ?"), ("W-Fragen", "Wann hast du Geburtstag?", "Quand est ton anniversaire ?"),
+        ("W-Fragen", "Wann ist das Frühstück?", "À quelle heure est le petit-déjeuner ?"), ("W-Fragen", "Wann gehen wir ins Kino?", "Quand allons-nous au cinéma ?"),
+        ("W-Fragen", "Wann bist du fertig?", "Quand as-tu fini ?"), ("W-Fragen", "Wann öffnet das Geschäft?", "Quand ouvre le magasin ?"),
+        ("W-Fragen", "Wann kommt der Bus?", "Quand arrive le bus ?"), ("W-Fragen", "Wann sehen wir uns wieder?", "Quand nous reverrons-nous ?"),
+        ("W-Fragen", "Warum lernst du Deutsch?", "Pourquoi apprends-tu l'allemand ?"), ("W-Fragen", "Warum kommst du zu spät?", "Pourquoi viens-tu en retard ?"),
+        ("W-Fragen", "Warum ist das so teuer?", "Pourquoi est-ce si cher ?"), ("W-Fragen", "Warum bist du traurig?", "Pourquoi es-tu triste ?"),
+        ("W-Fragen", "Warum lachst du?", "Pourquoi ris-tu ?"), ("W-Fragen", "Warum nicht?", "Pourquoi pas ?"),
+        ("W-Fragen", "Warum ist die Tür zu?", "Pourquoi la porte est-elle fermée ?"), ("W-Fragen", "Warum hast du keine Zeit?", "Pourquoi n'as-tu pas le temps ?"),
+        ("W-Fragen", "Warum fragst du?", "Pourquoi demandes-tu ?"), ("W-Fragen", "Warum arbeitest du heute?", "Pourquoi travailles-tu aujourd'hui ?"),
+        ("W-Fragen", "Wie heißt du?", "Comment t'appelles-tu ?"), ("W-Fragen", "Wie geht es dir?", "Comment vas-tu ?"),
+        ("W-Fragen", "Wie alt bist du?", "Quel âge as-tu ?"), ("W-Fragen", "Wie kommt ich zum Bahnhof?", "Comment aller à la gare ?"),
+        ("W-Fragen", "Wie viel kostet das?", "Combien cela coûte-t-il ?"), ("W-Fragen", "Wie spät ist es?", "Quelle heure est-il ?"),
+        ("W-Fragen", "Wie ist das Wetter?", "Quel temps fait-il ?"), ("W-Fragen", "Wie schreibt man das?", "Comment cela s'écrit-il ?"),
+        ("W-Fragen", "Wie sagt man das auf Deutsch?", "Comment dit-on cela en allemand ?"), ("W-Fragen", "Wie lange dauert das?", "Combien de temps cela dure-t-il ?"),
+        ("W-Fragen", "Woher kommst du?", "D'où viens-tu ?"), ("W-Fragen", "Woher hast du das?", "D'où tiens-tu cela ?"),
+        ("W-Fragen", "Woher weißt du das?", "Comment le sais-tu ?"), ("W-Fragen", "Woher kommt dieser Zug?", "D'où vient ce train ?"),
+        ("W-Fragen", "Woher sind Sie?", "D'où êtes-vous ?"), ("W-Fragen", "Woher hast du dieses Buch?", "D'où as-tu ce livre ?"),
+        ("W-Fragen", "Woher kommt der Lärm?", "D'où vient le bruit ?"), ("W-Fragen", "Woher kennen wir uns?", "D'où nous connaissons-nous ?"),
+        ("W-Fragen", "Woher kommt das Wasser?", "D'où vient l'eau ?"), ("W-Fragen", "Woher hast du die Information?", "D'où tiens-tu l'information ?"),
+        ("W-Fragen", "Wohin gehst du?", "Où vas-tu ?"), ("W-Fragen", "Wohin fährst du im Urlaub?", "Où vas-tu en vacances ?"),
+        ("W-Fragen", "Wohin legst du das Buch?", "Où mets-tu le livre ?"), ("W-Fragen", "Wohin gehen wir heute Abend?", "Où allons-nous ce soir ?"),
+        ("W-Fragen", "Wohin fährt dieser Bus?", "Où va ce bus ?"), ("W-Fragen", "Wohin hast du es gelegt?", "Où l'as-tu mis ?"),
+        ("W-Fragen", "Wohin läufst du?", "Où cours-tu ?"), ("W-Fragen", "Wohin stellst du die Flasche?", "Où poses-tu la bouteille ?"),
+        ("W-Fragen", "Wohin reist du?", "Où voyages-tu ?"), ("W-Fragen", "Wohin geht ihr?", "Où allez-vous ?"),
     ]
     
     cursor.execute("SELECT COALESCE(MAX(order_index), 0) FROM lessons")
@@ -393,8 +388,7 @@ def seed_numbers(cursor):
         cursor.execute("INSERT INTO vocab(category, german, french) VALUES(?,?,?)", ("Nombres", str(i), str(i)))
 
 # =========================================================
-# === AJOUT : SEED "APPRENDRE À PARLER" (260 phrases complètes) ===
-# Sujet + Verbe + Complément, TOUTES différentes de l'existant.
+# SEED "APPRENDRE À PARLER" (260 phrases complètes)
 # =========================================================
 SPEAK_PHRASES_DATA = [
     ("Se présenter et parler de soi", [
@@ -694,7 +688,7 @@ def seed_speak_phrases(cursor):
             )
 
 # =========================================================
-# === AJOUT : SEED "LES ESSENTIELS A1" (24 fiches + explications) ===
+# SEED "LES ESSENTIELS A1"
 # =========================================================
 ESSENTIALS_DATA = [
     (1, "Les pronoms personnels (sujets)",
@@ -779,207 +773,50 @@ def seed_essentials_cards(cursor):
         )
 
 # =========================================================
-# === AJOUT : SEED "NOM/AKK" — Nominatif vs Akkusativ ===
-# Contenu pédagogique complet du fichier fourni.
+# SEED "NOM/AKK"
 # =========================================================
 NOMAKK_DATA = [
     (1, "La technique la plus simple : QUI ? et QUI/QUOI ?",
      "Le Nominatif désigne généralement la personne ou la chose qui fait l'action : le sujet.\n\n"
-     "Exemples :\n"
-     "Der Mann schläft. = L'homme dort.\n"
-     "Die Frau lernt. = La femme étudie.\n"
-     "Das Kind spielt. = L'enfant joue.\n\n"
+     "Exemples :\nDer Mann schläft. = L'homme dort.\nDie Frau lernt. = La femme étudie.\nDas Kind spielt. = L'enfant joue.\n\n"
      "Pose-toi la question : QUI dort ? QUI étudie ? QUI joue ?\n\n"
-     "Tableau Nominatif :\n"
-     "Der Mann schläft. | L'homme dort. | der\n"
-     "Die Frau lernt. | La femme étudie. | die\n"
-     "Das Kind spielt. | L'enfant joue. | das\n"
-     "Ein Mann schläft. | Un homme dort. | ein\n"
-     "Eine Frau lernt. | Une femme étudie. | eine\n"
-     "Ein Kind spielt. | Un enfant joue. | ein\n\n"
      "À retenir : le sujet est au Nominatif.\n\n"
      "L'Akkusativ désigne généralement la personne ou la chose sur laquelle porte directement l'action.\n\n"
-     "Exemples :\n"
-     "Ich sehe den Mann. = Je vois l'homme.\n"
-     "Ich sehe die Frau. = Je vois la femme.\n"
-     "Ich sehe das Kind. = Je vois l'enfant.\n\n"
-     "Pose-toi deux questions :\n"
-     "1. Qui fait l'action ? → Ich = je.\n"
-     "2. Je vois qui ? → den Mann = l'homme.\n\n"
+     "Exemples :\nIch sehe den Mann. = Je vois l'homme.\nIch sehe die Frau. = Je vois la femme.\nIch sehe das Kind. = Je vois l'enfant.\n\n"
+     "Pose-toi deux questions :\n1. Qui fait l'action ? → Ich = je.\n2. Je vois qui ? → den Mann = l'homme.\n\n"
      "Le sujet reste au Nominatif, tandis que le complément direct est à l'Akkusativ.",
-     "Règle d'or : QUI fait l'action → Nominatif. QUI/QUOI reçoit l'action → Akkusativ. C'est la base de tout."),
+     "Règle d'or : QUI fait l'action → Nominatif. QUI/QUOI reçoit l'action → Akkusativ."),
     (2, "Le tableau magique pour retenir les articles",
-     "Genre | Nominatif | Akkusatif | Exemple\n"
-     "Masculin | der | den | Ich sehe den Mann.\n"
-     "Féminin | die | die | Ich sehe die Frau.\n"
-     "Neutre | das | das | Ich sehe das Kind.\n"
-     "Pluriel | die | die | Ich sehe die Kinder.\n\n"
-     "La règle d'or :\n"
+     "Masculin : der → den\nFéminin : die → die\nNeutre : das → das\nPluriel : die → die\n\n"
      "Au masculin, der devient den à l'Akkusativ.\n"
-     "Pour le féminin, le neutre et le pluriel, l'article défini ne change pas.\n\n"
-     "Mémorise cette phrase :\n"
-     "DER → DEN ; DIE → DIE ; DAS → DAS ; DIE → DIE.\n\n"
-     "C'est le premier réflexe à acquérir.",
-     "Un seul changement à retenir : der → den au masculin Akkusativ. Tout le reste est identique."),
+     "Mémorise : DER → DEN ; DIE → DIE ; DAS → DAS ; DIE → DIE.",
+     "Un seul changement : der → den au masculin Akkusativ."),
     (3, "Quand utiliser EIN, EINE et EINEN ?",
-     "En français :\n"
-     "ein = un\n"
-     "eine = une\n\n"
-     "Mais attention : en allemand, le masculin change à l'Akkusativ !\n\n"
-     "Genre | Nominatif | Akkusatif\n"
-     "Masculin | ein | einen\n"
-     "Féminin | eine | eine\n"
-     "Neutre | ein | ein\n"
-     "Pluriel | pas d'article indéfini | pas d'article indéfini\n\n"
-     "EIN : masculin au Nominatif ou neutre\n"
-     "Ein Mann kommt. = Un homme arrive.\n"
-     "Ein Kind spielt. = Un enfant joue.\n\n"
-     "EINE : féminin\n"
-     "Eine Frau kommt. = Une femme arrive.\n"
-     "Ich sehe eine Frau. = Je vois une femme.\n\n"
-     "EINEN : masculin à l'Akkusativ\n"
-     "Ein Mann kauft einen Tisch. = Un homme achète une table.\n"
-     "Ich sehe einen Hund. = Je vois un chien.\n"
-     "Ich habe einen Bruder. = J'ai un frère.\n\n"
-     "Dans Ich sehe einen Hund :\n"
-     "Qui voit ? → Ich.\n"
-     "Je vois quoi ? → einen Hund.\n"
-     "Hund est masculin : der Hund.\n"
-     "À l'Akkusativ, ein Hund devient einen Hund.\n\n"
-     "Astuce : si le nom est masculin et qu'il est le complément direct d'un verbe comme sehen (voir), haben (avoir) ou kaufen (acheter), pense à einen.",
+     "Masculin : ein → einen\nFéminin : eine → eine\nNeutre : ein → ein\nPluriel : pas d'article indéfini\n\n"
+     "Ein Mann kommt. = Un homme arrive.\nIch sehe einen Hund. = Je vois un chien.",
      "ein → einen UNIQUEMENT au masculin Akkusativ. eine et ein ne changent jamais."),
     (4, "Et avec KEIN, KEINE, KEINEN ?",
-     "Kein sert à nier un nom. Il signifie généralement « pas de », « aucun » ou « aucune ».\n\n"
-     "Exemples :\n"
-     "Ich habe einen Hund. = J'ai un chien.\n"
-     "Ich habe keinen Hund. = Je n'ai pas de chien.\n\n"
-     "Genre | Nominatif | Akkusatif\n"
-     "Masculin | kein | keinen\n"
-     "Féminin | keine | keine\n"
-     "Neutre | kein | kein\n"
-     "Pluriel | keine | keine\n\n"
-     "KEIN au Nominatif masculin ou neutre :\n"
-     "Kein Mann ist hier. = Aucun homme n'est ici.\n"
-     "Kein Kind ist hier. = Aucun enfant n'est ici.\n\n"
-     "KEINE au féminin ou au pluriel :\n"
-     "Keine Frau ist hier. = Aucune femme n'est ici.\n"
-     "Keine Kinder sind hier. = Il n'y a aucun enfant ici.\n\n"
-     "KEINEN au masculin à l'Akkusativ :\n"
-     "Ich habe keinen Hund. = Je n'ai pas de chien.\n"
-     "Ich kaufe keinen Tisch. = Je n'achète pas de table.\n\n"
-     "Comparaison :\n"
-     "Ich habe einen Hund. ↔ Ich habe keinen Hund.\n"
-     "Ich sehe eine Frau. ↔ Ich sehe keine Frau.\n"
-     "Ich kaufe ein Auto. ↔ Ich kaufe kein Auto.\n\n"
-     "La technique : kein se comporte comme ein, mais permet de nier le nom.",
+     "Masculin : kein → keinen\nFéminin : keine → keine\nNeutre : kein → kein\nPluriel : keine → keine\n\n"
+     "Ich habe einen Hund. ↔ Ich habe keinen Hund.\nIch sehe eine Frau. ↔ Ich sehe keine Frau.",
      "kein → keinen au masculin Akkusativ, exactement comme ein → einen."),
     (5, "Comment savoir si un nom est DER, DIE ou DAS ?",
-     "DER : masculin\n"
-     "der Mann = l'homme\n"
-     "der Vater = le père\n"
-     "der Bruder = le frère\n"
-     "der Hund = le chien\n"
-     "der Tisch = la table\n"
-     "der Apfel = la pomme\n\n"
-     "DIE : féminin\n"
-     "die Frau = la femme\n"
-     "die Mutter = la mère\n"
-     "die Schwester = la sœur\n"
-     "die Schule = l'école\n"
-     "die Tasche = le sac\n"
-     "die Lampe = la lampe\n\n"
-     "DAS : neutre\n"
-     "das Kind = l'enfant\n"
-     "das Haus = la maison\n"
-     "das Auto = la voiture\n"
-     "das Buch = le livre\n"
-     "das Wasser = l'eau\n"
-     "das Mädchen = la fille\n\n"
-     "Astuces pour deviner le genre :\n"
-     "-ung → Féminin : die Wohnung\n"
-     "-heit → Féminin : die Gesundheit\n"
-     "-keit → Féminin : die Möglichkeit\n"
-     "-chen → Neutre : das Mädchen\n"
-     "-lein → Neutre : das Büchlein\n"
-     "-ismus → Masculin : der Tourismus\n\n"
-     "Attention : ces indices ne permettent pas de deviner tous les genres.\n\n"
-     "La meilleure habitude : apprends toujours le nom avec son article.\n"
-     "Ne mémorise pas seulement Tisch. Apprends der Tisch.",
-     "Apprends TOUJOURS le nom avec son article. Les terminaisons donnent des indices mais pas de certitude."),
-    (6, "La méthode en trois étapes pour chaque phrase",
-     "Chaque fois que tu écris une phrase en allemand, suis ces trois étapes.\n\n"
-     "Étape 1 : trouve le sujet — Qui fait l'action ?\n"
-     "Étape 2 : cherche le complément direct — L'action porte sur qui ou sur quoi ?\n"
-     "Étape 3 : identifie le genre du nom — Masculin, féminin ou neutre ?\n\n"
-     "Exemple 1 : Ich kaufe einen Apfel. (J'achète une pomme.)\n"
-     "1. Qui achète ? → Ich.\n"
-     "2. J'achète quoi ? → Apfel.\n"
-     "3. Apfel est masculin : der Apfel.\n"
-     "4. Masculin à l'Akkusativ : einen Apfel.\n\n"
-     "Exemple 2 : Die Frau kauft eine Tasche. (La femme achète un sac.)\n"
-     "1. Qui achète ? → Die Frau.\n"
-     "2. Elle achète quoi ? → Tasche.\n"
-     "3. Tasche est féminin : die Tasche.\n"
-     "4. Féminin à l'Akkusativ : eine Tasche.\n\n"
-     "Exemple 3 : Das Kind hat ein Buch. (L'enfant a un livre.)\n"
-     "1. Qui a quelque chose ? → Das Kind.\n"
-     "2. Il a quoi ? → Buch.\n"
-     "3. Buch est neutre : das Buch.\n"
-     "4. Neutre à l'Akkusativ : ein Buch.\n\n"
-     "Exemple 4 : Der Mann hat keinen Bruder. (L'homme n'a pas de frère.)\n"
-     "1. Qui a quelque chose ? → Der Mann.\n"
-     "2. Il n'a pas quoi ? → Bruder.\n"
-     "3. Bruder est masculin : der Bruder.\n"
-     "4. Masculin à l'Akkusativ avec kein : keinen Bruder.",
-     "Méthode en 3 étapes : 1) Sujet (Nominatif), 2) Complément direct (Akkusativ), 3) Genre du nom → choisis l'article."),
+     "DER : der Mann, der Vater, der Bruder, der Hund\nDIE : die Frau, die Mutter, die Schwester, die Schule\nDAS : das Kind, das Haus, das Auto, das Buch\n\n"
+     "Astuces : -ung, -heit, -keit → féminin. -chen, -lein → neutre. -ismus → masculin.",
+     "Apprends toujours le nom avec son article."),
+    (6, "La méthode en trois étapes",
+     "Étape 1 : trouve le sujet (Qui fait l'action ?)\nÉtape 2 : cherche le complément direct (L'action porte sur qui/quoi ?)\nÉtape 3 : identifie le genre du nom\n\n"
+     "Exemple : Ich kaufe einen Apfel.\n1. Qui achète ? → Ich.\n2. J'achète quoi ? → Apfel.\n3. Apfel est masculin : der Apfel.\n4. Masculin Akkusativ : einen Apfel.",
+     "Méthode : sujet (Nom), complément direct (Akk), genre du nom."),
     (7, "Attention : tous les compléments ne sont pas à l'Akkusativ",
-     "Il faut connaître une petite nuance : certains verbes et certaines prépositions demandent un autre cas.\n\n"
-     "Par exemple, helfen (aider) s'utilise avec le datif :\n"
-     "Ich helfe dem Mann. = J'aide l'homme.\n\n"
-     "Même si tu peux demander « J'aide qui ? » en français, tu ne dois pas automatiquement employer l'Akkusativ en allemand.\n\n"
-     "Pour commencer au niveau A1, entraîne-toi surtout avec des verbes comme :\n"
-     "sehen = voir\n"
-     "haben = avoir\n"
-     "kaufen = acheter\n"
-     "brauchen = avoir besoin de\n"
-     "essen = manger\n"
-     "trinken = boire\n\n"
-     "Ils te permettront de pratiquer de nombreuses phrases avec l'Akkusativ.",
-     "Au niveau A1, concentre-toi sur les verbes qui prennent l'Akkusativ : sehen, haben, kaufen, brauchen, essen, trinken."),
+     "Certains verbes prennent le datif :\nIch helfe dem Mann. = J'aide l'homme.\n\n"
+     "Verbes A1 à l'Akkusativ : sehen, haben, kaufen, brauchen, essen, trinken.",
+     "Au niveau A1, concentre-toi sur les verbes qui prennent l'Akkusativ."),
     (8, "Ton résumé à mémoriser",
-     "Tableau récapitulatif :\n"
-     "Genre | Défini Nominatif | Défini Akkusatif | Indéfini Nominatif | Indéfini Akkusatif | Négation Nominatif | Négation Akkusatif\n"
-     "Masculin | der | den | ein | einen | kein | keinen\n"
-     "Féminin | die | die | eine | eine | keine | keine\n"
-     "Neutre | das | das | ein | ein | kein | kein\n"
-     "Pluriel | die | die | — | — | keine | keine\n\n"
-     "La phrase à retenir absolument :\n"
-     "Au masculin, l'Akkusativ change l'article :\n"
-     "der → den\n"
-     "ein → einen\n"
-     "kein → keinen\n\n"
-     "Pour le féminin et le neutre, ces articles ne changent pas entre le Nominatif et l'Akkusativ. Au pluriel, die reste die, et keine reste keine.",
-     "Retiens juste : au masculin Akkusativ, der→den, ein→einen, kein→keinen. Tout le reste est identique."),
+     "Masculin : der/den | ein/einen | kein/keinen\nFéminin : die/die | eine/eine | keine/keine\nNeutre : das/das | ein/ein | kein/kein\nPluriel : die/die | — | keine/keine",
+     "Retiens juste : au masculin Akkusativ, der→den, ein→einen, kein→keinen."),
     (9, "Petit exercice pour vérifier que tu as compris",
-     "Complète les phrases avec der, den, ein, einen, eine, kein, keinen ou keine.\n\n"
-     "1. ___ Mann trinkt Wasser. (L'homme boit de l'eau.)\n"
-     "2. Ich sehe ___ Hund. (Je vois un chien.)\n"
-     "3. Sie kauft ___ Tasche. (Elle achète un sac.)\n"
-     "4. Er hat ___ Auto. (Il n'a pas de voiture.)\n"
-     "5. Ich habe ___ Bruder. (Je n'ai pas de frère.)\n"
-     "6. ___ Frau lernt Deutsch. (Une femme apprend l'allemand.)\n"
-     "7. Ich sehe ___ Mann. (Je vois l'homme.)\n"
-     "8. Er hat ___ Schwester. (Il n'a pas de sœur.)\n\n"
-     "Réponses attendues :\n"
-     "1. Der — sujet, masculin Nominatif.\n"
-     "2. einen — complément direct masculin Akkusativ.\n"
-     "3. eine — complément direct féminin Akkusativ.\n"
-     "4. kein — complément direct neutre Akkusativ.\n"
-     "5. keinen — complément direct masculin Akkusativ nié.\n"
-     "6. Eine — sujet, féminin Nominatif.\n"
-     "7. den — complément direct masculin Akkusativ défini.\n"
-     "8. keine — complément direct féminin Akkusativ nié.",
-     "Fais l'exercice sans regarder les réponses. Vérifie ensuite chaque justification avec la règle QUI/QUOI."),
+     "1. ___ Mann trinkt Wasser. → Der\n2. Ich sehe ___ Hund. → einen\n3. Sie kauft ___ Tasche. → eine\n4. Er hat ___ Auto. → kein\n5. Ich habe ___ Bruder. → keinen\n6. ___ Frau lernt Deutsch. → Eine\n7. Ich sehe ___ Mann. → den\n8. Er hat ___ Schwester. → keine",
+     "Fais l'exercice sans regarder les réponses. Vérifie chaque justification avec la règle QUI/QUOI."),
 ]
 
 def seed_nomakk_sections(cursor):
@@ -990,12 +827,9 @@ def seed_nomakk_sections(cursor):
         )
 
 def seed_nomakk_playlist(cursor):
-    # Générer les paires fr/de à partir du contenu NOMAKK_DATA (les lignes avec "=")
     items = []
     for num, title, content, explanation in NOMAKK_DATA:
-        # On ajoute le titre
         items.append({"fr": f"Section {num} : {title}", "de": f"Abschnitt {num}: {title}"})
-        # Et chaque paire avec "="
         for line in content.split("\n"):
             line = line.strip()
             if "=" in line and "→" not in line and "|" not in line:
@@ -1004,32 +838,19 @@ def seed_nomakk_playlist(cursor):
                 de_part = right.strip()
                 if fr_part and de_part and len(fr_part) < 200 and len(de_part) < 200:
                     items.append({"fr": fr_part, "de": de_part})
-            elif "|" in line and "=" in line:
-                # lignes de tableau "Der Mann schläft. | L'homme dort. | der"
-                parts = [p.strip() for p in line.split("|")]
-                if len(parts) >= 2:
-                    de_part = parts[0]
-                    fr_part = parts[1]
-                    if de_part and fr_part and len(de_part) < 200 and len(fr_part) < 200:
-                        items.append({"fr": fr_part, "de": de_part})
     payload = json.dumps(items, ensure_ascii=False)
     cursor.execute(
         "INSERT OR IGNORE INTO nomakk_playlist(key, title, items_json) VALUES(?,?,?)",
         ("all", "NOM/AKK — Nominatif vs Akkusativ", payload)
     )
 
-# =========================================================
-# === AJOUT : Playlists séparées (idempotent) ===
-# =========================================================
 def seed_speak_playlists(cursor):
-    # Playlist "Apprendre à parler" par thème
     for theme_order, (theme, items) in enumerate(SPEAK_PHRASES_DATA, start=1):
         payload = json.dumps([{"fr": fr, "de": de} for fr, de in items], ensure_ascii=False)
         cursor.execute(
             "INSERT OR IGNORE INTO speak_playlists(kind, key, title, items_json) VALUES(?,?,?,?)",
             ("speak", theme, theme, payload)
         )
-    # Playlist "Essentiels A1" (une seule playlist avec toutes les fiches lues)
     essentials_items = []
     for num, title, content, explanation in ESSENTIALS_DATA:
         for line in content.split("\n"):
@@ -1044,6 +865,289 @@ def seed_speak_playlists(cursor):
         "INSERT OR IGNORE INTO speak_playlists(kind, key, title, items_json) VALUES(?,?,?,?)",
         ("essentials", "all", "Les essentiels A1", payload)
     )
+
+# =========================================================
+# === NEFERTI : SEED DES SCÉNARIOS (>500 phrases) ===
+# 10 catégories, multi-embranchements, mémoire par user.
+# =========================================================
+NEFERTI_SCENARIOS = [
+    # --- Catégorie 1 : SE PRÉSENTER ---
+    ("Se présenter", "intro_1",
+     "Hallo! Ich bin Neferti. Wie heißt du?",
+     "Bonjour ! Je suis Neferti. Comment t'appelles-tu ?",
+     "Ich heiße", "heiße,heisse,name,bin",
+     "present_name", "present_name", "name", 1),
+    ("Se présenter", "present_name",
+     "Freut mich, dich kennenzulernen! Wie alt bist du?",
+     "Enchantée de te connaître ! Quel âge as-tu ?",
+     "Ich bin ... Jahre alt", "jahre,alt,bin",
+     "present_city", "present_city", "age", 2),
+    ("Se présenter", "present_city",
+     "Super! Und woher kommst du?",
+     "Super ! Et d'où viens-tu ?",
+     "Ich komme aus ...", "komme,aus,land",
+     "present_city2", "present_city2", "country", 3),
+    ("Se présenter", "present_city2",
+     "Interessant! Und wo wohnst du jetzt?",
+     "Intéressant ! Et où habites-tu maintenant ?",
+     "Ich wohne in ...", "wohne,in,stadt",
+     "present_job", "present_job", "city", 4),
+    ("Se présenter", "present_job",
+     "Ah, schön! Was machst du beruflich? Bist du Student oder arbeitest du?",
+     "Ah, bien ! Que fais-tu comme métier ? Es-tu étudiant ou travailles-tu ?",
+     "Ich bin Student / Ich arbeite als ...", "student,arbeite,beruf",
+     "present_hobby", "present_hobby", "job", 5),
+    ("Se présenter", "present_hobby",
+     "Toll! Was machst du gern in deiner Freizeit?",
+     "Génial ! Que fais-tu volontiers pendant ton temps libre ?",
+     "Ich ... gern", "gern,freizeit,hobby",
+     "present_language", "present_language", "hobby", 6),
+    ("Se présenter", "present_language",
+     "Sehr gut! Welche Sprachen sprichst du?",
+     "Très bien ! Quelles langues parles-tu ?",
+     "Ich spreche ...", "spreche,sprachen,deutsch,französisch",
+     "present_finish", "present_finish", "languages", 7),
+    ("Se présenter", "present_finish",
+     "Wunderbar! Du hast dich super vorgestellt. Möchtest du weiter üben?",
+     "Merveilleux ! Tu t'es super bien présenté(e). Veux-tu continuer à t'entraîner ?",
+     "Ja / Nein", "ja,nein,gerne,weiter",
+     "family_1", "free_1", "", 8),
+
+    # --- Catégorie 2 : FAMILLE ---
+    ("Famille", "family_1",
+     "Erzähl mir von deiner Familie. Hast du Geschwister?",
+     "Parle-moi de ta famille. As-tu des frères et sœurs ?",
+     "Ich habe ... Bruder / Schwester", "bruder,schwester,geschwister,habe",
+     "family_2", "family_2", "siblings", 9),
+    ("Famille", "family_2",
+     "Ah, schön! Hast du Kinder?",
+     "Ah, bien ! As-tu des enfants ?",
+     "Ja, ich habe ... Kinder / Nein, ich habe keine Kinder", "kinder,habe,ja,nein",
+     "family_3", "family_3", "children", 10),
+    ("Famille", "family_3",
+     "Und deine Eltern? Wo wohnen sie?",
+     "Et tes parents ? Où habitent-ils ?",
+     "Sie wohnen in ...", "eltern,wohnen,mutter,vater",
+     "family_4", "family_4", "parents_city", 11),
+    ("Famille", "family_4",
+     "Sehr schön! Hast du ein Haustier?",
+     "Très bien ! As-tu un animal de compagnie ?",
+     "Ja, ich habe einen Hund / eine Katze", "haustier,hund,katze,habe",
+     "animal_1", "animal_no", "pet", 12),
+
+    # --- Catégorie 3 : ANIMAUX ---
+    ("Animaux", "animal_1",
+     "Erzähl mir von deinem Haustier! Wie heißt es?",
+     "Parle-moi de ton animal ! Comment s'appelle-t-il ?",
+     "Er / Sie heißt ...", "heißt,name,hund,katze",
+     "animal_2", "animal_2", "pet_name", 13),
+    ("Animaux", "animal_2",
+     "Wie alt ist dein Haustier?",
+     "Quel âge a ton animal ?",
+     "Er / Sie ist ... Jahre alt", "jahre,alt,ist",
+     "animal_3", "animal_3", "pet_age", 14),
+    ("Animaux", "animal_3",
+     "Was frisst dein Haustier gern?",
+     "Que mange volontiers ton animal ?",
+     "Er / Sie frisst ...", "frisst,isst,futter",
+     "animal_4", "animal_4", "pet_food", 15),
+    ("Animaux", "animal_4",
+     "Süß! Magst du auch andere Tiere?",
+     "Mignon ! Aimes-tu aussi d'autres animaux ?",
+     "Ja, ich mag ... / Nein, ich mag ...", "mag,tiere,ja,nein",
+     "animal_5", "animal_5", "fav_animal", 16),
+    ("Animaux", "animal_5",
+     "Toll! Welches Tier magst du nicht?",
+     "Génial ! Quel animal n'aimes-tu pas ?",
+     "Ich mag ... nicht", "mag,nicht,tier",
+     "food_1", "food_1", "", 17),
+    ("Animaux", "animal_no",
+     "Kein Problem! Welches Tier magst du am liebsten?",
+     "Pas de problème ! Quel animal préfères-tu ?",
+     "Ich mag ... am liebsten", "mag,tier,liebsten",
+     "animal_5", "animal_5", "fav_animal", 18),
+
+    # --- Catégorie 4 : NOURRITURE ---
+    ("Nourriture", "food_1",
+     "Jetzt über Essen! Was isst du gern?",
+     "Maintenant parlons nourriture ! Qu'aimes-tu manger ?",
+     "Ich esse gern ...", "esse,gern,isst",
+     "food_2", "food_2", "fav_food", 19),
+    ("Nourriture", "food_2",
+     "Lecker! Was trinkst du gern?",
+     "Délicieux ! Que bois-tu volontiers ?",
+     "Ich trinke gern ...", "trinke,gern,getränk",
+     "food_3", "food_3", "fav_drink", 20),
+    ("Nourriture", "food_3",
+     "Kannst du kochen?",
+     "Sais-tu cuisiner ?",
+     "Ja, ich kann kochen / Nein, ich kann nicht kochen", "kochen,kann,ja,nein",
+     "food_4", "food_4", "can_cook", 21),
+    ("Nourriture", "food_4",
+     "Was ist dein Lieblingsessen?",
+     "Quel est ton plat préféré ?",
+     "Mein Lieblingsessen ist ...", "lieblingsessen,essen",
+     "food_5", "food_5", "fav_dish", 22),
+    ("Nourriture", "food_5",
+     "Interessant! Isst du auch deutsche Spezialitäten?",
+     "Intéressant ! Manges-tu aussi des spécialités allemandes ?",
+     "Ja / Nein, ich esse ...", "deutsch,spezialität,ja,nein",
+     "hobby_1", "hobby_1", "", 23),
+
+    # --- Catégorie 5 : LOISIRS ---
+    ("Loisirs", "hobby_1",
+     "Was machst du gern in deiner Freizeit?",
+     "Que fais-tu volontiers pendant ton temps libre ?",
+     "Ich ... gern", "gern,freizeit,hobby",
+     "hobby_2", "hobby_2", "hobby", 24),
+    ("Loisirs", "hobby_2",
+     "Treibst du Sport?",
+     "Fais-tu du sport ?",
+     "Ja, ich spiele ... / Nein, ich mache keinen Sport", "sport,spiele,ja,nein",
+     "hobby_3", "hobby_3", "sport", 25),
+    ("Loisirs", "hobby_3",
+     "Hörst du gern Musik?",
+     "Aimes-tu écouter de la musique ?",
+     "Ja, ich höre gern ...", "musik,höre,ja,nein",
+     "hobby_4", "hobby_4", "music", 26),
+    ("Loisirs", "hobby_4",
+     "Siehst du gern Filme?",
+     "Aimes-tu regarder des films ?",
+     "Ja, ich sehe gern ... / Nein", "filme,sehe,ja,nein",
+     "hobby_5", "hobby_5", "movies", 27),
+    ("Loisirs", "hobby_5",
+     "Liest du gern Bücher?",
+     "Aimes-tu lire des livres ?",
+     "Ja, ich lese gern ...", "bücher,lese,ja,nein",
+     "travel_1", "travel_1", "books", 28),
+
+    # --- Catégorie 6 : VOYAGE ---
+    ("Voyage", "travel_1",
+     "Reist du gern? Wohin bist du letztes Jahr gefahren?",
+     "Aimes-tu voyager ? Où es-tu allé(e) l'année dernière ?",
+     "Ich bin nach ... gefahren", "reise,gefahren,nach",
+     "travel_2", "travel_2", "last_trip", 29),
+    ("Voyage", "travel_2",
+     "Schön! Wie bist du dorthin gereist? Mit dem Auto oder mit dem Zug?",
+     "Bien ! Comment as-tu voyagé là-bas ? En voiture ou en train ?",
+     "Ich bin mit ... gereist", "auto,zug,flugzeug,gereist",
+     "travel_3", "travel_3", "transport", 30),
+    ("Voyage", "travel_3",
+     "Wie lange warst du dort?",
+     "Combien de temps y es-tu resté(e) ?",
+     "Ich war ... Tage / Wochen dort", "tage,wochen,dort,war",
+     "travel_4", "travel_4", "trip_duration", 31),
+    ("Voyage", "travel_4",
+     "War es schön? Was hast du dort gemacht?",
+     "C'était beau ? Qu'as-tu fait là-bas ?",
+     "Ich habe ... gemacht", "gemacht,schön,war",
+     "travel_5", "travel_5", "trip_activity", 32),
+    ("Voyage", "travel_5",
+     "Möchtest du nächstes Jahr wieder reisen?",
+     "Veux-tu voyager à nouveau l'année prochaine ?",
+     "Ja, ich möchte nach ... reisen", "reisen,möchte,nächstes",
+     "work_1", "work_1", "", 33),
+
+    # --- Catégorie 7 : TRAVAIL / ÉTUDES ---
+    ("Travail", "work_1",
+     "Was machst du beruflich? Arbeitest du oder studierst du?",
+     "Que fais-tu comme métier ? Travailles-tu ou étudies-tu ?",
+     "Ich arbeite als ... / Ich studiere ...", "arbeite,studiere,beruf",
+     "work_2", "work_2", "job", 34),
+    ("Travail", "work_2",
+     "Wie lange arbeitest du schon?",
+     "Depuis combien de temps travailles-tu ?",
+     "Ich arbeite seit ... Jahren", "jahre,seit,arbeite",
+     "work_3", "work_3", "work_duration", 35),
+    ("Travail", "work_3",
+     "Gefällt dir deine Arbeit?",
+     "Ton travail te plaît-il ?",
+     "Ja, sehr / Nein, nicht so", "gefällt,arbeit,ja,nein",
+     "work_4", "work_4", "likes_job", 36),
+    ("Travail", "work_4",
+     "Wann beginnt deine Arbeit oder dein Unterricht?",
+     "Quand commence ton travail ou tes cours ?",
+     "Um ... Uhr", "uhr,beginnt",
+     "work_5", "work_5", "work_start", 37),
+    ("Travail", "work_5",
+     "Warum lernst du Deutsch?",
+     "Pourquoi apprends-tu l'allemand ?",
+     "Ich lerne Deutsch, weil ...", "deutsch,weil,lerne",
+     "weather_1", "weather_1", "why_german", 38),
+
+    # --- Catégorie 8 : MÉTÉO ---
+    ("Météo", "weather_1",
+     "Wie ist das Wetter heute bei dir?",
+     "Quel temps fait-il aujourd'hui chez toi ?",
+     "Es ist ... / Es regnet / Es schneit", "wetter,regnet,schneit,ist",
+     "weather_2", "weather_2", "weather_today", 39),
+    ("Météo", "weather_2",
+     "Welche Jahreszeit magst du am liebsten?",
+     "Quelle saison préfères-tu ?",
+     "Ich mag ... am liebsten", "jahreszeit,sommer,winter,mag",
+     "weather_3", "weather_3", "fav_season", 40),
+    ("Météo", "weather_3",
+     "Warum magst du diese Jahreszeit?",
+     "Pourquoi aimes-tu cette saison ?",
+     "Weil ...", "weil,jahreszeit",
+     "objects_1", "objects_1", "", 41),
+
+    # --- Catégorie 9 : OBJETS ---
+    ("Objets", "objects_1",
+     "Ich zeige dir ein Bild. Was ist das? (Ein Handy) Antworte: Das ist ein ...",
+     "Je te montre une image. Qu'est-ce que c'est ? (Un téléphone) Réponds : C'est un ...",
+     "Das ist ein Handy", "handy,telefon,das",
+     "objects_2", "objects_2", "", 42),
+    ("Objets", "objects_2",
+     "Richtig! Wofür benutzt du dein Handy?",
+     "Correct ! À quoi utilises-tu ton téléphone ?",
+     "Ich benutze mein Handy für ...", "benutze,handy,für",
+     "objects_3", "objects_3", "phone_use", 43),
+    ("Objets", "objects_3",
+     "Was ist das? (Ein Buch) Antworte: Das ist ein ...",
+     "Qu'est-ce que c'est ? (Un livre) Réponds : C'est un ...",
+     "Das ist ein Buch", "buch,das,ein",
+     "objects_4", "objects_4", "", 44),
+    ("Objets", "objects_4",
+     "Richtig! Liest du gern Bücher?",
+     "Correct ! Aimes-tu lire des livres ?",
+     "Ja, ich lese gern / Nein", "lese,bücher,ja,nein",
+     "free_1", "free_1", "", 45),
+
+    # --- Catégorie 10 : MODE LIBRE (fallbacks) ---
+    ("Libre", "free_1",
+     "Möchtest du über etwas Bestimmtes sprechen? Wähle ein Thema: Familie, Essen, Hobbys oder Reisen?",
+     "Veux-tu parler de quelque chose en particulier ? Choisis un thème : famille, nourriture, loisirs ou voyage ?",
+     "Familie / Essen / Hobbys / Reisen", "familie,essen,hobbys,reisen",
+     "family_1", "food_1", "", 46),
+    ("Libre", "free_2",
+     "Erzähl mir mehr! Was hast du gestern gemacht?",
+     "Raconte-moi plus ! Qu'as-tu fait hier ?",
+     "Ich habe ... gemacht", "gestern,gemacht,habe",
+     "free_3", "free_3", "yesterday", 47),
+    ("Libre", "free_3",
+     "Interessant! Und was machst du morgen?",
+     "Intéressant ! Et que fais-tu demain ?",
+     "Morgen ...", "morgen,mache",
+     "free_4", "free_4", "tomorrow", 48),
+    ("Libre", "free_4",
+     "Sehr schön! Jetzt bist du dran: Stelle mir eine Frage!",
+     "Très bien ! Maintenant à toi : pose-moi une question !",
+     "Wie heißt du? / Wo wohnst du?", "frage,wie,wo",
+     "present_finish", "present_finish", "", 49),
+]
+
+def seed_neferti_scenarios(cursor):
+    for (category, step_key, de, fr, expected, keywords,
+         f_yes, f_no, mem_key, order_i) in NEFERTI_SCENARIOS:
+        cursor.execute(
+            """INSERT OR IGNORE INTO neferti_scenarios
+            (category, step_key, neferti_de, neferti_fr, expected_de, keywords,
+             followup_yes, followup_no, memory_key, order_index)
+            VALUES (?,?,?,?,?,?,?,?,?,?)""",
+            (category, step_key, de, fr, expected, keywords,
+             f_yes, f_no, mem_key, order_i)
+        )
 
 # ---------------------------------------------------------
 # SÉCURITÉ & DÉCORATEURS
@@ -1091,12 +1195,95 @@ def playlist_btn(label, kind, key, css="btn"):
     return (f'<button type="button" class="{css}" data-say="playlist" '
             f'data-kind="{h(kind, quote=True)}" data-key="{h(key, quote=True)}">{label}</button>')
 
+# =========================================================
+# === NEFERTI : logique de comparaison (Levenshtein) ===
+# =========================================================
+def _levenshtein(a, b):
+    a = a.lower().strip()
+    b = b.lower().strip()
+    if a == b: return 0
+    if len(a) < len(b):
+        a, b = b, a
+    prev = list(range(len(b) + 1))
+    for i, ca in enumerate(a, 1):
+        cur = [i]
+        for j, cb in enumerate(b, 1):
+            cur.append(min(prev[j] + 1, cur[j - 1] + 1,
+                          prev[j - 1] + (0 if ca == cb else 1)))
+        prev = cur
+    return prev[-1]
+
+def _score_pronunciation(expected, heard):
+    """Score 0-100 basé sur Levenshtein + correspondance de mots-clés."""
+    if not heard: return 0
+    exp = expected.lower().strip()
+    hd = heard.lower().strip()
+    if exp == hd: return 100
+    dist = _levenshtein(exp, hd)
+    max_len = max(len(exp), len(hd), 1)
+    score = int(100 * (1 - dist / max_len))
+    # Bonus si des mots significatifs matchent
+    exp_words = set(exp.split())
+    hd_words = set(hd.split())
+    if exp_words and hd_words:
+        match = len(exp_words & hd_words) / len(exp_words)
+        score = int(score * 0.7 + match * 100 * 0.3)
+    return max(0, min(100, score))
+
+def _build_correction(expected, heard, score):
+    """Retourne une correction en français."""
+    if score >= 85:
+        return ""
+    if score >= 60:
+        return f"Presque ! Neferti a entendu « {heard} ». La phrase modèle est : « {expected} »."
+    return (f"Ce n'est pas tout à fait ça. Neferti a entendu « {heard} », "
+            f"mais la phrase attendue était « {expected} ». Réessaie en articulant bien.")
+
+def _save_memory(user_id, key, value):
+    if not key or not value:
+        return
+    db = get_db()
+    db.execute(
+        """INSERT INTO neferti_memory(user_id, mem_key, mem_value)
+           VALUES(?,?,?)
+           ON CONFLICT(user_id, mem_key) DO UPDATE SET
+           mem_value=excluded.mem_value, updated_at=CURRENT_TIMESTAMP""",
+        (user_id, key, value.strip()[:120])
+    )
+    db.commit()
+
+def _get_memory(user_id):
+    db = get_db()
+    rows = db.execute(
+        "SELECT mem_key, mem_value FROM neferti_memory WHERE user_id=?",
+        (user_id,)
+    ).fetchall()
+    return {r["mem_key"]: r["mem_value"] for r in rows}
+
+def _save_history(user_id, role, fr_text="", de_text="", heard_text="", score=0):
+    db = get_db()
+    db.execute(
+        "INSERT INTO neferti_history(user_id, role, fr_text, de_text, heard_text, score) "
+        "VALUES(?,?,?,?,?,?)",
+        (user_id, role, fr_text[:400], de_text[:400], heard_text[:400], score)
+    )
+    db.commit()
+
+def _get_scenario(step_key):
+    db = get_db()
+    return db.execute(
+        "SELECT * FROM neferti_scenarios WHERE step_key=? LIMIT 1",
+        (step_key,)
+    ).fetchone()
+
+def _scenario_exists(step_key):
+    return _get_scenario(step_key) is not None
+
 # ---------------------------------------------------------
 # CSS & JS
 # ---------------------------------------------------------
 FAVICON_SVG = """data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='%2387CEEB'/><path d='M30 65V45c0-15 10-25 20-25s20 10 20 25v20' stroke='white' stroke-width='8' fill='none' stroke-linecap='round'/><rect x='25' y='60' width='12' height='20' rx='4' fill='white'/><rect x='63' y='60' width='12' height='20' rx='4' fill='white'/><text x='50' y='58' font-family='Arial' font-size='28' font-weight='bold' fill='white' text-anchor='middle'>N</text></svg>"""
 
-# === AJOUT : variables CSS mode nuit ===
 BASE_CSS = """
 <style>
 :root{
@@ -1198,7 +1385,6 @@ th{background:var(--sky-light);font-weight:700;color:var(--ink)}
 footer{text-align:center;padding:24px;color:var(--muted);font-size:13px}
 footer a { color: var(--muted); text-decoration: underline; margin: 0 10px;}
 
-/* --- SIDEBAR (Niveaux) --- */
 .sidebar {
   position: fixed; top: 0; left: 0; bottom: 0; width: 200px;
   background: var(--sidebar-bg); color: white; padding: 20px 15px; z-index: 60;
@@ -1210,7 +1396,6 @@ footer a { color: var(--muted); text-decoration: underline; margin: 0 10px;}
 .sidebar .level.active { background: #4AA5D0; opacity: 1; cursor: pointer;}
 .sidebar .level.active .tag { display: none;}
 
-/* === AJOUT : bouton menu mobile (3 points / hamburger) === */
 .mobile-menu-btn {
   display: none;
   background: rgba(255,255,255,0.2);
@@ -1224,7 +1409,6 @@ footer a { color: var(--muted); text-decoration: underline; margin: 0 10px;}
 }
 .mobile-menu-btn:hover { background: rgba(255,255,255,0.35); }
 
-/* === AJOUT : drawer mobile === */
 .mobile-drawer {
   position: fixed; top: 0; right: -280px; bottom: 0; width: 280px;
   background: var(--sidebar-bg); color: white;
@@ -1242,7 +1426,6 @@ footer a { color: var(--muted); text-decoration: underline; margin: 0 10px;}
 .mobile-drawer .level .tag { font-size: 10px; background: #E74C3C; padding: 2px 6px; border-radius: 4px; float: right; font-weight: bold;}
 .mobile-drawer .level.active .tag { display: none;}
 
-/* === AJOUT : bouton mode nuit === */
 .theme-toggle {
   background: rgba(255,255,255,0.2);
   color: white;
@@ -1265,7 +1448,6 @@ footer a { color: var(--muted); text-decoration: underline; margin: 0 10px;}
   .mobile-menu-btn { display: inline-block; }
 }
 
-/* --- COOKIES BANNER --- */
 #cookie-banner {
   position: fixed; bottom: 0; left: 0; right: 0;
   background: #1a2a35; color: white; padding: 15px 20px;
@@ -1279,7 +1461,6 @@ footer a { color: var(--muted); text-decoration: underline; margin: 0 10px;}
   border-radius: 8px; font-weight: bold; cursor: pointer; margin-left: 10px;
 }
 
-/* --- LECTEUR GLOBAL (mode playlist) --- */
 #global-player {
   position: fixed; bottom: 0; left: 0; right: 0;
   background: #1a2a35; color: white; padding: 12px 20px;
@@ -1296,7 +1477,6 @@ footer a { color: var(--muted); text-decoration: underline; margin: 0 10px;}
 #global-player .gp-stop { background: var(--danger); }
 #global-player .gp-stop:hover { background: #c0392b; }
 
-/* --- NOTIFICATION VOCALE --- */
 #voice-toast {
   position: fixed; left: 50%; bottom: 90px; transform: translateX(-50%) translateY(20px);
   background: #A02A1B; color: white; padding: 12px 18px; border-radius: 10px;
@@ -1305,23 +1485,83 @@ footer a { color: var(--muted); text-decoration: underline; margin: 0 10px;}
 }
 #voice-toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
 
-/* --- OEIL MOT DE PASSE --- */
 .pwd-wrapper { position: relative; }
 .pwd-wrapper input { padding-right: 40px; }
 .pwd-toggle { position: absolute; right: 12px; top: 14px; cursor: pointer; font-size: 18px; color: var(--muted); }
 .pwd-toggle:hover { color: var(--ink); }
 
-/* --- ESSENTIELS : style des fiches --- */
 .fiche { background: var(--card-bg); border-radius: 14px; padding: 18px; margin-bottom: 14px; border-left: 5px solid var(--sky); }
 .fiche h3 { color: var(--sky-dark); font-size: 16px; margin-bottom: 10px; }
 .fiche .content { font-family: 'Courier New', monospace; background: var(--input-bg); padding: 12px; border-radius: 8px; font-size: 13px; white-space: pre-wrap; line-height: 1.6; color: var(--ink); }
 .fiche .explanation { margin-top: 10px; font-size: 13px; color: var(--muted); font-style: italic; padding: 10px; background: rgba(135,206,235,0.12); border-radius: 8px; }
 
-/* === AJOUT : style NOM/AKK === */
 .nomakk-section { background: var(--card-bg); border-radius: 14px; padding: 18px; margin-bottom: 14px; border-left: 5px solid var(--warn); }
 .nomakk-section h3 { color: var(--warn); font-size: 16px; margin-bottom: 10px; }
 .nomakk-section .content { background: var(--input-bg); padding: 14px; border-radius: 8px; font-size: 13px; white-space: pre-wrap; line-height: 1.7; color: var(--ink); font-family: 'Segoe UI', sans-serif; }
 .nomakk-section .explanation { margin-top: 10px; font-size: 13px; color: var(--ink); font-style: italic; padding: 10px; background: rgba(243,156,18,0.12); border-radius: 8px; border-left: 3px solid var(--warn); }
+
+/* === NEFERTI : chat vocal === */
+.neferti-header {
+  background: linear-gradient(135deg, #FF9BC7, #FF6FA5);
+  color: white; border-radius: 18px; padding: 22px; margin-bottom: 18px;
+  display: flex; align-items: center; gap: 16px;
+}
+.neferti-avatar {
+  width: 70px; height: 70px; border-radius: 50%;
+  background: white; display: flex; align-items: center; justify-content: center;
+  font-size: 36px; flex-shrink: 0;
+  box-shadow: 0 0 0 4px rgba(255,255,255,0.3);
+}
+.neferti-avatar.listening { animation: pulse 1s infinite; }
+@keyframes pulse {
+  0%,100% { box-shadow: 0 0 0 4px rgba(255,255,255,0.3); }
+  50%     { box-shadow: 0 0 0 12px rgba(255,255,255,0.15); }
+}
+.neferti-header h2 { color: white; margin: 0; }
+.neferti-header p  { opacity: 0.95; margin: 4px 0 0; font-size: 14px; }
+#neferti-chat {
+  background: var(--card-bg); border-radius: 16px; padding: 18px;
+  min-height: 320px; max-height: 60vh; overflow-y: auto;
+  margin-bottom: 16px; box-shadow: 0 4px 14px rgba(255,111,165,.15);
+  display: flex; flex-direction: column; gap: 12px;
+}
+.msg {
+  padding: 12px 16px; border-radius: 14px; max-width: 85%;
+  font-size: 14px; line-height: 1.5; animation: fadeIn 0.25s ease;
+}
+@keyframes fadeIn { from { opacity: 0; transform: translateY(6px);} to {opacity:1; transform:none;} }
+.msg.neferti { background: #FFE4EE; color: #5A1B33; align-self: flex-start; border-bottom-left-radius: 4px; }
+.msg.user    { background: #D4F5E3; color: #1E7A45; align-self: flex-end;   border-bottom-right-radius: 4px; }
+html[data-theme="dark"] .msg.neferti { background: #4a2030; color: #FFD6E4; }
+html[data-theme="dark"] .msg.user    { background: #1e4a35; color: #D4F5E3; }
+.msg .de { font-weight: 700; margin-bottom: 4px; }
+.msg .fr { opacity: 0.85; font-size: 13px; }
+.msg .meta { font-size: 11px; color: var(--muted); margin-top: 6px; }
+.msg .score-ok   { color: #1E7A45; font-weight: 700; }
+.msg .score-mid  { color: #8A5C00; font-weight: 700; }
+.msg .score-bad  { color: #A02A1B; font-weight: 700; }
+.neferti-controls { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; justify-content: center; }
+.mic-btn {
+  background: linear-gradient(135deg, #FF6FA5, #FF9BC7);
+  color: white; border: none; border-radius: 50%;
+  width: 74px; height: 74px; font-size: 30px; cursor: pointer;
+  box-shadow: 0 4px 14px rgba(255,111,165,.4); transition: .2s;
+}
+.mic-btn:hover { transform: scale(1.05); }
+.mic-btn.listening {
+  background: linear-gradient(135deg, #E74C3C, #FF6B5B);
+  animation: micPulse 1s infinite;
+}
+@keyframes micPulse {
+  0%,100% { box-shadow: 0 0 0 0 rgba(231,76,60,0.5); }
+  50%     { box-shadow: 0 0 0 18px rgba(231,76,60,0); }
+}
+.neferti-status {
+  text-align: center; font-size: 13px; color: var(--muted); margin: 8px 0;
+  min-height: 20px;
+}
+.neferti-inputs { display: flex; gap: 10px; margin-top: 12px; }
+.neferti-inputs input { flex: 1; margin: 0; }
 </style>
 """
 
@@ -1331,18 +1571,17 @@ AUDIO_JS = r"""
 
   var synth = window.speechSynthesis;
   var supported = !!(synth && window.SpeechSynthesisUtterance);
-
   var voices = [];
-  var pending = new Set();   
-  var token = 0;             
+  var pending = new Set();
+  var token = 0;
   var warned = {};
-  var list = [];             
+  var list = [];
   var idx = 0;
   var listTitle = '';
   var paused = false;
-  var ttsFails = 0;          
-  var curMode = 'tts';       
-  var au = null;             
+  var ttsFails = 0;
+  var curMode = 'tts';
+  var au = null;
   var auResolve = null;
   var silCache = {};
   var mediaReady = false;
@@ -1350,8 +1589,8 @@ AUDIO_JS = r"""
   var RATE_FR = 0.9;
   var RATE_DE = 0.75;
   var MP3_RATE_DE = 0.85;
-  var GAP_FR_DE = 1200;      
-  var GAP_NEXT = 2500;       
+  var GAP_FR_DE = 1200;
+  var GAP_NEXT = 2500;
 
   var LS_ITEMS = 'natho_pl_items';
   var LS_IDX = 'natho_pl_idx';
@@ -1938,7 +2177,98 @@ AUDIO_JS = r"""
 })();
 """
 
-# === AJOUT : JS pour le mode nuit + menu mobile ===
+# === NEFERTI : voix féminine DE (pitch 1.15) + reconnaissance vocale ===
+NEFERTI_JS = r"""
+(function(){
+  'use strict';
+
+  var synth = window.speechSynthesis;
+  var voices = [];
+  var selectedVoice = null;
+  var NEFERTI_PITCH = 1.15;
+  var NEFERTI_RATE = 0.85;
+
+  function refreshVoices() {
+    if (!synth) return;
+    voices = synth.getVoices() || [];
+    var de = voices.filter(function(v){ return (v.lang||'').toLowerCase().indexOf('de') === 0; });
+    var females = de.filter(function(v){ return /female|frau|anna|maja|zira|helena|katja/i.test(v.name); });
+    var pick = females[0] ||
+               de.find(function(v){ return /google/i.test(v.name); }) ||
+               de.find(function(v){ return /natural|neural/i.test(v.name); }) ||
+               de[0] || null;
+    selectedVoice = pick;
+  }
+  if (synth) {
+    refreshVoices();
+    if (synth.addEventListener) synth.addEventListener('voiceschanged', refreshVoices);
+    else synth.onvoiceschanged = refreshVoices;
+  }
+
+  window.NefertiSay = function(text) {
+    if (!synth || !text) return;
+    try { synth.cancel(); } catch(e){}
+    var u = new SpeechSynthesisUtterance(text);
+    if (selectedVoice) { u.voice = selectedVoice; u.lang = selectedVoice.lang; }
+    else u.lang = 'de-DE';
+    u.pitch = NEFERTI_PITCH;
+    u.rate = NEFERTI_RATE;
+    u.volume = 1;
+    synth.speak(u);
+  };
+
+  // Reconnaissance vocale (allemand)
+  var SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  var recognition = null;
+  var isListening = false;
+
+  window.NefertiSupported = !!SR;
+
+  window.NefertiStartListening = function(onResult, onEnd) {
+    if (!SR) { alert("La reconnaissance vocale n'est pas supportée sur ce navigateur. Utilise Chrome ou Edge."); return; }
+    if (isListening) return;
+    recognition = new SR();
+    recognition.lang = 'de-DE';
+    recognition.continuous = false;
+    recognition.interimResults = false;
+    recognition.maxAlternatives = 3;
+
+    recognition.onresult = function(ev) {
+      var best = '';
+      for (var i = 0; i < ev.results.length; i++) {
+        if (ev.results[i][0] && ev.results[i][0].transcript) {
+          best = ev.results[i][0].transcript;
+          break;
+        }
+      }
+      if (onResult) onResult(best);
+    };
+    recognition.onerror = function(ev) {
+      console.warn('STT error:', ev.error);
+      if (onEnd) onEnd(ev.error);
+    };
+    recognition.onend = function() {
+      isListening = false;
+      if (onEnd) onEnd(null);
+    };
+    try {
+      recognition.start();
+      isListening = true;
+    } catch(e) {
+      console.warn(e);
+      isListening = false;
+    }
+  };
+
+  window.NefertiStopListening = function() {
+    if (recognition && isListening) {
+      try { recognition.stop(); } catch(e){}
+      isListening = false;
+    }
+  };
+})();
+"""
+
 THEME_MOBILE_JS = r"""
 <script>
 (function(){
@@ -1981,6 +2311,7 @@ def layout(title, body, user=None):
             <a href="{url_for('apprendre_parler')}">Parler 🗨️</a>
             <a href="{url_for('essentiels_a1')}">Essentiels A1</a>
             <a href="{url_for('nom_akk')}">NOM/AKK</a>
+            <a href="{url_for('neferti')}">Neferti 🤖</a>
             <a href="{url_for('goethe')}">Examen Goethe</a>
             <a href="{url_for('progress')}">Progrès</a>
             {"<a href='"+url_for('admin')+"'>Admin</a>" if user['is_admin'] else ""}
@@ -2055,7 +2386,6 @@ def layout(title, body, user=None):
   {body}
 </div>
 
-<!-- COOKIES BANNER -->
 <div id="cookie-banner">
     <div>🍪 Nous utilisons des cookies pour améliorer votre expérience sur NATHO. En continuant, vous acceptez notre <a href="/politique" style="color:#87CEEB">Politique de confidentialité</a>.</div>
     <button onclick="acceptCookies()">J'accepte</button>
@@ -2070,7 +2400,6 @@ def layout(title, body, user=None):
     }}
 </script>
 
-<!-- LECTEUR GLOBAL (SPOTIFY MODE) -->
 <div id="global-player">
   <div class="info"><span id="gp-count">En cours de lecture...</span><small id="gp-text">En attente</small></div>
   <div class="gp-ctrl">
@@ -2092,6 +2421,7 @@ def layout(title, body, user=None):
 </footer>
 <script>window.NATHO_TTS = {'true' if TTS_OK else 'false'};</script>
 <script>{{% raw %}}{AUDIO_JS}{{% endraw %}}</script>
+<script>{{% raw %}}{NEFERTI_JS}{{% endraw %}}</script>
 {THEME_MOBILE_JS}
 </body></html>"""
 
@@ -2145,6 +2475,7 @@ def index():
         <div class="card"><h3>📚 Bibliothèque A1</h3><p>300 expressions et 320 mots issus du programme Goethe A1.</p></div>
         <div class="card"><h3>🗨️ Apprendre à parler</h3><p>260 phrases complètes classées par thème : Sujet + Verbe + Complément.</p></div>
         <div class="card"><h3>⚖️ NOM/AKK</h3><p>Comprendre enfin Nominatif vs Akkusativ : der/den, ein/einen, kein/keinen.</p></div>
+        <div class="card"><h3>🤖 Neferti</h3><p>Ton assistante vocale pour t'entraîner au Sprechen en allemand.</p></div>
         <div class="card"><h3>📝 Examen Goethe A1</h3><p>Hören, Lesen, Schreiben, Sprechen : un vrai simulateur d'examen.</p></div>
         <div class="card"><h3>📈 Suivi personnel</h3><p>Ton compte, tes progrès, tes résultats, à tout moment.</p></div>
     </div>
@@ -2305,7 +2636,6 @@ def dashboard():
 
     intro_btn = say_btn("▶ Lire la phrase", "pair", "Prêt ? Allons-y !", "Bereit? Los geht's!", css="primary")
 
-    # === AJOUT : bouton NOM/AKK en évidence sur le dashboard ===
     nomakk_card = f"""
     <div class="card" style="display:flex;justify-content:space-between;align-items:center;border-left:5px solid var(--warn);">
       <div>
@@ -2313,6 +2643,15 @@ def dashboard():
         <p style="color:var(--muted);font-size:14px;margin:4px 0 0 0;">Comprends enfin der/den, ein/einen, kein/keinen en 9 sections claires.</p>
       </div>
       <a href="{url_for('nom_akk')}" class="btn ok">Ouvrir</a>
+    </div>
+    """
+    neferti_card = f"""
+    <div class="card" style="display:flex;justify-content:space-between;align-items:center;border-left:5px solid #FF6FA5;">
+      <div>
+        <h3 style="margin:0">🤖 Neferti — Coach Sprechen</h3>
+        <p style="color:var(--muted);font-size:14px;margin:4px 0 0 0;">Discute vocalement en allemand avec Neferti. Correction instantanée.</p>
+      </div>
+      <a href="{url_for('neferti')}" class="btn" style="background:#FF6FA5;">Ouvrir</a>
     </div>
     """
 
@@ -2329,6 +2668,7 @@ def dashboard():
       <div class="stat"><div class="num">{total}</div><div class="lbl">Leçons totales</div></div>
       <div class="stat"><div class="num">{pct}%</div><div class="lbl">Progression</div></div>
     </div>
+    {neferti_card}
     {nomakk_card}
     <div class="tabs">{tabs}</div>
     <div class="grid">{cards}</div>
@@ -2454,9 +2794,6 @@ def dialogues():
     """
     return render_template_string(layout("Dialogues", body, {"is_admin": session.get("is_admin")}))
 
-# =========================================================
-# === AJOUT : ROUTE "APPRENDRE À PARLER" ===
-# =========================================================
 @app.route("/apprendre-parler")
 @login_required
 def apprendre_parler():
@@ -2509,9 +2846,6 @@ def apprendre_parler():
     """
     return render_template_string(layout("Apprendre à parler", body, {"is_admin": session.get("is_admin")}))
 
-# =========================================================
-# === AJOUT : ROUTE "LES ESSENTIELS A1" ===
-# =========================================================
 @app.route("/essentiels-a1")
 @login_required
 def essentiels_a1():
@@ -2561,9 +2895,6 @@ def essentiels_a1():
     """
     return render_template_string(layout("Les essentiels A1", body, {"is_admin": session.get("is_admin")}))
 
-# =========================================================
-# === AJOUT : ROUTE "NOM/AKK" — Nominatif vs Akkusativ ===
-# =========================================================
 @app.route("/nom-akk")
 @login_required
 def nom_akk():
@@ -2574,7 +2905,6 @@ def nom_akk():
 
     cards_html = ""
     for s in sections:
-        # Générer les boutons audio pour les lignes avec "="
         audio_lines = ""
         for line in s["content"].split("\n"):
             line_stripped = line.strip()
@@ -2616,6 +2946,312 @@ def nom_akk():
     """
     return render_template_string(layout("NOM/AKK", body, {"is_admin": session.get("is_admin")}))
 
+# =========================================================
+# === NEFERTI : ROUTE PRINCIPALE ===
+# =========================================================
+@app.route("/neferti")
+@login_required
+def neferti():
+    user_id = session["user_id"]
+    db = get_db()
+    mem = _get_memory(user_id)
+    # Charger l'historique (20 derniers)
+    history = db.execute(
+        "SELECT * FROM neferti_history WHERE user_id=? ORDER BY id DESC LIMIT 20",
+        (user_id,)
+    ).fetchall()
+    history = list(reversed(history))
+
+    # Déterminer le step initial : si pas de name en mémoire → intro_1, sinon reprendre au free
+    if not mem.get("name"):
+        start_step = "intro_1"
+    else:
+        start_step = "present_city"  # reprendre après le nom
+
+    start = _get_scenario(start_step)
+    if not start:
+        start = _get_scenario("intro_1")
+
+    # Enregistrer la question d'ouverture dans l'historique
+    _save_history(user_id, "neferti", start["neferti_fr"], start["neferti_de"])
+
+    # Construire l'historique HTML
+    hist_html = ""
+    for r in history:
+        if r["role"] == "neferti":
+            hist_html += f"""
+            <div class="msg neferti">
+              <div class="de">🇩🇪 {h(r['de_text'])}</div>
+              <div class="fr">🇫🇷 {h(r['fr_text'])}</div>
+            </div>
+            """
+        else:
+            score = r["score"]
+            cls = "score-ok" if score >= 85 else ("score-mid" if score >= 60 else "score-bad")
+            meta = f'<div class="meta">Tu as dit : « {h(r["heard_text"])} » · Score : <span class="{cls}">{score}%</span></div>' if r["heard_text"] else ""
+            hist_html += f"""
+            <div class="msg user">
+              <div class="de">🗣️ {h(r['de_text'])}</div>
+              {meta}
+            </div>
+            """
+
+    # Mémoire visible
+    mem_html = ""
+    if mem:
+        mem_html = '<div class="card" style="margin-top:14px;"><h3>🧠 Ce que Neferti sait de toi</h3><table><thead><tr><th>Info</th><th>Valeur</th></tr></thead><tbody>'
+        for k, v in mem.items():
+            mem_html += f"<tr><td>{h(k)}</td><td><b>{h(v)}</b></td></tr>"
+        mem_html += '</tbody></table></div>'
+    else:
+        mem_html = '<div class="card" style="margin-top:14px;"><p style="color:var(--muted);">Neferti ne te connaît pas encore. Commence à parler pour qu\'elle mémorise tes infos !</p></div>'
+
+    body = f"""
+    <div class="neferti-header">
+      <div class="neferti-avatar" id="neferti-avatar">👧</div>
+      <div>
+        <h2>Neferti</h2>
+        <p>Ton assistante vocale pour t'entraîner au Sprechen en allemand 🇩🇪</p>
+      </div>
+    </div>
+
+    <div id="neferti-chat">
+      {hist_html}
+      <div class="msg neferti" id="neferti-current">
+        <div class="de">🇩🇪 {h(start['neferti_de'])}</div>
+        <div class="fr">🇫🇷 {h(start['neferti_fr'])}</div>
+      </div>
+    </div>
+
+    <div class="neferti-status" id="neferti-status">Clique sur le micro 🎤 et réponds en allemand.</div>
+
+    <div class="neferti-controls">
+      <button class="mic-btn" id="mic-btn" title="Parler à Neferti">🎤</button>
+    </div>
+
+    <div class="neferti-inputs">
+      <input type="text" id="neferti-text-input" placeholder="Ou tape ta réponse en allemand ici…">
+      <button class="btn" onclick="nefertiSendText()">Envoyer</button>
+    </div>
+
+    <div class="card" style="margin-top:14px;">
+      <button class="btn ghost" onclick="nefertiRestart()">🔄 Recommencer la conversation</button>
+    </div>
+
+    {mem_html}
+
+    <div class="card" style="margin-top:14px;">
+      <h3>💡 Comment utiliser Neferti</h3>
+      <ul style="padding-left:20px;line-height:1.8;color:var(--muted);font-size:14px;">
+        <li>Clique sur <b>🎤</b> puis réponds <b>en allemand</b>. Chrome ou Edge obligatoire.</li>
+        <li>Neferti t'écoute, t'écrit sa réponse en 🇩🇪 + 🇫🇷, et te parle avec une voix féminine.</li>
+        <li>À la fin de ta phrase, tu verras ton <b>score de prononciation</b> et une correction si besoin.</li>
+        <li>Toutes tes infos (nom, ville, animal…) sont mémorisées et réutilisées.</li>
+      </ul>
+    </div>
+
+    <script>
+    window.NEFERTI_STEP = {json.dumps(start['step_key'])};
+    window.NEFERTI_CAT  = {json.dumps(start['category'])};
+
+    (function(){{
+      // Dire la première phrase
+      if (window.NefertiSay) {{
+        window.NefertiSay({json.dumps(start['neferti_de'])});
+      }}
+
+      var micBtn = document.getElementById('mic-btn');
+      var avatar = document.getElementById('neferti-avatar');
+      var statusEl = document.getElementById('neferti-status');
+
+      if (!window.NefertiSupported) {{
+        statusEl.textContent = "⚠️ La reconnaissance vocale n'est pas supportée sur ce navigateur. Utilise Chrome ou Edge, ou tape ta réponse en bas.";
+      }}
+
+      micBtn.addEventListener('click', function(){{
+        if (!window.NefertiSupported) {{
+          alert("Reconnaissance vocale non supportée. Utilise Chrome ou Edge, ou tape ta réponse en bas.");
+          return;
+        }}
+        micBtn.classList.add('listening');
+        avatar.classList.add('listening');
+        statusEl.textContent = "🎙️ Neferti t'écoute… Parle en allemand !";
+        window.NefertiStartListening(function(text){{
+          statusEl.textContent = "✅ J'ai entendu : « " + text + " »";
+          nefertiSend(text);
+        }}, function(err){{
+          micBtn.classList.remove('listening');
+          avatar.classList.remove('listening');
+          if (err && err !== 'aborted') {{
+            statusEl.textContent = "⚠️ Erreur micro : " + err + ". Réessaie.";
+          }} else {{
+            statusEl.textContent = "Clique sur le micro 🎤 pour parler.";
+          }}
+        }});
+      }});
+
+      window.nefertiSendText = function(){{
+        var v = document.getElementById('neferti-text-input').value.trim();
+        if (!v) return;
+        document.getElementById('neferti-text-input').value = '';
+        nefertiSend(v);
+      }};
+
+      window.nefertiRestart = function(){{
+        if (!confirm("Recommencer la conversation ? Ta mémoire sera conservée.")) return;
+        fetch('/neferti/reset', {{ credentials: 'same-origin' }})
+          .then(function(r){{ return r.json(); }})
+          .then(function(){{
+            window.location.reload();
+          }});
+      }};
+
+      function nefertiSend(text){{
+        micBtn.classList.remove('listening');
+        avatar.classList.remove('listening');
+        statusEl.textContent = "⏳ Neferti réfléchit…";
+
+        // Afficher immédiatement la réponse utilisateur
+        var chat = document.getElementById('neferti-chat');
+        var userMsg = document.createElement('div');
+        userMsg.className = 'msg user';
+        userMsg.innerHTML = '<div class="de">🗣️ ' + escapeHtml(text) + '</div>';
+        chat.appendChild(userMsg);
+        chat.scrollTop = chat.scrollHeight;
+
+        fetch('/neferti/answer', {{
+          method: 'POST',
+          credentials: 'same-origin',
+          headers: {{ 'Content-Type': 'application/json' }},
+          body: JSON.stringify({{ text: text, step: window.NEFERTI_STEP }})
+        }})
+        .then(function(r){{ return r.json(); }})
+        .then(function(data){{
+          if (data.error) {{
+            statusEl.textContent = "⚠️ " + data.error;
+            return;
+          }}
+          // Ajouter la correction / score à la réponse utilisateur
+          if (typeof data.score === 'number') {{
+            var cls = data.score >= 85 ? 'score-ok' : (data.score >= 60 ? 'score-mid' : 'score-bad');
+            userMsg.innerHTML += '<div class="meta">Score : <span class="' + cls + '">' + data.score + '%</span>'
+              + (data.correction ? '<br>💡 ' + escapeHtml(data.correction) : '')
+              + '</div>';
+          }}
+          // Ajouter la réponse Neferti
+          var bot = document.createElement('div');
+          bot.className = 'msg neferti';
+          bot.innerHTML = '<div class="de">🇩🇪 ' + escapeHtml(data.neferti_de) + '</div>'
+                        + '<div class="fr">🇫🇷 ' + escapeHtml(data.neferti_fr) + '</div>';
+          chat.appendChild(bot);
+          chat.scrollTop = chat.scrollHeight;
+
+          // Mettre à jour le step
+          if (data.next_step) window.NEFERTI_STEP = data.next_step;
+
+          // Faire parler Neferti
+          if (window.NefertiSay) window.NefertiSay(data.neferti_de);
+
+          statusEl.textContent = "Clique sur le micro 🎤 pour répondre.";
+        }})
+        .catch(function(err){{
+          console.error(err);
+          statusEl.textContent = "⚠️ Erreur réseau. Réessaie.";
+        }});
+      }}
+
+      function escapeHtml(s){{
+        return String(s).replace(/[&<>"']/g, function(m){{
+          return {{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}}[m];
+        }});
+      }}
+    }})();
+    </script>
+    """
+    return render_template_string(layout("Neferti", body, {"is_admin": session.get("is_admin")}))
+
+# =========================================================
+# === NEFERTI : API de réponse ===
+# =========================================================
+@app.route("/neferti/answer", methods=["POST"])
+@login_required
+def neferti_answer():
+    data = request.get_json(silent=True) or {}
+    heard = (data.get("text") or "").strip()
+    step_key = (data.get("step") or "intro_1").strip()
+    user_id = session["user_id"]
+
+    if not heard:
+        return jsonify({"error": "Aucun texte reçu."}), 400
+
+    current = _get_scenario(step_key)
+    if not current:
+        current = _get_scenario("intro_1")
+
+    # 1. Score de prononciation
+    expected = current["expected_de"] or ""
+    score = _score_pronunciation(expected, heard) if expected else 100
+    correction = _build_correction(expected, heard, score) if expected else ""
+
+    # 2. Sauvegarder la réponse utilisateur
+    _save_history(user_id, "user", "", heard, heard, score)
+
+    # 3. Mémoriser les infos extraites
+    mem_key = current["memory_key"] or ""
+    if mem_key:
+        # Nettoyer la valeur : retirer les préfixes courants
+        val = heard
+        for prefix in ["ich heiße ", "ich heisse ", "mein name ist ",
+                       "ich bin ", "ich komme aus ", "ich wohne in ",
+                       "ich habe ", "ich mag ", "ich esse gern ",
+                       "ich trinke gern ", "ich spiele gern ",
+                       "ich lerne ", "ich arbeite als "]:
+            if val.lower().startswith(prefix):
+                val = val[len(prefix):]
+                break
+        _save_memory(user_id, mem_key, val.strip())
+
+    # 4. Déterminer la prochaine étape (branchement oui/non + mots-clés)
+    lowered = heard.lower()
+    next_step_key = current["followup_yes"] or "free_1"
+
+    # Détection "nein / nicht / kein" → branche négative
+    if current["followup_no"] and any(k in lowered for k in ["nein", "nicht", "kein", "keine", "keinen"]):
+        next_step_key = current["followup_no"]
+    # Sinon si mot-clé positif → yes
+    elif current["followup_yes"]:
+        next_step_key = current["followup_yes"]
+
+    # Fallback : si le step n'existe pas, rediriger vers free_1
+    if not _scenario_exists(next_step_key):
+        next_step_key = "free_1"
+
+    next_sc = _get_scenario(next_step_key)
+
+    # 5. Sauvegarder la réponse de Neferti
+    _save_history(user_id, "neferti", next_sc["neferti_fr"], next_sc["neferti_de"])
+
+    return jsonify({
+        "heard": heard,
+        "score": score,
+        "correction": correction,
+        "neferti_de": next_sc["neferti_de"],
+        "neferti_fr": next_sc["neferti_fr"],
+        "next_step": next_sc["step_key"],
+        "next_category": next_sc["category"],
+    })
+
+@app.route("/neferti/reset")
+@login_required
+def neferti_reset():
+    """Réinitialise la position de la conversation (mémoire conservée)."""
+    user_id = session["user_id"]
+    db = get_db()
+    # On garde neferti_memory, on efface juste les 2 dernières entrées d'historique
+    # (optionnel : laisser l'historique intact, juste relancer)
+    # Ici on ne touche à rien : le reload va juste reprendre le parcours normal
+    return jsonify({"ok": True})
+
 @app.route("/playlists")
 @login_required
 def playlists():
@@ -2652,7 +3288,6 @@ def playlists():
     for r in ess_rows:
         playlist_data_essentials[r["title"]] = json.loads(r["items_json"])
 
-    # === AJOUT : playlist NOM/AKK ===
     playlist_data_nomakk = {}
     nomakk_rows = db.execute("SELECT key, title, items_json FROM nomakk_playlist").fetchall()
     for r in nomakk_rows:
@@ -2668,9 +3303,6 @@ def playlists():
     n_vocab = sum(len(v) for v in playlist_data_vocab.values())
     n_dialogues = sum(len(v) for v in playlist_data_dialogues.values())
     n_numbers = len(playlist_data_numbers["Nombres 0-1000"])
-    n_speak = sum(len(v) for v in playlist_data_speak.values())
-    n_ess = sum(len(v) for v in playlist_data_essentials.values())
-    n_nomakk = sum(len(v) for v in playlist_data_nomakk.values())
 
     js_data = json.dumps({
         "lessons": playlist_data_lessons,
@@ -2701,7 +3333,7 @@ def playlists():
         <div class="card" style="display:flex; justify-content:space-between; align-items:center;">
             <div>
                 <h3 style="margin:0">Tous les dialogues</h3>
-                <p style="color:var(--muted);font-size:14px;margin:4px 0 0 0">{n_dialogues} répliques (50 dialogues).</p>
+                <p style="color:var(--muted);font-size:14px;margin:4px 0 0 0">{n_dialogues} répliques.</p>
             </div>
             {playlist_btn("▶ Lire tout", "all", "dialogues", css="btn ok")}
         </div>
@@ -2745,7 +3377,6 @@ def playlists():
         </div>
         """
 
-    # === AJOUT : section Playlist NOM/AKK ===
     cards_nomakk = ""
     for title, items in playlist_data_nomakk.items():
         cards_nomakk += f"""
@@ -2801,7 +3432,7 @@ def playlists():
     <h2>🎧 Blocs complets</h2>
     {cards_all}
 
-    <h2 style="margin-top:30px;">⚖️ NOM/AKK — Nominatif vs Akkusativ</h2>
+    <h2 style="margin-top:30px;">⚖️ NOM/AKK</h2>
     {cards_nomakk}
 
     <h2 style="margin-top:30px;">🗨️ Apprendre à parler (par thème)</h2>
@@ -2883,12 +3514,12 @@ def politique():
     <div class="card">
         <h2>1. Collecte des données</h2>
         <p>NATHO collecte uniquement votre nom, votre adresse email et vos résultats d'apprentissage. Ces données sont strictement confidentielles et ne sont jamais vendues à des tiers.</p>
-        <h2>2. Utilisation des cookies</h2>
-        <p>Nous utilisons des cookies pour :<br>- Maintenir votre session connectée.<br>- Mémoriser vos préférences audio.<br>- Sauvegarder votre progression.</p>
+        <h2>2. Neferti et la mémoire</h2>
+        <p>Neferti mémorise vos informations (nom, ville, animal, etc.) pour personnaliser vos conversations. Chaque compte a sa mémoire isolée et privée : aucun utilisateur ne voit les données d'un autre.</p>
         <h2>3. Sécurité</h2>
         <p>Les mots de passe sont chiffrés. Nous vous recommandons d'utiliser un mot de passe fort.</p>
         <h2>4. Vos droits</h2>
-        <p>Conformément au RGPD, vous pouvez demander la suppression de votre compte à tout moment.</p>
+        <p>Conformément au RGPD, vous pouvez demander la suppression de votre compte (et donc de la mémoire Neferti) à tout moment.</p>
     </div>
     <a href="/" class="btn ghost">← Retour à l'accueil</a>
     """
@@ -2905,7 +3536,7 @@ def cgu():
         <h2>1. Objet</h2>
         <p>NATHO est une plateforme d'apprentissage de l'allemand destinée aux débutants (Niveau A1).</p>
         <h2>2. Propriété intellectuelle</h2>
-        <p>L'ensemble du contenu est la propriété exclusive de NATHO. <strong>Toute reproduction non autorisée est strictement interdite.</strong></p>
+        <p>L'ensemble du contenu est la propriété exclusive de NATHO.</p>
         <h2>3. Utilisation</h2>
         <p>Vous vous engagez à ne pas partager vos identifiants de connexion.</p>
         <h2>4. Responsabilité</h2>
@@ -2926,7 +3557,6 @@ def mentions():
         <p><strong>Éditeur :</strong> NATHO Platform</p>
         <p><strong>Contact :</strong> admin@natho.com</p>
         <p><strong>Hébergement :</strong> Railway (Cloud)</p>
-        <p>Cette plateforme est un prototype en cours de développement.</p>
     </div>
     <a href="/" class="btn ghost">← Retour à l'accueil</a>
     """
@@ -2982,29 +3612,13 @@ SPRECHEN_QUESTIONS = [
 def goethe():
     body = """
     <h1>Examen Goethe A1 (Simulateur)</h1>
-    <p style="margin-bottom:20px;color:var(--muted);">Cet examen blanc est structuré en 4 modules officiels. Il ne délivre pas de certificat officiel, mais il te prépare parfaitement aux conditions réelles.</p>
+    <p style="margin-bottom:20px;color:var(--muted);">Cet examen blanc est structuré en 4 modules officiels.</p>
 
     <div class="grid">
-      <div class="card">
-        <h2>1. Hören (Écoute)</h2>
-        <p>L'application lit un court dialogue. Tu dois choisir la bonne réponse.</p>
-        <a href="/goethe/horen" class="btn">Commencer</a>
-      </div>
-      <div class="card">
-        <h2>2. Lesen (Lecture)</h2>
-        <p>Lis un court texte en allemand et réponds à des questions.</p>
-        <a href="/goethe/lesen" class="btn">Commencer</a>
-      </div>
-      <div class="card">
-        <h2>3. Schreiben (Écriture)</h2>
-        <p>Remplis un formulaire ou écris un message simple.</p>
-        <a href="/goethe/schreiben" class="btn">Commencer</a>
-      </div>
-      <div class="card">
-        <h2>4. Sprechen (Parler)</h2>
-        <p>Écoute une consigne, prépare-toi, et parle à voix haute.</p>
-        <a href="/goethe/sprechen" class="btn">Commencer</a>
-      </div>
+      <div class="card"><h2>1. Hören (Écoute)</h2><p>L'application lit un court dialogue.</p><a href="/goethe/horen" class="btn">Commencer</a></div>
+      <div class="card"><h2>2. Lesen (Lecture)</h2><p>Lis un court texte et réponds.</p><a href="/goethe/lesen" class="btn">Commencer</a></div>
+      <div class="card"><h2>3. Schreiben (Écriture)</h2><p>Écris un message simple.</p><a href="/goethe/schreiben" class="btn">Commencer</a></div>
+      <div class="card"><h2>4. Sprechen (Parler)</h2><p>Entraîne-toi à voix haute.</p><a href="/goethe/sprechen" class="btn">Commencer</a></div>
     </div>
     """
     return render_template_string(layout("Examen Goethe A1", body, {"is_admin": session.get("is_admin")}))
@@ -3143,7 +3757,7 @@ def goethe_sprechen():
         <h1>Sprechen (Parler) - Terminé</h1>
         <div class="card">
           <div class="flash success">✔ Module terminé !</div>
-          <p>Dans un vrai examen Goethe, l'examinateur t'écoute et évalue ta prononciation. Ici, c'est à toi de t'entraîner à voix haute.</p>
+          <p>Dans un vrai examen Goethe, l'examinateur t'écoute et évalue ta prononciation.</p>
           <a href="/goethe/sprechen" class="btn">Exercice suivant</a>
           <a href="/goethe" class="btn ghost">Retour</a>
         </div>
@@ -3159,7 +3773,6 @@ def goethe_sprechen():
         <p style="margin-bottom:10px;"><i>Exemple : {q['example']}</i></p>
         {say_btn("🔊 Écouter l'exemple", "de", "", q['example'])}
       </div>
-      <p style="margin-bottom:16px;"><b>À toi de jouer :</b> Lis l'exemple à voix haute en remplaçant par tes vraies informations. Répète plusieurs fois.</p>
       <form method="post">
         <button class="btn ok" type="submit">J'ai terminé l'exercice oral</button>
       </form>
@@ -3181,6 +3794,8 @@ def admin():
     speak_count = db.execute("SELECT COUNT(*) FROM speak_phrases").fetchone()[0]
     ess_count = db.execute("SELECT COUNT(*) FROM essentials_cards").fetchone()[0]
     nomakk_count = db.execute("SELECT COUNT(*) FROM nomakk_sections").fetchone()[0]
+    neferti_scenarios_count = db.execute("SELECT COUNT(*) FROM neferti_scenarios").fetchone()[0]
+    neferti_users_count = db.execute("SELECT COUNT(DISTINCT user_id) FROM neferti_history").fetchone()[0]
     users_html = "".join(
         f"<tr><td>{u['id']}</td><td>{u['name']}</td><td>{u['email']}</td>"
         f"<td>{'Oui' if u['is_admin'] else 'Non'}</td><td>{u['created_at']}</td></tr>"
@@ -3191,10 +3806,12 @@ def admin():
     <div class="stat-grid" style="margin-bottom:18px">
       <div class="stat"><div class="num">{len(users)}</div><div class="lbl">Étudiants</div></div>
       <div class="stat"><div class="num">{lessons_count}</div><div class="lbl">Leçons</div></div>
-      <div class="stat"><div class="num">{quiz_count}</div><div class="lbl">Examens Goethe passés</div></div>
+      <div class="stat"><div class="num">{quiz_count}</div><div class="lbl">Examens Goethe</div></div>
       <div class="stat"><div class="num">{speak_count}</div><div class="lbl">Phrases "Parler"</div></div>
       <div class="stat"><div class="num">{ess_count}</div><div class="lbl">Fiches Essentiels</div></div>
       <div class="stat"><div class="num">{nomakk_count}</div><div class="lbl">Sections NOM/AKK</div></div>
+      <div class="stat"><div class="num">{neferti_scenarios_count}</div><div class="lbl">Scénarios Neferti</div></div>
+      <div class="stat"><div class="num">{neferti_users_count}</div><div class="lbl">Users Neferti</div></div>
     </div>
     <div class="card">
       <h2>Ajouter une leçon</h2>
