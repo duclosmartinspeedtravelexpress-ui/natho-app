@@ -4,6 +4,7 @@
 # + Apprendre à parler + Essentiels A1 + Mode nuit + Menu mobile
 # + NOM/AKK (Nominativ vs Akkusativ) + NEFERTI (bot Sprechen)
 # v4.1 : correctifs (sécurité, playlists, progression, Goethe, Neferti, contenu)
+# v4.4 : examen Goethe A1 refait (Hören 3 Teile, Lesen 4, Schreiben 2, Sprechen 3), tout en allemand, noté sur 100
 # v4.3 : Neferti (recommencer, présentation unique, micro à envoi manuel) + Guide (alphabet, 450 verbes, séparables, Perfekt)
 # v4.2 : sécurité renforcée, cours Datif/Génitif, Neferti intelligente (1000+ questions), dialogues uniques
 # =========================================================
@@ -6265,7 +6266,7 @@ def layout(title, body, user=None):
 <audio id="natho-audio" preload="auto" playsinline></audio>
 
 <footer>
-    © NATHO — Plateforme d'apprentissage de l'allemand A1 · v4.3<br>
+    © NATHO — Plateforme d'apprentissage de l'allemand A1 · v4.4<br>
     <a href="/politique">Politique de confidentialité</a> |
     <a href="/cgu">Conditions d'utilisation</a> |
     <a href="/mentions">Mentions légales</a>
@@ -9517,254 +9518,849 @@ def _choice_html(q, perm):
         f'<label class="quiz-opt"><input type="radio" name="rep" value="{pos}" required> {pos + 1}. {h(q["opts"][orig])}</label>'
         for pos, orig in enumerate(perm))
 
+# =========================================================
+# === GOETHE A1 v4.4 : Modellprüfung (Hören 3 Teile, Lesen 4 Teile, Schreiben 2 Teile, Sprechen 3 Teile) ===
+# Alle Aufgaben sind eigene Übungen im Format der Prüfung. Alles auf Deutsch.
+# =========================================================
+# Hören Teil 1 : (Hörtext, Frage, a, b, c, Lösung)
+GX_H1 = [
+    ("Entschuldigung, was kostet dieser Pullover? Der blaue kostet 35 Euro, aber heute ist er im Angebot: nur 25 Euro. Gut, dann nehme ich ihn.", "Was kostet der Pullover heute?", "35 Euro", "25 Euro", "15 Euro", "b"),
+    ("Wann fährt der nächste Zug nach Hamburg? Um 14 Uhr 20, von Gleis 7. Oh, dann habe ich noch zehn Minuten. Danke!", "Von welchem Gleis fährt der Zug?", "Gleis 7", "Gleis 14", "Gleis 20", "a"),
+    ("Guten Tag, ich möchte zu Frau Doktor Lang. Gehen Sie bitte in den zweiten Stock, Zimmer 215. Zweiter Stock, Zimmer 215. Vielen Dank.", "Welches Zimmer hat Frau Doktor Lang?", "Zimmer 205", "Zimmer 250", "Zimmer 215", "c"),
+    ("Was möchten Sie trinken? Einen Kaffee, bitte. Mit Milch und Zucker? Nur mit Milch, bitte.", "Wie trinkt der Mann seinen Kaffee?", "mit Milch", "mit Zucker", "schwarz", "a"),
+    ("Hallo Tina, wollen wir am Samstag ins Kino gehen? Am Samstag kann ich nicht, da arbeite ich. Aber am Sonntag habe ich Zeit. Gut, dann am Sonntag.", "Wann gehen die beiden ins Kino?", "am Freitag", "am Samstag", "am Sonntag", "c"),
+    ("Entschuldigung, wo ist hier die Post? Gehen Sie geradeaus und dann die zweite Straße links. Die Post ist neben der Bank. Danke schön!", "Wo ist die Post?", "neben der Bank", "neben der Schule", "neben dem Bahnhof", "a"),
+    ("Wie viel Uhr ist es, bitte? Es ist Viertel nach neun. Oh, mein Kurs beginnt um halb zehn. Ich muss gehen!", "Wann beginnt der Kurs?", "um 9.15 Uhr", "um 9.30 Uhr", "um 10.30 Uhr", "b"),
+    ("Ich hätte gern ein Kilo Tomaten und sechs Eier. Gern. Sonst noch etwas? Nein, danke. Das macht dann 4 Euro 80.", "Was kauft die Frau?", "Tomaten und Äpfel", "Eier und Käse", "Tomaten und Eier", "c"),
+    ("Was machst du heute Abend, Paul? Ich lerne für die Prüfung. Und du? Ich gehe mit meiner Schwester schwimmen.", "Was macht Paul heute Abend?", "Er geht schwimmen.", "Er lernt.", "Er besucht seine Schwester.", "b"),
+    ("Guten Tag, ich suche eine Wohnung. Wir haben eine Wohnung mit drei Zimmern, Küche und Bad. Sie kostet 650 Euro im Monat. Das ist gut, wann kann ich sie sehen?", "Wie viele Zimmer hat die Wohnung?", "zwei", "drei", "vier", "b"),
+    ("Wie kommst du zur Arbeit, Maria? Früher bin ich mit dem Bus gefahren, aber jetzt nehme ich immer das Fahrrad. Das ist gesund und kostet nichts.", "Wie kommt Maria jetzt zur Arbeit?", "mit dem Fahrrad", "mit dem Bus", "mit dem Auto", "a"),
+    ("Hallo, hier ist die Praxis Doktor Weber. Ich brauche einen Termin. Am Dienstag um zehn Uhr ist frei. Dienstag um zehn passt mir gut.", "Wann ist der Termin?", "am Montag um zehn Uhr", "am Dienstag um zwölf Uhr", "am Dienstag um zehn Uhr", "c"),
+    ("Was darf es sein? Ich nehme die Suppe und danach den Fisch mit Reis. Und zu trinken? Ein Mineralwasser, bitte.", "Was isst der Gast nach der Suppe?", "Fleisch mit Kartoffeln", "Fisch mit Reis", "Salat mit Brot", "b"),
+    ("Entschuldigung, fährt dieser Bus zum Flughafen? Nein, das ist die Linie 12. Zum Flughafen fährt die Linie 34. Sie hält dort drüben.", "Welcher Bus fährt zum Flughafen?", "die Linie 34", "die Linie 12", "die Linie 43", "a"),
+    ("Mama, wo ist meine Jacke? Im Schrank ist sie nicht. Schau mal im Auto, du hast sie gestern dort gelassen. Ach ja, stimmt!", "Wo ist die Jacke?", "im Schrank", "in der Schule", "im Auto", "c"),
+    ("Wie lange dauert der Deutschkurs? Der Kurs dauert drei Monate, von Januar bis März. Und was kostet er? 180 Euro.", "Wie lange dauert der Kurs?", "zwei Monate", "drei Monate", "sechs Monate", "b"),
+    ("Haben Sie Kinder, Herr Bauer? Ja, ich habe eine Tochter und zwei Söhne. Die Tochter ist schon zwölf Jahre alt.", "Wie viele Kinder hat Herr Bauer?", "drei", "zwei", "eins", "a"),
+    ("Ich möchte dieses Paket nach Kamerun schicken. Das kostet 28 Euro. Wie lange dauert das? Ungefähr zehn Tage.", "Wie lange braucht das Paket?", "zwei Tage", "zehn Tage", "achtundzwanzig Tage", "b"),
+    ("Kommst du mit zum Fußball? Nein, ich habe Kopfschmerzen. Ich bleibe zu Hause und gehe früh ins Bett. Gute Besserung!", "Warum kommt die Frau nicht mit?", "Sie muss arbeiten.", "Sie hat keine Lust.", "Sie hat Kopfschmerzen.", "c"),
+    ("Wo wollen wir uns treffen? Vor dem Kino? Nein, lieber im Café am Marktplatz, da ist es warm. Gut, um sechs im Café.", "Wo treffen sich die beiden?", "im Café", "vor dem Kino", "am Bahnhof", "a"),
+]
+# Hören Teil 2 : (Durchsage, Aussage, richtig?)
+GX_H2 = [
+    ("Achtung, eine Durchsage: Der Intercity nach München hat heute zwanzig Minuten Verspätung. Wir bitten um Ihr Verständnis.", "Der Zug nach München kommt pünktlich.", False),
+    ("Liebe Kunden, heute im Angebot: frische Erdbeeren, die Schale für nur 1 Euro 99. Sie finden die Erdbeeren in der Obstabteilung.", "Die Erdbeeren sind heute billig.", True),
+    ("Der kleine Tim sucht seine Mutter. Frau Schneider, bitte kommen Sie zur Information im Erdgeschoss.", "Frau Schneider soll zur Information kommen.", True),
+    ("Sehr geehrte Fahrgäste, wegen Bauarbeiten fährt die U-Bahn-Linie 3 heute nicht. Bitte benutzen Sie die Busse.", "Die U-Bahn-Linie 3 fährt heute normal.", False),
+    ("Liebe Besucher, das Schwimmbad schließt in dreißig Minuten. Bitte verlassen Sie jetzt das Wasser.", "Das Schwimmbad macht bald zu.", True),
+    ("Achtung am Gleis 4: Der Zug nach Köln fährt heute von Gleis 9 ab. Ich wiederhole: Gleis 9.", "Der Zug nach Köln fährt von Gleis 4.", False),
+    ("Verehrte Kunden, unser Restaurant im dritten Stock bietet heute ein Mittagsmenü für 7 Euro 50 an.", "Das Restaurant ist im dritten Stock.", True),
+    ("Guten Morgen, liebe Schüler. Der Sportunterricht fällt heute aus, weil Herr Kraus krank ist.", "Heute gibt es Sportunterricht.", False),
+    ("Meine Damen und Herren, in wenigen Minuten landen wir in Frankfurt. Bitte bleiben Sie auf Ihren Plätzen.", "Das Flugzeug landet bald in Frankfurt.", True),
+    ("Der Fahrer des roten Autos mit dem Kennzeichen B-MK 482: Bitte fahren Sie Ihr Auto weg, es steht vor dem Eingang.", "Das rote Auto steht richtig.", False),
+    ("Liebe Gäste, das Museum ist am Montag geschlossen. Von Dienstag bis Sonntag ist es von zehn bis achtzehn Uhr geöffnet.", "Am Montag kann man das Museum besuchen.", False),
+    ("Achtung, eine wichtige Information: Im Park wurde eine schwarze Tasche gefunden. Sie können sie an der Kasse abholen.", "Die Tasche liegt an der Kasse.", True),
+    ("Sehr geehrte Reisende, der Bus nach Leipzig fährt in fünf Minuten ab. Bitte steigen Sie jetzt ein.", "Der Bus fährt in einer Stunde.", False),
+    ("Liebe Kundinnen und Kunden, wir schließen heute schon um sechzehn Uhr. Morgen sind wir wieder ab acht Uhr für Sie da.", "Das Geschäft schließt heute früher.", True),
+    ("Hier ist die Wettervorhersage: Morgen regnet es im Norden den ganzen Tag. Im Süden scheint die Sonne.", "Im Süden regnet es morgen.", False),
+    ("Achtung, Kursteilnehmer: Der Deutschkurs A1 findet heute in Raum 12 statt, nicht in Raum 8.", "Der Kurs ist heute in Raum 12.", True),
+    ("Liebe Fahrgäste, nächste Haltestelle: Hauptbahnhof. Hier können Sie in die Straßenbahn umsteigen.", "Am Hauptbahnhof kann man umsteigen.", True),
+    ("Sehr geehrte Patienten, Doktor Meier macht vom ersten bis zum fünfzehnten August Urlaub. Die Praxis ist geschlossen.", "Die Praxis ist im August immer geöffnet.", False),
+    ("Sonderangebot in der Bäckerei: Heute bekommen Sie zehn Brötchen für nur zwei Euro.", "Zehn Brötchen kosten heute zwei Euro.", True),
+    ("Das Fußballspiel beginnt heute nicht um fünfzehn Uhr, sondern erst um siebzehn Uhr. Die Karten bleiben gültig.", "Das Spiel beginnt um fünfzehn Uhr.", False),
+]
+# Hören Teil 3 : (Nachricht am Telefon, Frage, a, b, c, Lösung)
+GX_H3 = [
+    ("Hallo Lisa, hier ist Markus. Ich komme heute später, mein Zug hat Verspätung. Ich bin erst um acht Uhr am Bahnhof. Holst du mich ab?", "Wann kommt Markus am Bahnhof an?", "um sieben Uhr", "um acht Uhr", "um neun Uhr", "b"),
+    ("Guten Tag, Herr Okafor, hier ist die Zahnarztpraxis. Ihr Termin am Mittwoch fällt leider aus. Bitte kommen Sie am Freitag um elf Uhr.", "Wann soll Herr Okafor kommen?", "am Freitag", "am Mittwoch", "am Montag", "a"),
+    ("Hallo Papa, ich bin noch bei Sara. Wir machen zusammen Hausaufgaben. Ich komme um sechs Uhr nach Hause. Tschüs!", "Wo ist das Kind?", "in der Schule", "zu Hause", "bei einer Freundin", "c"),
+    ("Hier ist die Buchhandlung am Markt. Frau Keller, Ihr Buch ist da. Sie können es ab morgen bei uns abholen.", "Was soll Frau Keller machen?", "ein Buch bestellen", "ein Buch abholen", "ein Buch bezahlen", "b"),
+    ("Hallo Jonas, hier ist Felix. Die Party ist nicht bei mir, sondern bei Anna, in der Gartenstraße 14. Bring bitte Getränke mit!", "Was soll Jonas mitbringen?", "Getränke", "Musik", "einen Kuchen", "a"),
+    ("Guten Tag, hier ist die Autowerkstatt Schulz. Ihr Auto ist fertig. Die Reparatur kostet 240 Euro. Wir haben bis achtzehn Uhr geöffnet.", "Was kostet die Reparatur?", "214 Euro", "420 Euro", "240 Euro", "c"),
+    ("Hallo Mama, ich habe meinen Schlüssel vergessen. Bist du heute Nachmittag zu Hause? Ruf mich bitte an!", "Was ist das Problem?", "Der Schlüssel ist nicht da.", "Das Handy ist kaputt.", "Die Mutter ist krank.", "a"),
+    ("Hier spricht Frau Brandt von der Sprachschule. Der Kurs beginnt nicht am ersten, sondern am achten September, um neun Uhr.", "Wann beginnt der Kurs?", "am ersten September", "am achten September", "am neunten September", "b"),
+    ("Hallo Kemal, hier ist Sven. Wir spielen am Sonntag Fußball im Park, um zehn Uhr. Kommst du auch? Wir brauchen noch einen Spieler.", "Wo spielen die Freunde Fußball?", "in der Schule", "im Stadion", "im Park", "c"),
+    ("Guten Tag, hier ist das Hotel Sonne. Ihr Zimmer ist reserviert: ein Doppelzimmer für drei Nächte, mit Frühstück.", "Für wie viele Nächte ist das Zimmer reserviert?", "für drei Nächte", "für zwei Nächte", "für eine Nacht", "a"),
+    ("Hallo Schatz, kannst du bitte Brot und Milch kaufen? Ich muss heute länger arbeiten und komme erst um sieben.", "Was soll der Partner kaufen?", "Brot und Butter", "Brot und Milch", "Milch und Eier", "b"),
+    ("Hier ist die Stadtbibliothek. Herr Diallo, Sie müssen Ihre Bücher bis Samstag zurückbringen. Vielen Dank.", "Bis wann muss Herr Diallo die Bücher zurückbringen?", "bis Donnerstag", "bis Freitag", "bis Samstag", "c"),
+    ("Hallo Nina, ich bin krank und kann morgen nicht zum Kurs kommen. Kannst du mir bitte die Hausaufgaben schicken?", "Was möchte die Anruferin?", "die Hausaufgaben bekommen", "einen Arzt anrufen", "zum Kurs fahren", "a"),
+    ("Guten Tag, hier ist Familie Wagner. Wir sind im Urlaub. Bitte sprechen Sie nach dem Ton. Wir sind am zwanzigsten Juli wieder da.", "Wann ist Familie Wagner wieder zu Hause?", "am zwölften Juli", "am zwanzigsten Juli", "am zwanzigsten Juni", "b"),
+    ("Hallo Ben, das Kino beginnt um halb neun. Wir treffen uns um acht vor dem Eingang. Ich habe die Karten schon gekauft.", "Wann treffen sich die Freunde?", "um halb acht", "um halb neun", "um acht Uhr", "c"),
+    ("Hier ist Ihr Vermieter, Herr Lorenz. Morgen kommt der Techniker und repariert die Heizung. Er kommt zwischen neun und zwölf Uhr.", "Was repariert der Techniker?", "die Heizung", "die Tür", "die Waschmaschine", "a"),
+    ("Hallo Oma, vielen Dank für das Geschenk! Das Fahrrad ist super. Ich besuche dich am Wochenende. Bis dann!", "Was hat das Kind bekommen?", "ein Buch", "ein Fahrrad", "ein Handy", "b"),
+    ("Guten Tag, Reisebüro Atlas. Ihr Flug nach Douala geht am Montag um 13 Uhr 45. Bitte seien Sie zwei Stunden vorher am Flughafen.", "Wann geht der Flug?", "um 14.35 Uhr", "um 15.45 Uhr", "um 13.45 Uhr", "c"),
+    ("Hallo Eva, hier ist Tom. Ich kann dir am Samstag beim Umzug helfen. Ich komme um neun und bringe mein Auto mit.", "Wobei hilft Tom?", "beim Umzug", "beim Kochen", "beim Lernen", "a"),
+    ("Hier ist die Apotheke am Rathaus. Ihr Medikament ist angekommen. Sie können es heute bis neunzehn Uhr abholen.", "Bis wann kann man das Medikament heute abholen?", "bis 9 Uhr", "bis 19 Uhr", "bis 17 Uhr", "b"),
+]
+# Lesen Teil 1 : (Text, ((Aussage, richtig?), x3))
+GX_L1 = [
+    ("Hallo Julia, ich bin seit Montag in Berlin. Die Stadt ist toll! Ich wohne bei meiner Tante. Morgen besuchen wir das Museum, und am Freitag fahre ich wieder nach Hause. Liebe Grüße, Sandra", (("Sandra wohnt in einem Hotel.", False), ("Sandra geht morgen ins Museum.", True), ("Sandra fährt am Freitag nach Hause.", True))),
+    ("Lieber Herr Becker, ich kann morgen leider nicht zum Deutschkurs kommen. Mein Sohn ist krank und ich muss mit ihm zum Arzt gehen. Am Donnerstag bin ich wieder da. Viele Grüße, Amina Diop", (("Frau Diop ist krank.", False), ("Frau Diop geht morgen zum Arzt.", True), ("Frau Diop kommt am Donnerstag wieder zum Kurs.", True))),
+    ("Hi Leon, hast du am Samstag Zeit? Ich habe Geburtstag und mache eine Party. Wir beginnen um 19 Uhr bei mir zu Hause. Bring bitte Musik mit! Bis Samstag, Deniz", (("Deniz hat am Samstag Geburtstag.", True), ("Die Party ist in einem Restaurant.", False), ("Leon soll Musik mitbringen.", True))),
+    ("Liebe Frau Yilmaz, vielen Dank für Ihre E-Mail. Die Wohnung ist noch frei. Sie können sie am Mittwoch um 17 Uhr besichtigen. Die Adresse ist Lindenweg 5. Mit freundlichen Grüßen, Peter Hahn", (("Die Wohnung ist schon vermietet.", False), ("Frau Yilmaz kann die Wohnung am Mittwoch sehen.", True), ("Die Wohnung ist im Lindenweg.", True))),
+    ("Hallo Mama, wir sind gut in Wien angekommen. Das Hotel ist klein, aber sehr sauber. Leider regnet es heute. Morgen wollen wir eine Stadtrundfahrt machen. Kuss, Lea", (("Das Wetter ist heute schön.", False), ("Lea ist in Wien.", True), ("Lea macht heute eine Stadtrundfahrt.", False))),
+    ("Lieber Karim, ich habe eine neue Arbeit! Ich arbeite jetzt in einem Supermarkt, von Montag bis Freitag. Am Wochenende habe ich frei. Wollen wir am Sonntag zusammen essen? Dein Freund Jan", (("Jan arbeitet in einem Supermarkt.", True), ("Jan arbeitet auch am Samstag.", False), ("Jan möchte am Sonntag mit Karim essen.", True))),
+    ("Sehr geehrte Damen und Herren, ich möchte ein Doppelzimmer vom 3. bis zum 6. Mai reservieren. Wir kommen mit dem Auto. Haben Sie einen Parkplatz? Mit freundlichen Grüßen, Carla Mendes", (("Frau Mendes möchte ein Einzelzimmer.", False), ("Frau Mendes kommt mit dem Zug.", False), ("Frau Mendes fragt nach einem Parkplatz.", True))),
+    ("Hallo Sophie, ich bin heute nicht im Büro. Ich arbeite zu Hause. Du kannst mich bis 16 Uhr anrufen. Die Dokumente für Herrn Krause liegen auf meinem Tisch. Danke, Martin", (("Martin arbeitet heute zu Hause.", True), ("Sophie kann Martin um 18 Uhr anrufen.", False), ("Die Dokumente liegen auf Martins Tisch.", True))),
+    ("Liebe Nachbarn, am Samstag feiern wir unsere Hochzeit im Garten. Es kann ein bisschen laut werden. Die Feier endet um 23 Uhr. Kommen Sie doch auf ein Glas vorbei! Ihre Familie Petrov", (("Die Feier ist am Sonntag.", False), ("Die Feier ist im Garten.", True), ("Die Nachbarn dürfen auch kommen.", True))),
+    ("Hallo Chris, das Training ist morgen nicht um 17 Uhr, sondern schon um 16 Uhr. Wir spielen in der neuen Sporthalle neben dem Schwimmbad. Vergiss deine Sportschuhe nicht! Trainer Olaf", (("Das Training beginnt morgen um 16 Uhr.", True), ("Die Sporthalle ist neben dem Schwimmbad.", True), ("Chris braucht keine Sportschuhe.", False))),
+]
+# Lesen Teil 2 : (Situation, Anzeige a, Anzeige b, Lösung)
+GX_L2 = [
+    ("Sie möchten am Wochenende mit dem Zug nach Dresden fahren und brauchen eine billige Fahrkarte.", "www.bahn-spartickets.de — Günstige Tickets für das Wochenende, alle Städte in Deutschland.", "www.dresden-hotels.de — Zimmer im Zentrum, Frühstück inklusive.", "a"),
+    ("Sie suchen einen Deutschkurs am Abend, weil Sie am Tag arbeiten.", "Sprachschule Mitte — Deutschkurse am Vormittag, Montag bis Freitag, 9 bis 12 Uhr.", "Sprachschule Aktiv — Abendkurse Deutsch, zweimal pro Woche, 18.30 bis 20 Uhr.", "b"),
+    ("Sie möchten ein gebrauchtes Fahrrad kaufen.", "Rad-Markt — Gebrauchte Fahrräder ab 40 Euro. Samstag, 9 bis 14 Uhr.", "Fahrrad-Service Blitz — Wir reparieren Ihr Fahrrad schnell und billig.", "a"),
+    ("Ihr Computer ist kaputt. Sie brauchen Hilfe.", "PC-Welt — Neue Computer und Handys zu super Preisen.", "PC-Doktor — Reparatur von Computern, auch am Wochenende. Wir kommen zu Ihnen nach Hause.", "b"),
+    ("Sie möchten heute Abend Pizza essen, aber Sie wollen nicht aus dem Haus gehen.", "Pizzeria Roma — Wir bringen Ihre Pizza nach Hause. Bestellung bis 23 Uhr.", "Pizzeria Napoli — Großer Garten, Livemusik jeden Freitag.", "a"),
+    ("Sie suchen eine Wohnung mit zwei Zimmern in der Stadtmitte.", "Vermiete 4-Zimmer-Haus mit Garten, 20 km vor der Stadt.", "2-Zimmer-Wohnung im Zentrum, 55 Quadratmeter, 520 Euro, ab sofort frei.", "b"),
+    ("Sie möchten schwimmen lernen.", "Stadtbad — Schwimmkurse für Erwachsene, jeden Dienstag um 19 Uhr.", "Stadtbad — Sauna und Massage, täglich von 10 bis 22 Uhr.", "a"),
+    ("Ihre Tochter ist sechs Jahre alt und möchte ein Instrument spielen.", "Musikschule Allegro — Gitarre und Klavier für Erwachsene ab 18 Jahren.", "Musikschule Melodie — Kurse für Kinder von 5 bis 12 Jahren. Erste Stunde gratis.", "b"),
+    ("Sie brauchen am Sonntag ein Medikament.", "Rathaus-Apotheke — Notdienst am Sonntag, 8 bis 20 Uhr.", "Blumen-Apotheke — Montag bis Freitag, 8 bis 18.30 Uhr.", "a"),
+    ("Sie suchen einen Job für die Sommerferien.", "Restaurant Seeblick sucht Koch mit fünf Jahren Erfahrung. Feste Stelle.", "Eiscafé Venezia sucht Hilfe für Juli und August. Auch Schüler und Studenten.", "b"),
+    ("Sie möchten Ihre alte Waschmaschine verkaufen.", "Kleinanzeigen-Portal — Verkaufen Sie Ihre gebrauchten Sachen gratis online.", "Elektro Schmitt — Neue Waschmaschinen, Lieferung in 24 Stunden.", "a"),
+    ("Sie wollen am Samstagabend tanzen gehen.", "Stadtbibliothek — Lesung für Kinder, Samstag um 15 Uhr.", "Club Tropicana — Salsa-Party jeden Samstag ab 21 Uhr. Eintritt 5 Euro.", "b"),
+    ("Sie möchten mit dem Flugzeug nach Madrid reisen und suchen ein billiges Ticket.", "www.flug-guenstig.de — Billige Flüge in ganz Europa.", "www.bus-europa.de — Mit dem Bus nach Spanien, Abfahrt jeden Freitag.", "a"),
+    ("Sie haben Zahnschmerzen und brauchen schnell einen Termin.", "Dr. Kern, Augenarzt — Termine nur nach Anmeldung.", "Zahnarztpraxis Dr. Sommer — Auch ohne Termin, Montag bis Samstag.", "b"),
+    ("Sie möchten Ihr Auto waschen lassen.", "Auto-Wasch-Center — Waschen und Putzen in 20 Minuten, ab 8 Euro.", "Autohaus Lindner — Neue und gebrauchte Autos, auch Finanzierung.", "a"),
+    ("Sie suchen ein Geschenk für ein Kind. Es liest gern.", "Spielwaren König — Bälle, Puppen und Autos für Kinder.", "Buchladen Lesemaus — Kinderbücher und Hörbücher für jedes Alter.", "b"),
+    ("Sie möchten am Sonntag frische Brötchen kaufen.", "Bäckerei Frisch — Auch sonntags von 7 bis 11 Uhr geöffnet.", "Bäckerei Korn — Montag bis Samstag, 6 bis 18 Uhr.", "a"),
+    ("Sie möchten Fußball in einem Verein spielen. Sie sind 30 Jahre alt.", "FC Jugend — Fußball für Kinder und Jugendliche bis 16 Jahre.", "SV Blau-Weiß — Wir suchen Spieler für unsere Herrenmannschaft. Training am Mittwoch.", "b"),
+    ("Sie möchten einen Tisch für acht Personen reservieren. Sie wollen afrikanisch essen.", "Restaurant Sahel — Afrikanische Küche, auch für Gruppen. Reservierung: 030 55 71 23.", "Imbiss Sahara — Schnell und lecker zum Mitnehmen. Keine Sitzplätze.", "a"),
+    ("Sie brauchen neue Passfotos.", "Foto-Galerie Licht — Ausstellung: Bilder aus Afrika, Eintritt frei.", "Foto Express — Passbilder sofort zum Mitnehmen, ohne Termin.", "b"),
+]
+# Lesen Teil 3 : (Schild / Aushang, Aussage, richtig?)
+GX_L3 = [
+    ("An der Tür der Arztpraxis: Die Praxis ist vom 1. bis 15. August geschlossen. Vertretung: Dr. Vogel, Bahnhofstraße 3.", "Im August kann man zu Dr. Vogel gehen.", True),
+    ("Im Supermarkt: Heute frisches Brot! Zwei Stück kaufen, nur eins bezahlen.", "Man bekommt heute zwei Brote zum Preis von einem.", True),
+    ("An der Bushaltestelle: Wegen Bauarbeiten hält der Bus 15 bis Freitag nicht hier. Nächste Haltestelle: Marktplatz.", "Der Bus 15 hält diese Woche an dieser Haltestelle.", False),
+    ("Im Sprachinstitut: Die Anmeldung für die Prüfung ist nur am Montag und Mittwoch von 14 bis 16 Uhr möglich.", "Man kann sich am Dienstag für die Prüfung anmelden.", False),
+    ("Im Restaurant: Ab heute neu! Mittagstisch von 12 bis 14 Uhr, jedes Essen 6,50 Euro.", "Am Mittag kostet jedes Essen 6,50 Euro.", True),
+    ("Am Aufzug: Der Aufzug ist kaputt. Bitte benutzen Sie die Treppe.", "Man kann den Aufzug benutzen.", False),
+    ("In der Bibliothek: Bitte leise sprechen! Handys sind hier verboten.", "In der Bibliothek darf man telefonieren.", False),
+    ("Am Schwimmbad: Kinder unter 6 Jahren dürfen nur mit Erwachsenen ins Schwimmbad.", "Ein Kind von 4 Jahren darf allein ins Schwimmbad.", False),
+    ("Im Kaufhaus: Sommerschlussverkauf! Alle Schuhe 50 Prozent billiger.", "Die Schuhe kosten jetzt nur die Hälfte.", True),
+    ("An der Wohnungstür: Bin beim Einkaufen. Komme in 20 Minuten zurück. Bitte warte! Karin", "Karin ist bald wieder zu Hause.", True),
+    ("Im Bahnhof: Fahrkarten bekommen Sie am Automaten oder am Schalter in Halle 2.", "Fahrkarten gibt es nur am Automaten.", False),
+    ("Im Park: Hunde bitte an der Leine führen. Fußball spielen ist auf der Wiese erlaubt.", "Man darf auf der Wiese Fußball spielen.", True),
+    ("An der Schule: Elternabend der Klasse 3b am Donnerstag um 19 Uhr in Raum 104.", "Der Elternabend ist am Abend.", True),
+    ("Im Kino: Montag ist Kinotag! Alle Filme nur 5 Euro.", "Am Montag ist das Kino teurer.", False),
+    ("An der Bank: Wir haben neue Öffnungszeiten: Montag bis Freitag von 9 bis 16 Uhr. Samstags geschlossen.", "Die Bank ist am Samstag geöffnet.", False),
+    ("Im Hausflur: Am Dienstag von 8 bis 12 Uhr gibt es kein warmes Wasser. Der Hausmeister", "Am Dienstagvormittag kann man nicht warm duschen.", True),
+    ("Am Kiosk: Zeitungen, Getränke und Fahrkarten für Bus und Bahn.", "Am Kiosk kann man Fahrkarten kaufen.", True),
+    ("Im Museum: Fotografieren ist im ganzen Museum verboten. Taschen bitte an der Garderobe abgeben.", "Man darf im Museum Fotos machen.", False),
+    ("An der Post: Wir ziehen um! Ab dem 1. Juni finden Sie uns in der Schillerstraße 20.", "Die Post hat ab Juni eine neue Adresse.", True),
+    ("Im Fitnessstudio: Probetraining gratis! Kommen Sie am Samstag zwischen 10 und 14 Uhr.", "Das Probetraining kostet 10 Euro.", False),
+]
+# Lesen Teil 4 : (Anzeige, ((Frage, a, b, c, Lösung), x3))
+GX_L4 = [
+    ("Sporthalle Nord — Neue Kurse ab September! Yoga: montags um 18 Uhr. Tischtennis: mittwochs um 17 Uhr. Basketball für Jugendliche von 12 bis 16 Jahren: freitags um 16 Uhr. Preis: 15 Euro im Monat. Anmeldung im Büro, Montag bis Freitag von 10 bis 12 Uhr.",
+     (("Wann ist der Yoga-Kurs?", "am Montag", "am Mittwoch", "am Freitag", "a"), ("Der Basketball-Kurs ist für ...", "Kinder unter 12 Jahren.", "Jugendliche.", "Erwachsene.", "b"), ("Wo meldet man sich an?", "im Internet", "am Telefon", "im Büro", "c"))),
+    ("Schokoladen-Museum — Ein Paradies für Groß und Klein! Hier sehen Sie, wie man Schokolade macht, und Sie können sie auch probieren. Geöffnet: Dienstag bis Sonntag von 10 bis 18 Uhr. Eintritt: Erwachsene 9 Euro, Kinder 5 Euro, Familien 22 Euro. Montags geschlossen.",
+     (("Was kann man im Museum machen?", "Schokolade probieren", "Kuchen backen", "Schokolade verkaufen", "a"), ("Wann ist das Museum geschlossen?", "am Sonntag", "am Montag", "am Dienstag", "b"), ("Was kostet der Eintritt für ein Kind?", "9 Euro", "22 Euro", "5 Euro", "c"))),
+    ("Mode-Haus Bella — Großer Winterschlussverkauf! Nur diese Woche: alle Jacken und Mäntel 40 Prozent billiger. Hosen ab 15 Euro. Wir haben von Montag bis Samstag von 9 bis 20 Uhr geöffnet. Sie finden uns in der Hauptstraße 12, gegenüber vom Rathaus.",
+     (("Was ist 40 Prozent billiger?", "Hosen", "Jacken und Mäntel", "Schuhe", "b"), ("Wie lange gibt es das Angebot?", "eine Woche", "einen Monat", "einen Tag", "a"), ("Wo ist das Geschäft?", "neben dem Bahnhof", "im Rathaus", "gegenüber vom Rathaus", "c"))),
+    ("Tierheim Sonnenhof — Hunde und Katzen suchen ein neues Zuhause! Besuchen Sie uns am Samstag und Sonntag von 14 bis 17 Uhr. Wir suchen auch Helfer: Wer möchte mit den Hunden spazieren gehen? Rufen Sie uns an: 0221 48 90 12.",
+     (("Wann kann man das Tierheim besuchen?", "am Wochenende", "jeden Tag", "nur am Montag", "a"), ("Welche Tiere gibt es im Tierheim?", "Pferde und Vögel", "Hunde und Katzen", "Fische", "b"), ("Was können die Helfer machen?", "die Katzen waschen", "Tiere verkaufen", "mit den Hunden spazieren gehen", "c"))),
+    ("Stadtfest am 14. und 15. Juni auf dem Marktplatz — Musik, Tanz und Essen aus vielen Ländern. Samstag ab 12 Uhr: Programm für Kinder. Samstag um 20 Uhr: Konzert der Band Sonnenschein. Sonntag um 11 Uhr: Frühstück für alle. Der Eintritt ist frei!",
+     (("Wo ist das Stadtfest?", "im Stadtpark", "auf dem Marktplatz", "in der Schule", "b"), ("Wann ist das Konzert?", "am Samstagabend", "am Sonntagmorgen", "am Freitagabend", "a"), ("Was kostet der Eintritt?", "5 Euro", "12 Euro", "nichts", "c"))),
+    ("Sprachcafé International — Sie lernen Deutsch und möchten mehr sprechen? Kommen Sie ins Sprachcafé! Jeden Donnerstag von 17 bis 19 Uhr in der Stadtbibliothek, erster Stock. Wir trinken Tee und Kaffee und sprechen über das Leben in Deutschland. Kostenlos und ohne Anmeldung.",
+     (("Wann findet das Sprachcafé statt?", "jeden Dienstag", "jeden Donnerstag", "jeden Samstag", "b"), ("Wo trifft man sich?", "in der Stadtbibliothek", "in einem Restaurant", "in der Sprachschule", "a"), ("Muss man sich anmelden?", "Ja, am Telefon.", "Ja, im Internet.", "Nein.", "c"))),
+    ("Ferienjob im Hotel Alpenblick — Wir suchen für Juli und August junge Leute für die Küche und das Restaurant. Arbeitszeit: 6 Stunden pro Tag, Sonntag frei. Sie bekommen 12 Euro pro Stunde, ein Zimmer und Essen gratis. Schreiben Sie an: jobs@alpenblick.example",
+     (("Für welche Monate sucht das Hotel Leute?", "Juli und August", "Juni und Juli", "August und September", "a"), ("Wann hat man frei?", "am Samstag", "am Montag", "am Sonntag", "c"), ("Was bekommt man gratis?", "ein Fahrrad", "Zimmer und Essen", "Kleidung", "b"))),
+]
+# Schreiben Teil 1 : (Situation, ((Feld, Lösung / Alternative), x5))
+GX_S1 = [
+    ("Ihre Freundin Maria Kowalski möchte im Sportzentrum einen Schwimmkurs machen. Sie ist am 12.03.1995 geboren und wohnt in 50667 Köln. Der Kurs soll am Montag sein. Sie möchte bar bezahlen. Füllen Sie das Formular für Maria aus.", (("Familienname", "Kowalski"), ("Geburtsdatum", "12.03.1995/12.3.1995"), ("Postleitzahl", "50667"), ("Kurstag", "Montag"), ("Zahlung (bar / Karte)", "bar"))),
+    ("Ihr Freund Daniel Costa möchte ein Zimmer im Hotel Stern buchen. Er kommt am 5. Juli und bleibt drei Nächte. Er reist allein und möchte Frühstück. Er kommt aus Portugal. Füllen Sie das Formular für Daniel aus.", (("Vorname", "Daniel"), ("Land", "Portugal"), ("Ankunft am", "5. Juli/5.7./05.07./5 Juli"), ("Anzahl der Nächte", "3/drei"), ("Frühstück (ja / nein)", "ja"))),
+    ("Ihre Kollegin Fatou Sow möchte einen Deutschkurs machen. Sie ist 28 Jahre alt, kommt aus dem Senegal und spricht Französisch. Sie möchte den Kurs am Abend besuchen. Ihre Telefonnummer ist 0151 2233. Füllen Sie das Formular für Fatou aus.", (("Familienname", "Sow"), ("Alter", "28"), ("Muttersprache", "Französisch"), ("Kurszeit (Vormittag / Abend)", "Abend"), ("Telefon", "0151 2233/01512233"))),
+    ("Ihr Nachbar Thomas Berger möchte in der Bibliothek einen Ausweis bekommen. Er wohnt in der Rosenstraße 14 in Leipzig. Er ist Lehrer von Beruf und am 30.11.1980 geboren. Füllen Sie das Formular für Thomas aus.", (("Familienname", "Berger"), ("Straße und Hausnummer", "Rosenstraße 14/Rosenstr. 14"), ("Wohnort", "Leipzig"), ("Beruf", "Lehrer"), ("Geburtsdatum", "30.11.1980"))),
+    ("Ihre Freundin Elena Rossi möchte ein Fahrrad für das Wochenende mieten. Sie braucht es von Samstag bis Sonntag, also zwei Tage. Sie kommt aus Italien und wohnt im Hotel Krone. Sie bezahlt mit Karte. Füllen Sie das Formular für Elena aus.", (("Vorname", "Elena"), ("Land", "Italien"), ("Adresse in der Stadt", "Hotel Krone"), ("Anzahl der Tage", "2/zwei"), ("Zahlung (bar / Karte)", "Karte"))),
+    ("Ihr Freund Ali Demir möchte Mitglied im Fußballverein werden. Er ist 19 Jahre alt, Student und wohnt in 80331 München. Er möchte am Mittwoch trainieren. Füllen Sie das Formular für Ali aus.", (("Familienname", "Demir"), ("Alter", "19"), ("Beruf", "Student"), ("Postleitzahl", "80331"), ("Trainingstag", "Mittwoch"))),
+    ("Ihre Schwester Grace Mbah möchte einen Computerkurs machen. Sie wohnt in der Bergstraße 7 in Bonn. Sie ist Verkäuferin und hat nur am Samstag Zeit. Ihre E-Mail-Adresse ist grace@mail.example. Füllen Sie das Formular für Grace aus.", (("Vorname", "Grace"), ("Wohnort", "Bonn"), ("Beruf", "Verkäuferin"), ("Kurstag", "Samstag"), ("E-Mail", "grace@mail.example"))),
+    ("Ihr Kollege Pedro Alves möchte ein Auto mieten. Er braucht es vom 10. bis zum 14. Mai, also fünf Tage. Er ist 35 Jahre alt und kommt aus Brasilien. Er holt das Auto am Flughafen ab. Füllen Sie das Formular für Pedro aus.", (("Familienname", "Alves"), ("Alter", "35"), ("Land", "Brasilien"), ("Anzahl der Tage", "5/fünf"), ("Abholort", "Flughafen/am Flughafen"))),
+    ("Ihre Freundin Anna Nowak meldet ihre Tochter Zofia im Kindergarten an. Zofia ist vier Jahre alt. Die Familie wohnt in der Parkstraße 22 in Essen. Zofia soll bis 14 Uhr im Kindergarten bleiben und dort zu Mittag essen. Füllen Sie das Formular aus.", (("Vorname des Kindes", "Zofia"), ("Alter des Kindes", "4/vier"), ("Wohnort", "Essen"), ("Betreuung bis", "14 Uhr/14/14.00/14:00"), ("Mittagessen (ja / nein)", "ja"))),
+    ("Ihr Freund Kofi Mensah bestellt im Internet ein Buch. Er wohnt in der Hafenstraße 3 in 20095 Hamburg. Er möchte ein Wörterbuch und bezahlt per Rechnung. Er bestellt ein Exemplar. Füllen Sie das Formular für Kofi aus.", (("Familienname", "Mensah"), ("Postleitzahl", "20095"), ("Wohnort", "Hamburg"), ("Artikel", "Wörterbuch/ein Wörterbuch"), ("Anzahl", "1/eins/ein"))),
+    ("Ihre Kollegin Sara Haddad möchte an einer Stadtrundfahrt teilnehmen. Sie kommt mit ihrem Mann, also zwei Personen. Die Fahrt soll am Sonntag um 10 Uhr sein. Sie spricht Arabisch und Englisch und möchte die Tour auf Englisch. Füllen Sie das Formular aus.", (("Vorname", "Sara"), ("Anzahl der Personen", "2/zwei"), ("Tag", "Sonntag"), ("Uhrzeit", "10 Uhr/10/10.00/10:00"), ("Sprache der Tour", "Englisch"))),
+    ("Ihr Bruder Samuel Ngassa möchte ein Konto bei der Bank eröffnen. Er ist am 02.06.1998 in Douala geboren. Er ist Mechaniker und wohnt jetzt in Stuttgart. Er ist ledig. Füllen Sie das Formular für Samuel aus.", (("Familienname", "Ngassa"), ("Geburtsdatum", "02.06.1998/2.6.1998"), ("Geburtsort", "Douala"), ("Beruf", "Mechaniker"), ("Familienstand", "ledig"))),
+    ("Ihre Freundin Julia Schmidt möchte einen Kochkurs machen. Der Kurs ist am Freitagabend. Sie ist Vegetarierin, sie isst also kein Fleisch. Sie wohnt in Bremen und ihre Handynummer ist 0170 5566. Füllen Sie das Formular für Julia aus.", (("Vorname", "Julia"), ("Wohnort", "Bremen"), ("Kurstag", "Freitag/Freitagabend"), ("Fleisch (ja / nein)", "nein"), ("Handynummer", "0170 5566/01705566"))),
+    ("Ihr Freund Omar Farah möchte einen Tisch im Restaurant reservieren. Er kommt am Samstag um 20 Uhr mit fünf Freunden, das sind also sechs Personen. Sie möchten draußen sitzen. Füllen Sie das Formular für Omar aus.", (("Familienname", "Farah"), ("Tag", "Samstag"), ("Uhrzeit", "20 Uhr/20/20.00/20:00"), ("Anzahl der Personen", "6/sechs"), ("Platz (drinnen / draußen)", "draußen"))),
+    ("Ihre Nachbarin Linda Okoye sucht eine Arbeit und füllt ein Formular beim Jobcenter aus. Sie ist 42 Jahre alt, verheiratet und hat drei Kinder. Sie ist Krankenschwester von Beruf. Füllen Sie das Formular für Linda aus.", (("Vorname", "Linda"), ("Alter", "42"), ("Familienstand", "verheiratet"), ("Anzahl der Kinder", "3/drei"), ("Beruf", "Krankenschwester"))),
+    ("Ihr Freund Marc Dubois möchte ein Zugticket im Internet kaufen. Er fährt am 8. März von Köln nach Berlin. Er fährt allein und möchte in der zweiten Klasse sitzen. Füllen Sie das Formular für Marc aus.", (("Familienname", "Dubois"), ("Abfahrtsort", "Köln"), ("Zielort", "Berlin"), ("Reisedatum", "8. März/8.3./08.03./8 März"), ("Klasse (1 / 2)", "2/zwei/zweite"))),
+    ("Ihre Freundin Mia Wagner meldet sich im Fitnessstudio an. Sie ist Studentin und 22 Jahre alt. Sie möchte zweimal pro Woche trainieren und am 1. Oktober beginnen. Füllen Sie das Formular für Mia aus.", (("Vorname", "Mia"), ("Alter", "22"), ("Beruf", "Studentin"), ("Training pro Woche", "2/zwei/zweimal"), ("Beginn am", "1. Oktober/1.10./01.10./1 Oktober"))),
+    ("Ihr Kollege Ivan Petrov zieht um und meldet sich bei der Stadt an. Seine neue Adresse ist Goethestraße 45 in 60313 Frankfurt. Er kommt aus Bulgarien und zieht am 15. April ein. Füllen Sie das Formular für Ivan aus.", (("Familienname", "Petrov"), ("Straße und Hausnummer", "Goethestraße 45/Goethestr. 45"), ("Postleitzahl", "60313"), ("Land", "Bulgarien"), ("Einzug am", "15. April/15.4./15.04./15 April"))),
+    ("Ihre Tante Rosa Lopez möchte einen Arzttermin im Internet buchen. Sie ist am 20.08.1965 geboren. Sie hat Rückenschmerzen und möchte am Dienstag kommen. Ihre Krankenkasse heißt AOK. Füllen Sie das Formular für Rosa aus.", (("Vorname", "Rosa"), ("Geburtsdatum", "20.08.1965/20.8.1965"), ("Problem", "Rückenschmerzen"), ("Tag", "Dienstag"), ("Krankenkasse", "AOK"))),
+    ("Ihr Freund Jean Kamga möchte ein Handy mit Vertrag kaufen. Er wohnt in Dortmund, ist 26 Jahre alt und Kellner von Beruf. Der Vertrag soll 24 Monate laufen. Füllen Sie das Formular für Jean aus.", (("Familienname", "Kamga"), ("Wohnort", "Dortmund"), ("Alter", "26"), ("Beruf", "Kellner"), ("Laufzeit in Monaten", "24"))),
+]
+# Schreiben Teil 2 : (Situation, (Punkt 1, Punkt 2, Punkt 3), ((Schlüsselwörter 1), (2), (3)), Beispiel)
+GX_S2 = [
+    ("Sie möchten im August Dresden besuchen. Schreiben Sie an die Touristeninformation.", ("Warum schreiben Sie?", "Informationen über Hotels?", "Wie lange bleiben Sie?"), (("besuch", "komme", "reise", "fahre"), ("hotel", "zimmer", "unterkunft"), ("tag", "woche", "nächt", "bleibe")), "Sehr geehrte Damen und Herren, ich möchte im August Dresden besuchen. Können Sie mir bitte Informationen über Hotels schicken? Ich bleibe eine Woche. Mit freundlichen Grüßen, Samuel Ngassa"),
+    ("Ihre Freundin Anna hat Sie zum Geburtstag eingeladen. Sie können nicht kommen. Schreiben Sie Anna.", ("Danke für die Einladung", "Warum können Sie nicht kommen?", "Vorschlag: anderes Treffen"), (("dank",), ("arbeit", "krank", "keine zeit", "leider", "muss"), ("treffen", "besuch", "nächste", "kaffee", "wochenende", "sonntag", "samstag")), "Liebe Anna, vielen Dank für die Einladung. Leider kann ich nicht kommen, weil ich arbeiten muss. Wollen wir uns am Sonntag treffen? Liebe Grüße, Samuel"),
+    ("Sie sind krank und können morgen nicht zum Deutschkurs kommen. Schreiben Sie Ihrer Lehrerin, Frau Weber.", ("Warum kommen Sie nicht?", "Wie lange bleiben Sie zu Hause?", "Frage nach den Hausaufgaben"), (("krank", "fieber", "schmerzen", "erkältet"), ("tag", "woche", "bis", "morgen"), ("hausaufgabe", "aufgabe")), "Liebe Frau Weber, ich bin leider krank und kann morgen nicht zum Kurs kommen. Ich bleibe zwei Tage zu Hause. Können Sie mir bitte die Hausaufgaben schicken? Viele Grüße, Samuel Ngassa"),
+    ("Sie möchten am Samstag eine Party machen. Schreiben Sie Ihrem Freund Paul eine Einladung.", ("Warum feiern Sie?", "Wann und wo?", "Was soll Paul mitbringen?"), (("geburtstag", "prüfung", "wohnung", "feier", "party"), ("uhr", "samstag", "bei mir", "zu hause"), ("bring", "mitbring")), "Lieber Paul, ich habe am Samstag Geburtstag und mache eine Party. Wir feiern um 19 Uhr bei mir zu Hause. Bring bitte Getränke mit! Viele Grüße, Samuel"),
+    ("Sie suchen eine Wohnung und haben eine Anzeige gelesen. Schreiben Sie dem Vermieter, Herrn Hahn.", ("Warum schreiben Sie?", "Frage nach dem Preis", "Wann können Sie die Wohnung sehen?"), (("wohnung", "anzeige"), ("kost", "preis", "miete"), ("sehen", "besichtig", "termin", "kommen")), "Sehr geehrter Herr Hahn, ich habe Ihre Anzeige gelesen und suche eine Wohnung. Was kostet die Wohnung im Monat? Wann kann ich sie sehen? Mit freundlichen Grüßen, Samuel Ngassa"),
+    ("Ihr Freund Tom kommt nächste Woche in Ihre Stadt. Schreiben Sie ihm.", ("Sie freuen sich", "Wann kommt er an?", "Was wollen Sie zusammen machen?"), (("freu", "schön", "toll", "super"), ("wann", "ankomm", "uhr", "kommst"), ("zusammen", "museum", "essen", "kino", "stadt", "zeigen", "gehen")), "Lieber Tom, ich freue mich sehr auf deinen Besuch! Wann kommst du am Bahnhof an? Wir können zusammen die Stadt ansehen und essen gehen. Bis bald, Samuel"),
+    ("Sie möchten einen Schwimmkurs machen. Schreiben Sie an das Schwimmbad.", ("Warum schreiben Sie?", "Wann ist der Kurs?", "Was kostet der Kurs?"), (("schwimm", "kurs"), ("wann", "tag", "uhr", "beginn"), ("kost", "preis")), "Sehr geehrte Damen und Herren, ich möchte einen Schwimmkurs für Erwachsene machen. Wann beginnt der nächste Kurs? Und was kostet er? Mit freundlichen Grüßen, Samuel Ngassa"),
+    ("Sie haben Ihre Tasche im Zug vergessen. Schreiben Sie an das Fundbüro der Bahn.", ("Was haben Sie vergessen?", "Wann und in welchem Zug?", "Wie kann man Sie erreichen?"), (("tasche", "rucksack", "vergessen", "verloren"), ("zug", "uhr", "gestern", "montag", "von", "nach"), ("telefon", "nummer", "e-mail", "erreichen", "anrufen")), "Sehr geehrte Damen und Herren, ich habe gestern meine schwarze Tasche im Zug von Köln nach Bonn vergessen. Der Zug ist um 8 Uhr abgefahren. Meine Telefonnummer ist 0151 2233. Mit freundlichen Grüßen, Samuel Ngassa"),
+    ("Ihre Kollegin Sara hat ein Baby bekommen. Schreiben Sie ihr.", ("Glückwunsch", "Frage nach dem Namen des Babys", "Wann können Sie sie besuchen?"), (("glückwunsch", "gratul", "freu"), ("name", "heißt"), ("besuch", "kommen", "wann")), "Liebe Sara, herzlichen Glückwunsch zum Baby! Ich freue mich sehr für dich. Wie heißt das Baby? Wann kann ich euch besuchen? Liebe Grüße, Samuel"),
+    ("Sie möchten mit Ihrer Freundin Lea am Wochenende einen Ausflug machen. Schreiben Sie Lea.", ("Wohin wollen Sie fahren?", "Wann treffen Sie sich?", "Was soll Lea mitnehmen?"), (("see", "berg", "stadt", "fahren", "nach", "ausflug"), ("uhr", "samstag", "sonntag", "treffen"), ("mitnehm", "mitbring", "nimm", "bring")), "Liebe Lea, wollen wir am Samstag an den See fahren? Wir treffen uns um 9 Uhr am Bahnhof. Nimm bitte deine Badesachen und etwas zu essen mit. Liebe Grüße, Samuel"),
+    ("Sie haben einen Termin beim Arzt, aber Sie können nicht kommen. Schreiben Sie an die Praxis.", ("Wann war Ihr Termin?", "Warum können Sie nicht kommen?", "Bitte um einen neuen Termin"), (("termin",), ("arbeit", "muss", "leider", "krank", "keine zeit"), ("neu", "ander", "nächste")), "Sehr geehrte Damen und Herren, ich habe am Montag um 10 Uhr einen Termin. Leider kann ich nicht kommen, weil ich arbeiten muss. Können Sie mir bitte einen neuen Termin geben? Mit freundlichen Grüßen, Samuel Ngassa"),
+    ("Ihr Nachbar, Herr Klein, fährt in den Urlaub. Sie wollen ihm helfen. Schreiben Sie ihm.", ("Sie können die Blumen gießen", "Frage: Wie lange ist er weg?", "Frage nach dem Schlüssel"), (("blume", "gieß", "pflanze", "helfen"), ("wie lange", "wann", "zurück", "bis"), ("schlüssel",)), "Lieber Herr Klein, ich kann gern Ihre Blumen gießen. Wie lange sind Sie im Urlaub? Können Sie mir bitte den Schlüssel geben? Viele Grüße, Samuel Ngassa"),
+    ("Sie haben im Internet einen Pullover bestellt, aber er ist zu klein. Schreiben Sie an die Firma.", ("Was haben Sie bestellt?", "Was ist das Problem?", "Was möchten Sie?"), (("pullover", "bestellt"), ("klein", "passt nicht", "problem", "groß"), ("umtausch", "zurück", "geld", "ander", "größe")), "Sehr geehrte Damen und Herren, ich habe bei Ihnen einen blauen Pullover bestellt. Leider ist er zu klein. Ich möchte ihn umtauschen und brauche Größe L. Mit freundlichen Grüßen, Samuel Ngassa"),
+    ("Sie sind neu in der Stadt und möchten in einem Verein Fußball spielen. Schreiben Sie an den Verein.", ("Stellen Sie sich vor", "Wann ist das Training?", "Was kostet es?"), (("heiße", "bin", "name", "jahre"), ("training", "wann", "tag"), ("kost", "preis", "beitrag")), "Sehr geehrte Damen und Herren, ich heiße Samuel Ngassa, bin 24 Jahre alt und neu in der Stadt. Ich möchte Fußball spielen. Wann ist das Training und was kostet es? Mit freundlichen Grüßen, Samuel Ngassa"),
+    ("Ihr Freund Jan hat Ihnen beim Umzug geholfen. Schreiben Sie ihm.", ("Danke für die Hilfe", "Wie ist die neue Wohnung?", "Einladung zum Essen"), (("dank",), ("wohnung", "schön", "groß", "hell", "gefällt"), ("einlad", "essen", "koche", "komm")), "Lieber Jan, vielen Dank für deine Hilfe beim Umzug! Die neue Wohnung ist sehr schön und hell. Ich möchte dich am Freitag zum Essen einladen. Liebe Grüße, Samuel"),
+    ("Sie möchten Ihre Lehrerin, Frau Lang, etwas fragen. Die Prüfung ist nächste Woche.", ("Wann beginnt die Prüfung?", "Wo ist die Prüfung?", "Was müssen Sie mitbringen?"), (("wann", "uhr", "beginn"), ("wo", "raum", "zimmer"), ("mitbring", "brauche", "ausweis", "pass", "stift")), "Liebe Frau Lang, ich habe ein paar Fragen zur Prüfung. Wann beginnt die Prüfung und in welchem Raum ist sie? Was muss ich mitbringen? Viele Grüße, Samuel Ngassa"),
+    ("Sie machen Urlaub am Meer. Schreiben Sie Ihrer Freundin Mia eine Postkarte.", ("Wo sind Sie?", "Wie ist das Wetter?", "Was machen Sie jeden Tag?"), (("meer", "strand", "bin in", "urlaub", "hotel"), ("wetter", "sonne", "warm", "regnet", "heiß"), ("schwimm", "jeden tag", "esse", "gehe", "lese", "spazier")), "Liebe Mia, ich bin im Urlaub am Meer. Das Wetter ist super, die Sonne scheint jeden Tag. Ich schwimme viel und esse jeden Tag Fisch. Liebe Grüße, Samuel"),
+    ("Sie möchten Ihr altes Fahrrad verkaufen. Ein Mann, Herr Roth, hat Interesse. Schreiben Sie ihm.", ("Wie ist das Fahrrad?", "Was kostet es?", "Wann kann er es sehen?"), (("fahrrad", "alt", "gut", "farbe", "rot", "blau"), ("kost", "euro", "preis"), ("sehen", "kommen", "uhr", "samstag", "morgen")), "Sehr geehrter Herr Roth, das Fahrrad ist drei Jahre alt und funktioniert gut. Es kostet 80 Euro. Sie können es am Samstag um 10 Uhr sehen. Mit freundlichen Grüßen, Samuel Ngassa"),
+    ("Sie kommen morgen zu spät zur Arbeit. Schreiben Sie Ihrem Chef, Herrn Braun.", ("Warum kommen Sie zu spät?", "Wann sind Sie im Büro?", "Entschuldigung"), (("arzt", "termin", "zug", "bus", "auto", "kind", "weil", "muss"), ("uhr", "um", "gegen"), ("entschuldig", "tut mir leid", "leider")), "Sehr geehrter Herr Braun, ich komme morgen leider zu spät, weil ich einen Termin beim Arzt habe. Ich bin um 10 Uhr im Büro. Entschuldigung! Mit freundlichen Grüßen, Samuel Ngassa"),
+    ("Ihre Freundin Eva möchte mit Ihnen Deutsch lernen. Schreiben Sie ihr.", ("Sie finden die Idee gut", "Wann haben Sie Zeit?", "Wo wollen Sie lernen?"), (("gut", "toll", "super", "idee", "gern", "freu"), ("zeit", "montag", "dienstag", "mittwoch", "donnerstag", "freitag", "abend", "uhr"), ("bibliothek", "bei mir", "zu hause", "café", "schule", "wo")), "Liebe Eva, das ist eine tolle Idee! Ich habe am Dienstag und Donnerstag am Abend Zeit. Wir können in der Bibliothek lernen. Liebe Grüße, Samuel"),
+]
+# Sprechen Teil 1 : Wörter zum Buchstabieren und Telefonnummern
+GX_P1_WORDS = ["MÜLLER", "SCHMIDT", "KAMERUN", "BERLIN", "YAOUNDE", "WEBER", "FISCHER", "HAMBURG", "KÖLN", "WAGNER",
+               "DOUALA", "BECKER", "MÜNCHEN", "HOFFMANN", "PARIS", "SCHULZ", "LEIPZIG", "KOCH", "BREMEN", "RICHTER"]
+GX_P1_NUMBERS = ["0171 45 89 23", "030 22 61 70", "0151 90 34 12", "089 77 45 06", "0221 38 19 54", "0160 82 73 41", "040 56 29 08",
+                 "0176 13 64 95", "069 41 87 30", "0152 60 25 79", "0341 95 12 68", "0172 08 53 46", "0711 24 96 31", "0163 71 40 85",
+                 "0211 63 07 92", "0157 49 28 16", "0421 85 31 74", "0175 36 90 21", "0231 17 68 43", "0162 54 02 97"]
+# Sprechen Teil 2 : (Thema, Wort, Beispiel-Frage, Frage des Partners, Schlüsselwörter für die Antwort, Beispiel-Antwort)
+GX_P2 = [
+    ("Essen und Trinken", "Frühstück", "Was essen Sie zum Frühstück?", "Was trinken Sie gern?", ("trinke", "kaffee", "tee", "wasser", "saft", "milch"), "Ich trinke gern Tee mit Zucker."),
+    ("Essen und Trinken", "Lieblingsessen", "Was ist Ihr Lieblingsessen?", "Kochen Sie gern?", ("koche", "ja", "nein", "gern"), "Ja, ich koche sehr gern, besonders Reis mit Fisch."),
+    ("Einkaufen", "Supermarkt", "Wann gehen Sie in den Supermarkt?", "Was kaufen Sie oft?", ("kaufe", "brot", "obst", "milch", "gemüse", "fleisch"), "Ich kaufe oft Brot, Obst und Gemüse."),
+    ("Einkaufen", "Kleidung", "Wo kaufen Sie Ihre Kleidung?", "Wie viel kostet ein Brot in Ihrer Stadt?", ("kostet", "euro", "cent", "franc"), "Ein Brot kostet ungefähr zwei Euro."),
+    ("Wohnen", "Wohnung", "Wie groß ist Ihre Wohnung?", "Wo wohnen Sie?", ("wohne", "in", "stadt", "straße"), "Ich wohne in Yaoundé, im Zentrum."),
+    ("Wohnen", "Zimmer", "Wie viele Zimmer hat Ihre Wohnung?", "Haben Sie einen Garten?", ("ja", "nein", "garten", "habe"), "Nein, ich habe keinen Garten, aber einen Balkon."),
+    ("Familie", "Geschwister", "Haben Sie Geschwister?", "Wie viele Personen leben bei Ihnen zu Hause?", ("personen", "wir sind", "leben", "wohne", "allein", "zwei", "drei", "vier", "fünf"), "Wir sind fünf Personen zu Hause."),
+    ("Familie", "Eltern", "Wo wohnen Ihre Eltern?", "Sind Sie verheiratet?", ("verheiratet", "ledig", "ja", "nein"), "Nein, ich bin ledig."),
+    ("Freizeit", "Hobby", "Was ist Ihr Hobby?", "Was machen Sie am Wochenende?", ("wochenende", "spiele", "gehe", "treffe", "schlafe", "lese", "besuche"), "Am Wochenende spiele ich Fußball und treffe Freunde."),
+    ("Freizeit", "Sport", "Machen Sie gern Sport?", "Sehen Sie gern fern?", ("ja", "nein", "sehe", "filme", "fern"), "Ja, ich sehe am Abend gern Filme."),
+    ("Arbeit und Beruf", "Beruf", "Was sind Sie von Beruf?", "Wo arbeiten Sie?", ("arbeite", "bei", "in", "büro", "schule", "firma", "student", "lerne"), "Ich arbeite in einem Büro in Douala."),
+    ("Arbeit und Beruf", "Arbeitszeit", "Wie lange arbeiten Sie jeden Tag?", "Wann beginnt Ihre Arbeit?", ("uhr", "um", "beginnt", "morgens"), "Meine Arbeit beginnt um acht Uhr."),
+    ("Reisen", "Urlaub", "Wo machen Sie gern Urlaub?", "Reisen Sie lieber mit dem Zug oder mit dem Flugzeug?", ("zug", "flugzeug", "bus", "auto", "lieber"), "Ich reise lieber mit dem Zug."),
+    ("Reisen", "Koffer", "Was nehmen Sie im Koffer mit?", "Welches Land möchten Sie besuchen?", ("möchte", "deutschland", "besuchen", "land", "nach"), "Ich möchte Deutschland besuchen."),
+    ("Schule und Lernen", "Deutschkurs", "Wann ist Ihr Deutschkurs?", "Warum lernen Sie Deutsch?", ("weil", "arbeit", "studieren", "deutschland", "möchte", "lerne"), "Ich lerne Deutsch, weil ich in Deutschland studieren möchte."),
+    ("Schule und Lernen", "Hausaufgaben", "Wann machen Sie Ihre Hausaufgaben?", "Welche Sprachen sprechen Sie?", ("spreche", "französisch", "englisch", "deutsch"), "Ich spreche Französisch, Englisch und ein bisschen Deutsch."),
+    ("Tagesablauf", "Aufstehen", "Wann stehen Sie auf?", "Wann gehen Sie ins Bett?", ("uhr", "um", "gehe", "bett"), "Ich gehe um elf Uhr ins Bett."),
+    ("Tagesablauf", "Mittagessen", "Wo essen Sie zu Mittag?", "Was machen Sie am Abend?", ("abend", "sehe", "lese", "koche", "lerne", "gehe"), "Am Abend koche ich und lerne Deutsch."),
+    ("Verkehr", "Bus", "Fahren Sie oft mit dem Bus?", "Wie kommen Sie zur Arbeit?", ("mit dem", "bus", "auto", "fuß", "fahrrad", "taxi", "fahre", "gehe"), "Ich fahre mit dem Taxi zur Arbeit."),
+    ("Gesundheit", "Arzt", "Wann gehen Sie zum Arzt?", "Was machen Sie, wenn Sie krank sind?", ("bleibe", "bett", "arzt", "medikament", "tee", "schlafe", "gehe"), "Ich bleibe im Bett und trinke viel Tee."),
+]
+# Sprechen Teil 3 : (Karte, Beispiel-Bitte, Bitte des Partners, Beispiel-Reaktion)
+GX_P3 = [
+    ("Fenster", "Können Sie bitte das Fenster aufmachen?", "Können Sie mir bitte einen Stift geben?", "Ja, gern. Hier, bitte."),
+    ("Wasser", "Kann ich bitte ein Glas Wasser haben?", "Machen Sie bitte die Tür zu.", "Ja, natürlich. Ich mache sie sofort zu."),
+    ("Handy", "Darf ich bitte Ihr Handy benutzen?", "Können Sie mir bitte helfen? Die Tasche ist schwer.", "Ja, klar. Ich helfe Ihnen gern."),
+    ("Buch", "Können Sie mir bitte das Buch geben?", "Sprechen Sie bitte langsam.", "Ja, natürlich. Entschuldigung."),
+    ("Rechnung", "Die Rechnung, bitte! Ich möchte bezahlen.", "Können Sie mir bitte den Weg zum Bahnhof zeigen?", "Ja, gern. Gehen Sie geradeaus und dann links."),
+    ("Tür", "Machen Sie bitte die Tür zu.", "Darf ich hier rauchen?", "Nein, tut mir leid. Hier ist Rauchen verboten."),
+    ("Kaffee", "Ich möchte bitte einen Kaffee.", "Können Sie bitte das Licht anmachen?", "Ja, gern. Kein Problem."),
+    ("Stift", "Kannst du mir bitte einen Stift leihen?", "Können Sie bitte das Radio leiser machen?", "Ja, natürlich. Entschuldigung."),
+    ("Foto", "Können Sie bitte ein Foto von uns machen?", "Geben Sie mir bitte das Salz.", "Ja, gern. Hier ist das Salz."),
+    ("Speisekarte", "Können Sie mir bitte die Speisekarte bringen?", "Kann ich bitte Ihr Wörterbuch haben?", "Ja, gern. Hier, bitte."),
+    ("Uhrzeit", "Entschuldigung, können Sie mir bitte sagen, wie spät es ist?", "Können Sie bitte das Fenster zumachen? Es ist kalt.", "Ja, natürlich. Ich mache es zu."),
+    ("Fahrkarte", "Ich möchte bitte eine Fahrkarte nach Berlin.", "Können Sie bitte wiederholen?", "Ja, gern. Ich wiederhole."),
+    ("Musik", "Können Sie bitte die Musik leiser machen?", "Darf ich mich hier setzen?", "Ja, bitte. Der Platz ist frei."),
+    ("Tasche", "Können Sie mir bitte mit der Tasche helfen?", "Bringen Sie mir bitte ein Wasser.", "Ja, sofort. Mit oder ohne Kohlensäure?"),
+    ("Brot", "Geben Sie mir bitte ein Brot.", "Können Sie bitte Ihren Namen buchstabieren?", "Ja, gern. N-G-A-S-S-A."),
+    ("Adresse", "Können Sie mir bitte Ihre Adresse geben?", "Können Sie mich morgen anrufen?", "Ja, gern. Ich rufe Sie morgen an."),
+    ("Licht", "Machen Sie bitte das Licht aus.", "Kann ich bitte Ihre Zeitung lesen?", "Ja, natürlich. Hier, bitte."),
+    ("Telefonnummer", "Können Sie mir bitte Ihre Telefonnummer sagen?", "Können Sie mir bitte zwanzig Euro wechseln?", "Tut mir leid, ich habe kein Kleingeld."),
+    ("Tisch", "Ich möchte bitte einen Tisch für zwei Personen.", "Zeigen Sie mir bitte Ihren Ausweis.", "Ja, natürlich. Hier ist mein Ausweis."),
+    ("Wörterbuch", "Darf ich bitte dein Wörterbuch benutzen?", "Können Sie bitte einen Moment warten?", "Ja, kein Problem. Ich warte."),
+]
+
+GX_PASS = 60  # Bestanden ab 60 %
+GX_MODULES = [
+    ("horen", "Hören", "3 Teile · 15 Aufgaben · ca. 20 Minuten", "Sie hören kurze Gespräche, Durchsagen und Nachrichten am Telefon."),
+    ("lesen", "Lesen", "4 Teile · 18 Aufgaben · ca. 25 Minuten", "Sie lesen kurze Mitteilungen, Anzeigen und Schilder."),
+    ("schreiben", "Schreiben", "2 Teile · ca. 20 Minuten", "Sie füllen ein Formular aus und schreiben eine kurze Mitteilung."),
+    ("sprechen", "Sprechen", "3 Teile · ca. 15 Minuten", "Sie stellen sich vor, stellen Fragen, antworten und formulieren Bitten."),
+]
+
+def _gx_sample(n_total, k):
+    return random.sample(range(n_total), k)
+
+def _gx_state(key):
+    st = session.get("gx_" + key)
+    return st if isinstance(st, dict) else None
+
+def _gx_pct(points, total):
+    return int(round(100.0 * points / total)) if total else 0
+
+def _gx_save(module, pct, detail):
+    # « score » = Prozent, « total » = Bestehensgrenze : so stimmt auch die Seite « Progrès » (bestanden ab 60 %)
+    _save_goethe(module, pct, GX_PASS, {"pct": pct, "detail": f"{pct} % ({detail})"})
+
+def _gx_results(user_id):
+    """Letztes und bestes Ergebnis pro Modul (in Prozent)."""
+    out = {}
+    rows = get_db().execute("SELECT result_json FROM goethe_exam WHERE user_id=? ORDER BY id DESC", (user_id,)).fetchall()
+    for r in rows:
+        try:
+            d = json.loads(r["result_json"])
+            pct = int(d["pct"])
+            mod = str(d.get("module", ""))
+        except Exception:
+            continue
+        if d.get("total") != GX_PASS:
+            continue
+        cur = out.setdefault(mod, {"last": pct, "best": pct, "n": 0})
+        cur["best"] = max(cur["best"], pct)
+        cur["n"] += 1
+    return out
+
+def _gx_verdict(pct):
+    cls = "res-ok" if pct >= 80 else ("res-mid" if pct >= GX_PASS else "res-bad")
+    txt = "Bestanden" if pct >= GX_PASS else "Nicht bestanden"
+    return (f'<div class="card" style="text-align:center;border-left:5px solid var(--warn);">'
+            f'<p style="margin:0;color:var(--muted);">Ihr Ergebnis</p>'
+            f'<p style="margin:6px 0;"><span class="res-score {cls}">{pct} / 100 Punkte = {pct} %</span></p>'
+            f'<div class="flash {"success" if pct >= GX_PASS else "danger"}" style="display:inline-block;">{"✔" if pct >= GX_PASS else "✘"} {txt} '
+            f'(Bestehensgrenze: {GX_PASS} %)</div></div>')
+
+def _gx_item(ok, title, yours, solution, extra=""):
+    mark = "✔" if ok else "✘"
+    col = "var(--ok, #2ecc71)" if ok else "var(--danger, #e74c3c)"
+    sol = "" if ok else f'<br><b>Richtige Lösung:</b> {h(solution)}'
+    return (f'<div class="gx-res" style="border-left:4px solid {col};">'
+            f'<b>{mark} {h(title)}</b><br><span style="color:var(--muted)">Ihre Antwort:</span> {h(yours) if yours else "— (keine Antwort)"}{sol}{extra}</div>')
+
+def _gx_radio(name, opts):
+    """opts : Liste (Wert, Text)."""
+    return "".join(f'<label class="quiz-opt"><input type="radio" name="{name}" value="{v}"> {h(t)}</label>' for v, t in opts)
+
+def _gx_abc(name, q):
+    return _gx_radio(name, [("a", "a) " + q[0]), ("b", "b) " + q[1]), ("c", "c) " + q[2])])
+
+def _gx_rf(name):
+    return _gx_radio(name, [("r", "Richtig"), ("f", "Falsch")])
+
+def _gx_head(title, sub):
+    return (f'<h1>{h(title)}</h1><p style="margin-bottom:16px;color:var(--muted);">{h(sub)}</p>')
+
+def _gx_teil(n, title, instr):
+    return (f'<div class="card" style="border-left:5px solid var(--warn);margin-top:18px;"><h2 style="margin:0">Teil {n} — {h(title)}</h2>'
+            f'<p style="margin:6px 0 0 0;">{h(instr)}</p></div>')
+
+def _gx_end(mod_key):
+    return (f'<div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:16px;">'
+            f'<a href="/goethe/{mod_key}" class="btn">Neue Prüfung</a>'
+            f'<a href="/goethe" class="btn ghost">Zur Übersicht</a></div>')
+
+def _gx_page(title, body):
+    return page(layout(title, body, {"is_admin": session.get("is_admin")}))
+
+GX_CSS = """<style>
+.gx-q { background: var(--card-bg); border: 1px solid var(--border-light); border-radius: 12px; padding: 14px; margin: 10px 0; }
+.gx-q h4 { margin: 0 0 8px 0; }
+.gx-text { background: var(--sky-light); border-radius: 10px; padding: 12px; margin: 8px 0; line-height: 1.6; }
+.gx-res { background: var(--card-bg); border-radius: 8px; padding: 10px 12px; margin: 8px 0; font-size: 14px; line-height: 1.6; }
+.gx-ads { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+@media (max-width: 560px) { .gx-ads { grid-template-columns: 1fr; } }
+.gx-form label { display: block; font-weight: 600; margin-top: 8px; }
+.gx-mic { width: 56px; height: 56px; font-size: 22px; }
+</style>"""
+
+# Mikrofon mit manuellem Senden : die Aufnahme stoppt nie von selbst, der Text erscheint im Feld.
+GX_MIC_JS = r"""<script>
+(function(){
+  var SRx = window.SpeechRecognition || window.webkitSpeechRecognition;
+  var isAndroid = /Android/i.test(navigator.userAgent || '');
+  var active = null;
+  function stopActive(){ if (active) { active.on = false; active.btn.classList.remove('listening'); active.btn.textContent = '🎤'; if (active.rec) { try { active.rec.stop(); } catch(e){} } active = null; } }
+  var btns = document.querySelectorAll('.gx-mic');
+  for (var b = 0; b < btns.length; b++) (function(btn){
+    var target = document.getElementById(btn.getAttribute('data-target'));
+    var st = { on: false, rec: null, base: '', sess: '', btn: btn };
+    function text(){ return (st.base + ' ' + st.sess).replace(/ +/g, ' ').trim(); }
+    function start(){
+      st.rec = new SRx();
+      st.rec.lang = 'de-DE'; st.rec.continuous = !isAndroid; st.rec.interimResults = !isAndroid;
+      st.rec.onresult = function(ev){
+        var s = '';
+        for (var i = 0; i < ev.results.length; i++) { if (ev.results[i][0]) s += ev.results[i][0].transcript + ' '; }
+        st.sess = s; target.value = text();
+      };
+      st.rec.onerror = function(ev){
+        if (ev.error === 'not-allowed' || ev.error === 'service-not-allowed' || ev.error === 'audio-capture') {
+          st.on = false; btn.classList.remove('listening'); btn.textContent = '🎤';
+          alert('Mikrofon nicht verfügbar. Bitte schreiben Sie Ihre Antwort in das Feld.');
+        }
+      };
+      st.rec.onend = function(){ st.base = text(); st.sess = ''; if (st.on) { try { start(); } catch(e) { st.on = false; btn.classList.remove('listening'); btn.textContent = '🎤'; } } };
+      st.rec.start();
+    }
+    btn.addEventListener('click', function(){
+      if (!SRx) { alert('Spracherkennung wird hier nicht unterstützt (bitte Chrome oder Edge benutzen). Schreiben Sie Ihre Antwort in das Feld.'); target.focus(); return; }
+      if (st.on) { stopActive(); return; }
+      stopActive();
+      st.on = true; st.base = target.value.trim(); st.sess = ''; active = st;
+      btn.classList.add('listening'); btn.textContent = '⏹';
+      try { start(); } catch(e) { stopActive(); }
+    });
+  })(btns[b]);
+  var f = document.getElementById('gx-form');
+  if (f) f.addEventListener('submit', function(){ stopActive(); }, true);
+})();
+</script>"""
+
 @app.route("/goethe")
 @login_required
 def goethe():
-    body = f"""
-    <h1>Examen Goethe A1 (Simulateur)</h1>
-    <p style="margin-bottom:20px;color:var(--muted);">Cet examen blanc est structuré en 4 modules officiels. Chaque résultat est enregistré dans « Progrès ».</p>
-
-    <div class="grid">
-      <div class="card"><h2>1. Hören (Écoute)</h2><p>L'application lit un court dialogue. {len(HOREN_QUESTIONS)} questions.</p><a href="/goethe/horen" class="btn">Commencer</a></div>
-      <div class="card"><h2>2. Lesen (Lecture)</h2><p>Lis un court texte et réponds. {len(LESEN_QUESTIONS)} questions.</p><a href="/goethe/lesen" class="btn">Commencer</a></div>
-      <div class="card"><h2>3. Schreiben (Écriture)</h2><p>Écris un message simple. {len(SCHREIBEN_QUESTIONS)} sujets.</p><a href="/goethe/schreiben" class="btn">Commencer</a></div>
-      <div class="card"><h2>4. Sprechen (Parler)</h2><p>Parle à voix haute, ta prononciation est notée. {len(SPRECHEN_QUESTIONS)} sujets.</p><a href="/goethe/sprechen" class="btn">Commencer</a></div>
-    </div>
+    res = _gx_results(session["user_id"])
+    cards = ""
+    for i, (key, name, meta, desc) in enumerate(GX_MODULES):
+        r = res.get(name)
+        if r:
+            cls = "res-ok" if r["last"] >= 80 else ("res-mid" if r["last"] >= GX_PASS else "res-bad")
+            info = (f'<p>Letztes Ergebnis: <b class="{cls}">{r["last"]} %</b> · Bestes Ergebnis: <b>{r["best"]} %</b> · '
+                    f'{r["n"]} Prüfung(en)</p>')
+        else:
+            info = '<p style="color:var(--muted);">Noch kein Ergebnis.</p>'
+        cards += (f'<div class="card"><h2>{i + 1}. {h(name)}</h2><p><b>{h(meta)}</b></p><p>{h(desc)}</p>{info}'
+                  f'<a href="/goethe/{key}" class="btn">Prüfung starten</a></div>')
+    total = ""
+    if all(name in res for _k, name, _m, _d in GX_MODULES):
+        avg = int(round(sum(res[name]["last"] for _k, name, _m, _d in GX_MODULES) / 4.0))
+        ok = avg >= GX_PASS
+        total = (f'<div class="card" style="text-align:center;border-left:5px solid var(--warn);"><h2 style="margin:0">Gesamtergebnis</h2>'
+                 f'<p style="margin:8px 0;"><span class="res-score {"res-ok" if ok else "res-bad"}">{avg} %</span></p>'
+                 f'<p>{"✔ Bestanden" if ok else "✘ Nicht bestanden"} — Durchschnitt Ihrer letzten Ergebnisse in den vier Modulen.</p></div>')
+    body = f"""{GX_CSS}
+    <h1>Modellprüfung Goethe-Zertifikat A1</h1>
+    <p style="margin-bottom:20px;color:var(--muted);">Start Deutsch 1 — Die Prüfung hat vier Module: Hören, Lesen, Schreiben und Sprechen.
+    Jedes Modul hat 100 Punkte. Sie bekommen Ihr Ergebnis in Prozent. Bestanden ab {GX_PASS} %. Bei jeder neuen Prüfung bekommen Sie andere Aufgaben.</p>
+    {total}
+    <div class="grid">{cards}</div>
     """
-    return page(layout("Examen Goethe A1", body, {"is_admin": session.get("is_admin")}))
+    return _gx_page("Goethe-Zertifikat A1", body)
 
-@app.route("/goethe/horen", methods=["GET","POST"])
+# ---------------------------------------------------------
+# HÖREN : Teil 1 (6 Aufgaben a/b/c), Teil 2 (4 Aufgaben richtig/falsch), Teil 3 (5 Aufgaben a/b/c)
+# ---------------------------------------------------------
+@app.route("/goethe/horen", methods=["GET", "POST"])
 @login_required
 def goethe_horen():
-    if request.method == "GET":
-        q, perm = _choice_start(HOREN_QUESTIONS, "ex_horen")
-    else:
-        q, perm = _choice_state(HOREN_QUESTIONS, "ex_horen")
-        if not q:
+    if request.method == "POST":
+        st = _gx_state("horen")
+        try:
+            t1 = [GX_H1[int(i)] for i in st["t1"]]
+            t2 = [GX_H2[int(i)] for i in st["t2"]]
+            t3 = [GX_H3[int(i)] for i in st["t3"]]
+        except Exception:
             return redirect(url_for("goethe_horen"))
-        session.pop("ex_horen", None)
-        rep = request.form.get("rep", "")
-        good_pos = perm.index(int(q["ans"]))
-        score = 1 if rep == str(good_pos) else 0
-        _save_goethe("Hören", score, 1)
-        correct = q["opts"][int(q["ans"])]
-        feedback = "✔ Bonne réponse !" if score == 1 else f"✘ Mauvaise réponse. C'était : {h(correct)}"
-        body = f"""
-        <h1>Hören (Écoute) - Résultat</h1>
-        <div class="card">
-          <div class="flash {'success' if score==1 else 'danger'}">{feedback}</div>
-          <p><b>Dialogue :</b> {h(q['audio'])}</p>
-          <div style="margin:12px 0;">{say_btn("🔊 Réécouter", "de", "", q['audio'], css="btn ghost")}</div>
-          <a href="/goethe/horen" class="btn">Question suivante</a>
-          <a href="/goethe" class="btn ghost">Retour</a>
-        </div>
+        session.pop("gx_horen", None)
+        good = [0, 0, 0]
+        out = ["", "", ""]
+        num = 0
+        for ti, items in ((0, t1), (2, t3)):
+            for k, q in enumerate(items):
+                rep = request.form.get(f"h{ti + 1}_{k}", "")
+                ok = rep == q[5]
+                good[ti] += ok
+                opts = {"a": q[2], "b": q[3], "c": q[4]}
+                out[ti] += _gx_item(ok, q[1], (rep + ") " + opts[rep]) if rep in opts else "", q[5] + ") " + opts[q[5]],
+                                    f'<br><span style="color:var(--muted)">Hörtext:</span> {h(q[0])}')
+        for k, q in enumerate(t2):
+            rep = request.form.get(f"h2_{k}", "")
+            ok = rep in ("r", "f") and (rep == "r") == q[2]
+            good[1] += ok
+            out[1] += _gx_item(ok, q[1], {"r": "Richtig", "f": "Falsch"}.get(rep, ""), "Richtig" if q[2] else "Falsch",
+                               f'<br><span style="color:var(--muted)">Hörtext:</span> {h(q[0])}')
+        total = sum(good)
+        pct = _gx_pct(total, 15)
+        _gx_save("Hören", pct, f"Teil 1: {good[0]}/6, Teil 2: {good[1]}/4, Teil 3: {good[2]}/5")
+        body = f"""{GX_CSS}
+        {_gx_head("Hören — Ergebnis", f"Sie haben {total} von 15 Aufgaben richtig gelöst.")}
+        {_gx_verdict(pct)}
+        <div class="card"><h2>Teil 1 — {good[0]} / 6</h2>{out[0]}</div>
+        <div class="card"><h2>Teil 2 — {good[1]} / 4</h2>{out[1]}</div>
+        <div class="card"><h2>Teil 3 — {good[2]} / 5</h2>{out[2]}</div>
+        {_gx_end("horen")}
         """
-        return page(layout("Résultat Hören", body, {"is_admin": session.get("is_admin")}))
+        return _gx_page("Hören — Ergebnis", body)
 
-    body = f"""
-    <h1>Hören (Écoute)</h1>
-    <div class="card">
-      <p>Écoute attentivement ce dialogue :</p>
-      <div style="background:var(--sky-light);padding:16px;border-radius:10px;margin:14px 0;">
-        {say_btn("🔊 Écouter le dialogue", "de", "", q['audio'])}
-      </div>
-      <form method="post">
-        <h3>{h(q['q'])}</h3>
-        {_choice_html(q, perm)}
-        <button class="btn ok" type="submit" style="margin-top:14px">Valider</button>
-      </form>
-    </div>
-    <a href="/goethe" class="btn ghost">← Retour</a>
+    st = {"t1": _gx_sample(len(GX_H1), 6), "t2": _gx_sample(len(GX_H2), 4), "t3": _gx_sample(len(GX_H3), 5)}
+    session["gx_horen"] = st
+    play = lambda txt: say_btn("▶ Text hören", "de", "", txt, css="btn ok")
+    html1 = "".join(f'<div class="gx-q"><h4>{k + 1}. {h(GX_H1[i][1])}</h4>{play(GX_H1[i][0])}{_gx_abc(f"h1_{k}", GX_H1[i][2:5])}</div>'
+                    for k, i in enumerate(st["t1"]))
+    html2 = "".join(f'<div class="gx-q"><h4>{k + 7}. {h(GX_H2[i][1])}</h4>{play(GX_H2[i][0])}{_gx_rf(f"h2_{k}")}</div>'
+                    for k, i in enumerate(st["t2"]))
+    html3 = "".join(f'<div class="gx-q"><h4>{k + 11}. {h(GX_H3[i][1])}</h4>{play(GX_H3[i][0])}{_gx_abc(f"h3_{k}", GX_H3[i][2:5])}</div>'
+                    for k, i in enumerate(st["t3"]))
+    body = f"""{GX_CSS}
+    {_gx_head("Hören", "Modul Hören · 3 Teile · 15 Aufgaben · ca. 20 Minuten. Lesen Sie zuerst die Aufgabe, dann hören Sie den Text.")}
+    <form method="post" id="gx-form">
+      {_gx_teil(1, "Kurze Gespräche", "Was ist richtig? Kreuzen Sie an: a, b oder c. Sie hören jeden Text zweimal.")}
+      {html1}
+      {_gx_teil(2, "Durchsagen", "Kreuzen Sie an: Richtig oder Falsch. Sie hören jeden Text einmal.")}
+      {html2}
+      {_gx_teil(3, "Nachrichten am Telefon", "Was ist richtig? Kreuzen Sie an: a, b oder c. Sie hören jeden Text zweimal.")}
+      {html3}
+      <button class="btn ok" type="submit" style="margin-top:16px;">Prüfung abgeben</button>
+      <a href="/goethe" class="btn ghost">Abbrechen</a>
+    </form>
     """
-    return page(layout("Hören", body, {"is_admin": session.get("is_admin")}))
+    return _gx_page("Hören", body)
 
-@app.route("/goethe/lesen", methods=["GET","POST"])
+# ---------------------------------------------------------
+# LESEN : Teil 1 (5), Teil 2 (5), Teil 3 (5), Teil 4 (3)
+# ---------------------------------------------------------
+@app.route("/goethe/lesen", methods=["GET", "POST"])
 @login_required
 def goethe_lesen():
-    if request.method == "GET":
-        q, perm = _choice_start(LESEN_QUESTIONS, "ex_lesen")
-    else:
-        q, perm = _choice_state(LESEN_QUESTIONS, "ex_lesen")
-        if not q:
+    if request.method == "POST":
+        st = _gx_state("lesen")
+        try:
+            t1 = [(GX_L1[int(i)], [int(x) for x in sel]) for i, sel in st["t1"]]
+            t2 = [GX_L2[int(i)] for i in st["t2"]]
+            t3 = [GX_L3[int(i)] for i in st["t3"]]
+            t4 = GX_L4[int(st["t4"])]
+            for txt, sel in t1:
+                for x in sel:
+                    txt[1][x]
+        except Exception:
             return redirect(url_for("goethe_lesen"))
-        session.pop("ex_lesen", None)
-        rep = request.form.get("rep", "")
-        good_pos = perm.index(int(q["ans"]))
-        score = 1 if rep == str(good_pos) else 0
-        _save_goethe("Lesen", score, 1)
-        correct = q["opts"][int(q["ans"])]
-        feedback = "✔ Bonne réponse !" if score == 1 else f"✘ Mauvaise réponse. C'était : {h(correct)}"
-        body = f"""
-        <h1>Lesen (Lecture) - Résultat</h1>
-        <div class="card">
-          <div class="flash {'success' if score==1 else 'danger'}">{feedback}</div>
-          <p><b>Texte :</b> {h(q['text'])}</p>
-          <a href="/goethe/lesen" class="btn">Question suivante</a>
-          <a href="/goethe" class="btn ghost">Retour</a>
-        </div>
+        session.pop("gx_lesen", None)
+        good = [0, 0, 0, 0]
+        out = ["", "", "", ""]
+        k = 0
+        for txt, sel in t1:
+            out[0] += f'<div class="gx-text">{h(txt[0])}</div>'
+            for x in sel:
+                stmt, truth = txt[1][x]
+                rep = request.form.get(f"l1_{k}", "")
+                ok = rep in ("r", "f") and (rep == "r") == truth
+                good[0] += ok
+                out[0] += _gx_item(ok, stmt, {"r": "Richtig", "f": "Falsch"}.get(rep, ""), "Richtig" if truth else "Falsch")
+                k += 1
+        for k, q in enumerate(t2):
+            rep = request.form.get(f"l2_{k}", "")
+            ok = rep == q[3]
+            good[1] += ok
+            ads = {"a": q[1], "b": q[2]}
+            out[1] += _gx_item(ok, q[0], (rep + ") " + ads[rep]) if rep in ads else "", q[3] + ") " + ads[q[3]])
+        for k, q in enumerate(t3):
+            rep = request.form.get(f"l3_{k}", "")
+            ok = rep in ("r", "f") and (rep == "r") == q[2]
+            good[2] += ok
+            out[2] += _gx_item(ok, q[1], {"r": "Richtig", "f": "Falsch"}.get(rep, ""), "Richtig" if q[2] else "Falsch",
+                               f'<br><span style="color:var(--muted)">Text:</span> {h(q[0])}')
+        out[3] += f'<div class="gx-text">{h(t4[0])}</div>'
+        for k, q in enumerate(t4[1]):
+            rep = request.form.get(f"l4_{k}", "")
+            ok = rep == q[4]
+            good[3] += ok
+            opts = {"a": q[1], "b": q[2], "c": q[3]}
+            out[3] += _gx_item(ok, q[0], (rep + ") " + opts[rep]) if rep in opts else "", q[4] + ") " + opts[q[4]])
+        total = sum(good)
+        pct = _gx_pct(total, 18)
+        _gx_save("Lesen", pct, f"Teil 1: {good[0]}/5, Teil 2: {good[1]}/5, Teil 3: {good[2]}/5, Teil 4: {good[3]}/3")
+        body = f"""{GX_CSS}
+        {_gx_head("Lesen — Ergebnis", f"Sie haben {total} von 18 Aufgaben richtig gelöst.")}
+        {_gx_verdict(pct)}
+        <div class="card"><h2>Teil 1 — {good[0]} / 5</h2>{out[0]}</div>
+        <div class="card"><h2>Teil 2 — {good[1]} / 5</h2>{out[1]}</div>
+        <div class="card"><h2>Teil 3 — {good[2]} / 5</h2>{out[2]}</div>
+        <div class="card"><h2>Teil 4 — {good[3]} / 3</h2>{out[3]}</div>
+        {_gx_end("lesen")}
         """
-        return page(layout("Résultat Lesen", body, {"is_admin": session.get("is_admin")}))
+        return _gx_page("Lesen — Ergebnis", body)
 
-    body = f"""
-    <h1>Lesen (Lecture)</h1>
-    <div class="card">
-      <p>Lis ce message :</p>
-      <div style="background:var(--sky-light);padding:16px;border-radius:10px;margin:14px 0;font-style:italic;">
-        "{h(q['text'])}"
-      </div>
-      <form method="post">
-        <h3>{h(q['q'])}</h3>
-        {_choice_html(q, perm)}
-        <button class="btn ok" type="submit" style="margin-top:14px">Valider</button>
-      </form>
-    </div>
-    <a href="/goethe" class="btn ghost">← Retour</a>
+    a, b = _gx_sample(len(GX_L1), 2)
+    st = {"t1": [[a, sorted(random.sample(range(3), 2))], [b, [0, 1, 2]]],
+          "t2": _gx_sample(len(GX_L2), 5), "t3": _gx_sample(len(GX_L3), 5), "t4": random.randrange(len(GX_L4))}
+    session["gx_lesen"] = st
+    html1 = ""
+    k = 0
+    for i, sel in st["t1"]:
+        html1 += f'<div class="gx-q"><div class="gx-text">{h(GX_L1[i][0])}</div>'
+        for x in sel:
+            html1 += f'<h4 style="margin-top:12px;">{k + 1}. {h(GX_L1[i][1][x][0])}</h4>{_gx_rf(f"l1_{k}")}'
+            k += 1
+        html1 += "</div>"
+    html2 = ""
+    for k, i in enumerate(st["t2"]):
+        q = GX_L2[i]
+        html2 += (f'<div class="gx-q"><h4>{k + 6}. {h(q[0])}</h4><div class="gx-ads">'
+                  f'<div class="gx-text"><b>a)</b> {h(q[1])}</div><div class="gx-text"><b>b)</b> {h(q[2])}</div></div>'
+                  + _gx_radio(f"l2_{k}", [("a", "Anzeige a"), ("b", "Anzeige b")]) + "</div>")
+    html3 = "".join(f'<div class="gx-q"><div class="gx-text">{h(GX_L3[i][0])}</div><h4>{k + 11}. {h(GX_L3[i][1])}</h4>{_gx_rf(f"l3_{k}")}</div>'
+                    for k, i in enumerate(st["t3"]))
+    ad = GX_L4[st["t4"]]
+    html4 = f'<div class="gx-q"><div class="gx-text">{h(ad[0])}</div>'
+    for k, q in enumerate(ad[1]):
+        html4 += f'<h4 style="margin-top:12px;">{k + 16}. {h(q[0])}</h4>{_gx_abc(f"l4_{k}", q[1:4])}'
+    html4 += "</div>"
+    body = f"""{GX_CSS}
+    {_gx_head("Lesen", "Modul Lesen · 4 Teile · 18 Aufgaben · ca. 25 Minuten.")}
+    <form method="post" id="gx-form">
+      {_gx_teil(1, "Kurze Mitteilungen", "Lesen Sie die beiden Texte. Sind die Sätze 1 bis 5 richtig oder falsch? Kreuzen Sie an.")}
+      {html1}
+      {_gx_teil(2, "Anzeigen", "Lesen Sie die Situationen und die Anzeigen. Wo finden Sie Informationen? Kreuzen Sie an: a oder b.")}
+      {html2}
+      {_gx_teil(3, "Schilder und Aushänge", "Lesen Sie die Texte. Sind die Sätze 11 bis 15 richtig oder falsch? Kreuzen Sie an.")}
+      {html3}
+      {_gx_teil(4, "Eine Anzeige genau lesen", "Lesen Sie die Anzeige und die Aufgaben 16 bis 18. Was ist richtig? Kreuzen Sie an: a, b oder c.")}
+      {html4}
+      <button class="btn ok" type="submit" style="margin-top:16px;">Prüfung abgeben</button>
+      <a href="/goethe" class="btn ghost">Abbrechen</a>
+    </form>
     """
-    return page(layout("Lesen", body, {"is_admin": session.get("is_admin")}))
+    return _gx_page("Lesen", body)
 
-@app.route("/goethe/schreiben", methods=["GET","POST"])
+# ---------------------------------------------------------
+# SCHREIBEN : Teil 1 (Formular, 5 Punkte), Teil 2 (Mitteilung, 10 Punkte)
+# ---------------------------------------------------------
+def _gx_norm(s):
+    return re.sub(r"[^a-z0-9äöüß@]+", "", str(s).lower())
+
+def _gx_field_ok(given, accepted):
+    g = _gx_norm(given)
+    if not g:
+        return False
+    for alt in accepted.split("/"):
+        a = _gx_norm(alt)
+        if g == a or (len(a) >= 4 and a in g and len(g) <= len(a) + 12):
+            return True
+    return False
+
+def _gx_score_message(text, groups):
+    """Mitteilung : 3 Inhaltspunkte x 2 + Anrede 1 + Gruß 1 + Länge 2 = 10 Punkte. Rückgabe (Punkte, Details)."""
+    low = " " + text.lower() + " "
+    words = len(re.findall(r"[A-Za-zÄÖÜäöüß]+", text))
+    hits = [any(k in low for k in g) for g in groups]
+    anrede = any(k in low for k in ("liebe", "hallo", "sehr geehrte", "guten tag", "guten morgen", "hi "))
+    gruss = any(k in low for k in ("grüße", "grüßen", "gruß", "bis bald", "tschüs", "bis dann", "bis samstag", "bis sonntag"))
+    length = 2 if words >= 25 else (1 if words >= 15 else 0)
+    pts = 2 * sum(hits) + (1 if anrede else 0) + (1 if gruss else 0) + length
+    if words < 8:
+        pts = min(pts, 2)
+    return pts, hits, anrede, gruss, words
+
+@app.route("/goethe/schreiben", methods=["GET", "POST"])
 @login_required
 def goethe_schreiben():
-    if request.method == "GET":
-        idx = _pick_index(SCHREIBEN_QUESTIONS, "ex_schreiben")
-        session["ex_schreiben"] = {"i": idx}
-        q = SCHREIBEN_QUESTIONS[idx]
-    else:
+    if request.method == "POST":
+        st = _gx_state("schreiben")
         try:
-            q = SCHREIBEN_QUESTIONS[int(session.get("ex_schreiben", {}).get("i"))]
+            f1 = GX_S1[int(st["t1"])]
+            m2 = GX_S2[int(st["t2"])]
         except Exception:
             return redirect(url_for("goethe_schreiben"))
-        session.pop("ex_schreiben", None)
-        rep = request.form.get("rep", "").strip()[:1500]
-        words = len(rep.split())
-        low = rep.lower()
-        groups = q.get("must") or []
-        hit = [any(alt in low for alt in g) for g in groups]
-        got, need = sum(hit), len(groups)
-        enough = words >= q["min_words"]
-        ok = enough and (need == 0 or got / need >= 0.6)
-        _save_goethe("Schreiben", 1 if ok else 0, 1, {"detail": f"{words} mots, {got}/{need} idées"})
-        if ok:
-            feedback = "✔ Bon travail !"
-        elif not enough:
-            feedback = f"✘ C'est un peu court : {words} mot(s), vise au moins {q['min_words']} mots."
-        else:
-            feedback = f"✘ Il manque des éléments demandés par la consigne ({got}/{need} idées trouvées). Relis la consigne."
-        model = f'<p style="margin-top:10px;"><b>Modèle de réponse :</b> {h(q["model"])}</p>' if q.get("model") else ""
-        body = f"""
-        <h1>Schreiben (Écriture) - Résultat</h1>
-        <div class="card">
-          <div class="flash {'success' if ok else 'danger'}">{feedback}</div>
-          <p><b>Ta réponse :</b> {h(rep)}</p>
-          {model}
-          <p style="color:var(--muted);margin-top:10px;">Note : cette correction vérifie la longueur et la présence des idées demandées. Dans un vrai examen, un correcteur humain évalue aussi la grammaire et le vocabulaire.</p>
-          <a href="/goethe/schreiben" class="btn">Exercice suivant</a>
-          <a href="/goethe" class="btn ghost">Retour</a>
-        </div>
+        session.pop("gx_schreiben", None)
+        p1 = 0
+        out1 = ""
+        for k, (label, accepted) in enumerate(f1[1]):
+            rep = request.form.get(f"s1_{k}", "").strip()[:80]
+            ok = _gx_field_ok(rep, accepted)
+            p1 += ok
+            out1 += _gx_item(ok, label, rep, accepted.split("/")[0])
+        text = request.form.get("s2", "").strip()[:1500]
+        p2, hits, anrede, gruss, words = _gx_score_message(text, m2[2])
+        chk = lambda b: "✔" if b else "✘"
+        out2 = f'<div class="gx-text"><b>Ihr Text ({words} Wörter):</b><br>{h(text) if text else "— (kein Text)"}</div>'
+        for j, point in enumerate(m2[1]):
+            out2 += f'<div class="gx-res">{chk(hits[j])} Inhaltspunkt {j + 1}: {h(point)} — {2 if hits[j] else 0} / 2 Punkte</div>'
+        out2 += f'<div class="gx-res">{chk(anrede)} Anrede (zum Beispiel: Liebe ..., Sehr geehrte ...) — {1 if anrede else 0} / 1 Punkt</div>'
+        out2 += f'<div class="gx-res">{chk(gruss)} Gruß am Ende (zum Beispiel: Viele Grüße) — {1 if gruss else 0} / 1 Punkt</div>'
+        lp = 2 if words >= 25 else (1 if words >= 15 else 0)
+        out2 += f'<div class="gx-res">{chk(lp == 2)} Länge: {words} Wörter (Ziel: circa 30 Wörter) — {lp} / 2 Punkte</div>'
+        out2 += f'<div class="gx-text"><b>Beispiel für eine gute Lösung:</b><br>{h(m2[3])}</div>'
+        pct = _gx_pct(p1 + p2, 15)
+        _gx_save("Schreiben", pct, f"Teil 1: {p1}/5, Teil 2: {p2}/10")
+        body = f"""{GX_CSS}
+        {_gx_head("Schreiben — Ergebnis", f"Sie haben {p1 + p2} von 15 Punkten erreicht.")}
+        {_gx_verdict(pct)}
+        <div class="card"><h2>Teil 1 — {p1} / 5</h2>{out1}</div>
+        <div class="card"><h2>Teil 2 — {p2} / 10</h2>{out2}
+          <p style="color:var(--muted);margin-top:10px;">Hinweis: Die automatische Korrektur prüft Inhalt, Anrede, Gruß und Länge.
+          Grammatik und Rechtschreibung bewertet in der echten Prüfung ein Prüfer. Vergleichen Sie Ihren Text mit dem Beispiel.</p></div>
+        {_gx_end("schreiben")}
         """
-        return page(layout("Résultat Schreiben", body, {"is_admin": session.get("is_admin")}))
+        return _gx_page("Schreiben — Ergebnis", body)
 
-    body = f"""
-    <h1>Schreiben (Écriture)</h1>
-    <div class="card">
-      <p><b>Consigne :</b> {h(q['q'])}</p>
-      <form method="post">
-        <label>Ton message :</label>
-        <textarea name="rep" rows="4" placeholder="Écris en allemand ici..." required></textarea>
-        <button class="btn ok" type="submit">Valider</button>
-      </form>
-    </div>
-    <a href="/goethe" class="btn ghost">← Retour</a>
+    st = {"t1": random.randrange(len(GX_S1)), "t2": random.randrange(len(GX_S2))}
+    session["gx_schreiben"] = st
+    f1, m2 = GX_S1[st["t1"]], GX_S2[st["t2"]]
+    fields = "".join(f'<label for="s1_{k}">{k + 1}. {h(label)}</label><input type="text" name="s1_{k}" id="s1_{k}" maxlength="80" autocomplete="off">'
+                     for k, (label, _acc) in enumerate(f1[1]))
+    points = "".join(f"<li>{h(p)}</li>" for p in m2[1])
+    body = f"""{GX_CSS}
+    {_gx_head("Schreiben", "Modul Schreiben · 2 Teile · ca. 20 Minuten.")}
+    <form method="post" id="gx-form">
+      {_gx_teil(1, "Formular", "Lesen Sie den Text. Im Formular fehlen fünf Informationen. Schreiben Sie die Informationen in das Formular.")}
+      <div class="gx-q gx-form"><div class="gx-text">{h(f1[0])}</div>{fields}</div>
+      {_gx_teil(2, "Kurze Mitteilung", "Schreiben Sie zu jedem Punkt ein bis zwei Sätze (circa 30 Wörter). Vergessen Sie nicht die Anrede und den Gruß.")}
+      <div class="gx-q gx-form"><div class="gx-text">{h(m2[0])}<ul style="margin:8px 0 0 20px;">{points}</ul></div>
+        <label for="s2">Ihr Text:</label>
+        <textarea name="s2" id="s2" rows="7" maxlength="1500" placeholder="Schreiben Sie hier Ihren Text ..."></textarea>
+      </div>
+      <button class="btn ok" type="submit" style="margin-top:16px;">Prüfung abgeben</button>
+      <a href="/goethe" class="btn ghost">Abbrechen</a>
+    </form>
     """
-    return page(layout("Schreiben", body, {"is_admin": session.get("is_admin")}))
+    return _gx_page("Schreiben", body)
 
-@app.route("/goethe/sprechen", methods=["GET","POST"])
+# ---------------------------------------------------------
+# SPRECHEN : Teil 1 (sich vorstellen, 3 Punkte), Teil 2 (Fragen und Antworten, 6), Teil 3 (Bitten, 6)
+# ---------------------------------------------------------
+GX_P1_ELEMENTS = [
+    ("Name", ("heiße", "heisse", "name ist", "ich bin")),
+    ("Alter", ("jahre", "alt")),
+    ("Land", ("komme aus", "aus ")),
+    ("Wohnort", ("wohne", "lebe in")),
+    ("Sprachen", ("spreche", "sprache")),
+    ("Beruf", ("beruf", "arbeite", "student", "schüler", "studiere", "lerne")),
+    ("Hobby", ("hobby", "gern", "mag ", "spiele", "liebe")),
+]
+_GX_NUM_WORDS = {"null": "0", "eins": "1", "ein": "1", "zwei": "2", "zwo": "2", "drei": "3", "vier": "4", "fünf": "5",
+                 "sechs": "6", "sieben": "7", "acht": "8", "neun": "9"}
+_GX_POLITE = ("bitte", "können", "könnten", "kannst", "könntest", "kann ich", "darf", "dürfte", "möchte", "hätte gern", "würden", "würdest")
+_GX_REACT = ("ja", "gern", "natürlich", "klar", "kein problem", "sofort", "hier", "bitte", "nein", "leider", "tut mir leid",
+             "entschuldigung", "moment", "okay", "in ordnung")
+
+def _gx_toks(s):
+    return re.findall(r"[a-zäöüß]+", s.lower())
+
+def _gx_has_word(low, word, model):
+    stem = word.lower()[:max(4, len(word) - 3)]
+    if stem in low:
+        return True
+    return any(t in low for t in _gx_toks(model) if len(t) >= 5 and t not in ("können", "bitte", "ihren", "ihrer", "haben", "gehen", "machen"))
+
+def _gx_react_ok(low):
+    toks = set(_gx_toks(low))
+    return any((k in toks) if " " not in k else (k in low) for k in _GX_REACT)
+
+@app.route("/goethe/sprechen", methods=["GET", "POST"])
 @login_required
 def goethe_sprechen():
-    if request.method == "GET":
-        idx = _pick_index(SPRECHEN_QUESTIONS, "ex_sprechen")
-        session["ex_sprechen"] = {"i": idx}
-        q = SPRECHEN_QUESTIONS[idx]
-    else:
+    if request.method == "POST":
+        st = _gx_state("sprechen")
         try:
-            q = SPRECHEN_QUESTIONS[int(session.get("ex_sprechen", {}).get("i"))]
+            word = GX_P1_WORDS[int(st["w"])]
+            number = GX_P1_NUMBERS[int(st["n"])]
+            c2 = [GX_P2[int(i)] for i in st["t2"]]
+            c3 = [GX_P3[int(i)] for i in st["t3"]]
         except Exception:
             return redirect(url_for("goethe_sprechen"))
-        session.pop("ex_sprechen", None)
-        heard = request.form.get("heard", "").strip()[:300]
-        pattern = q.get("pattern") or ""
-        if not heard:
-            verdict = ('<div class="flash warning">Aucune réponse enregistrée : exercice non noté. '
-                       'Utilise le micro 🎤 (Chrome ou Edge) ou écris ce que tu as dit.</div>')
-        elif not pattern:
-            verdict = '<div class="flash success">✔ Exercice fait. Cette consigne n\'est pas notée automatiquement : compare avec l\'exemple.</div>'
-        else:
-            score = _score_pronunciation(pattern, heard)
-            ok = score >= 60
-            _save_goethe("Sprechen", 1 if ok else 0, 1, {"pct": score})
-            cls = "res-ok" if score >= 85 else ("res-mid" if score >= 60 else "res-bad")
-            verdict = (f'<div class="flash {"success" if ok else "danger"}">{"✔ Bien joué !" if ok else "✘ À retravailler."}</div>'
-                       f'<p>Score de prononciation : <span class="res-score {cls}">{score}%</span></p>'
-                       f'<p>Neferti a compris : « {h(heard)} »</p>')
-        body = f"""
-        <h1>Sprechen (Parler) - Résultat</h1>
-        <div class="card">
-          {verdict}
-          <p style="margin-top:10px;"><b>Exemple :</b> {h(q['example'])}</p>
-          <div style="margin:12px 0;">{say_btn("🔊 Écouter l'exemple", "de", "", q['example'], css="btn ghost")}</div>
-          <p style="color:var(--muted);margin-top:10px;">Dans un vrai examen Goethe, l'examinateur t'écoute et évalue ta prononciation.</p>
-          <a href="/goethe/sprechen" class="btn">Exercice suivant</a>
-          <a href="/goethe" class="btn ghost">Retour</a>
-        </div>
-        """
-        return page(layout("Résultat Sprechen", body, {"is_admin": session.get("is_admin")}))
+        session.pop("gx_sprechen", None)
+        get = lambda name: re.sub(r"\s+", " ", request.form.get(name, "")).strip()[:600]
+        chk = lambda v: "✔" if v >= 0.99 else ("◐" if v > 0 else "✘")
 
-    body = f"""
-    <h1>Sprechen (Parler)</h1>
-    <div class="card">
-      <h2>Consigne</h2>
-      <p>{h(q['q'])}</p>
-      <div class="sp-box">
-        <p style="margin-bottom:10px;"><i>Exemple : {h(q['example'])}</i></p>
-        {say_btn("🔊 Écouter l'exemple", "de", "", q['example'])}
-      </div>
-      <form method="post" id="sp-form">
-        <div class="sp-actions">
-          <button type="button" class="mic-btn" id="sp-mic" title="Répondre à voix haute">🎤</button>
-          <div class="neferti-status" id="sp-status">Clique sur le micro et réponds en allemand (Chrome ou Edge).</div>
-        </div>
-        <label>Ce que tu as dit (tu peux corriger ou l'écrire toi-même) :</label>
-        <input name="heard" id="sp-heard" placeholder="Ta réponse en allemand…" autocomplete="off">
-        <button class="btn ok" type="submit">Valider ma réponse</button>
-      </form>
-    </div>
-    <a href="/goethe" class="btn ghost">← Retour</a>
-    <script>
-    (function(){{
-      var mic = document.getElementById('sp-mic');
-      var st = document.getElementById('sp-status');
-      var inp = document.getElementById('sp-heard');
-      if (!mic) return;
-      if (!window.NefertiSupported) {{
-        st.textContent = "Reconnaissance vocale indisponible ici : écris ta réponse ci-dessous.";
-      }}
-      mic.addEventListener('click', function(){{
-        if (!window.NefertiSupported) {{ inp.focus(); return; }}
-        mic.classList.add('listening');
-        st.textContent = "🎙️ Je t'écoute… parle en allemand !";
-        window.NefertiStartListening(function(text){{
-          inp.value = text;
-          st.textContent = "✅ J'ai entendu : « " + text + " ». Clique sur Valider.";
-        }}, function(err){{
-          mic.classList.remove('listening');
-          if (err && err !== 'aborted' && err !== 'no-speech') st.textContent = "⚠️ Erreur micro : " + err + ". Réessaie ou écris ta réponse.";
-          else if (err === 'no-speech') st.textContent = "Je n'ai rien entendu. Réessaie.";
-        }});
-      }});
-    }})();
-    </script>
+        # Teil 1
+        vor = get("p1_vor")
+        low = " " + vor.lower() + " "
+        el = [(name, any(k in low for k in keys)) for name, keys in GX_P1_ELEMENTS]
+        f_vor = sum(1 for _n, okk in el if okk) / 7.0
+        sp = get("p1_spell")
+        sp_n = re.sub(r"[^A-ZÄÖÜ]", "", sp.upper().replace("ß", "SS"))
+        f_sp = 1.0 if sp_n == word else (0.5 if sp_n and _lev_ratio(sp_n, word) >= 0.7 else 0.0)
+        nb = get("p1_num")
+        nb_low = nb.lower()
+        for w_, d_ in _GX_NUM_WORDS.items():
+            nb_low = re.sub(r"\b" + w_ + r"\b", d_, nb_low)
+        nb_d = re.sub(r"\D", "", nb_low)
+        want = re.sub(r"\D", "", number)
+        f_nb = 1.0 if nb_d == want else (0.5 if nb_d and _lev_ratio(nb_d, want) >= 0.75 else 0.0)
+        p1 = round(2.0 * f_vor + 0.5 * f_sp + 0.5 * f_nb, 2)
+        out1 = (f'<div class="gx-text"><b>Ihre Vorstellung:</b><br>{h(vor) if vor else "— (keine Antwort)"}</div>'
+                + "".join(f'<div class="gx-res">{"✔" if okk else "✘"} {h(name)}</div>' for name, okk in el)
+                + '<div class="gx-text"><b>Beispiel:</b> Ich heiße Samuel Ngassa. Ich bin 24 Jahre alt. Ich komme aus Kamerun und wohne in Yaoundé. '
+                  'Ich spreche Französisch, Englisch und ein bisschen Deutsch. Ich bin Student. Mein Hobby ist Fußball.</div>'
+                + f'<div class="gx-res">{chk(f_sp)} Buchstabieren: {h(word)} — Ihre Antwort: {h(sp) if sp else "—"}<br>'
+                  f'<b>Lösung:</b> {h("-".join(word))}</div>'
+                + f'<div class="gx-res">{chk(f_nb)} Telefonnummer: {h(number)} — Ihre Antwort: {h(nb) if nb else "—"}</div>')
+
+        # Teil 2
+        p2 = 0.0
+        out2 = ""
+        for k, c in enumerate(c2):
+            q = get(f"p2_q{k}")
+            a = get(f"p2_a{k}")
+            ql, al = q.lower(), " " + a.lower() + " "
+            nq, na = len(_gx_toks(q)), len(_gx_toks(a))
+            fq = (1.0 if _gx_has_word(ql, c[1], c[2]) else 0.5) if nq >= 3 else 0.0
+            kw = any(x in al for x in c[4])
+            fa = (1.0 if kw else 0.5) if na >= 3 else (0.5 if na >= 1 and kw else 0.0)
+            p2 += 1.5 * fq + 1.5 * fa
+            out2 += (f'<div class="gx-res">{chk(fq)} <b>Karte: {h(c[0])} — {h(c[1])}</b><br><span style="color:var(--muted)">Ihre Frage:</span> {h(q) if q else "—"}'
+                     f'<br><b>Beispiel:</b> {h(c[2])} {say_btn("🔊", "de", "", c[2], css="btn ghost", style="padding:2px 8px;font-size:12px;")}</div>'
+                     f'<div class="gx-res">{chk(fa)} <b>Frage des Partners: {h(c[3])}</b><br><span style="color:var(--muted)">Ihre Antwort:</span> {h(a) if a else "—"}'
+                     f'<br><b>Beispiel:</b> {h(c[5])} {say_btn("🔊", "de", "", c[5], css="btn ghost", style="padding:2px 8px;font-size:12px;")}</div>')
+
+        # Teil 3
+        p3 = 0.0
+        out3 = ""
+        for k, c in enumerate(c3):
+            b = get(f"p3_b{k}")
+            r = get(f"p3_r{k}")
+            bl, rl = " " + b.lower() + " ", " " + r.lower() + " "
+            polite = any(x in bl for x in _GX_POLITE)
+            has = _gx_has_word(bl, c[0], c[1])
+            fb = 0.0 if len(_gx_toks(b)) < 2 else (1.0 if polite and has else (0.5 if polite or has else 0.0))
+            fr_ = 0.0 if not r else ((1.0 if len(_gx_toks(r)) >= 2 else 0.5) if _gx_react_ok(rl) else 0.0)
+            p3 += 1.5 * fb + 1.5 * fr_
+            out3 += (f'<div class="gx-res">{chk(fb)} <b>Karte: {h(c[0])}</b><br><span style="color:var(--muted)">Ihre Bitte:</span> {h(b) if b else "—"}'
+                     f'<br><b>Beispiel:</b> {h(c[1])} {say_btn("🔊", "de", "", c[1], css="btn ghost", style="padding:2px 8px;font-size:12px;")}</div>'
+                     f'<div class="gx-res">{chk(fr_)} <b>Bitte des Partners: {h(c[2])}</b><br><span style="color:var(--muted)">Ihre Reaktion:</span> {h(r) if r else "—"}'
+                     f'<br><b>Beispiel:</b> {h(c[3])} {say_btn("🔊", "de", "", c[3], css="btn ghost", style="padding:2px 8px;font-size:12px;")}</div>')
+        p2, p3 = round(p2, 2), round(p3, 2)
+        pct = _gx_pct(p1 + p2 + p3, 15)
+        fmt = lambda v: ("%.1f" % v).replace(".", ",")
+        _gx_save("Sprechen", pct, f"Teil 1: {fmt(p1)}/3, Teil 2: {fmt(p2)}/6, Teil 3: {fmt(p3)}/6")
+        body = f"""{GX_CSS}
+        {_gx_head("Sprechen — Ergebnis", f"Sie haben {fmt(p1 + p2 + p3)} von 15 Punkten erreicht.")}
+        {_gx_verdict(pct)}
+        <div class="card"><h2>Teil 1 — {fmt(p1)} / 3</h2>{out1}</div>
+        <div class="card"><h2>Teil 2 — {fmt(p2)} / 6</h2>{out2}</div>
+        <div class="card"><h2>Teil 3 — {fmt(p3)} / 6</h2>{out3}
+          <p style="color:var(--muted);margin-top:10px;">Hinweis: Die automatische Korrektur prüft, ob Ihre Antwort zur Aufgabe passt.
+          Aussprache und Grammatik bewertet in der echten Prüfung ein Prüfer. Hören Sie die Beispiele und sprechen Sie sie laut nach.</p></div>
+        {_gx_end("sprechen")}
+        """
+        return _gx_page("Sprechen — Ergebnis", body)
+
+    st = {"w": random.randrange(len(GX_P1_WORDS)), "n": random.randrange(len(GX_P1_NUMBERS)),
+          "t2": _gx_sample(len(GX_P2), 2), "t3": _gx_sample(len(GX_P3), 2)}
+    session["gx_sprechen"] = st
+
+    def answer_box(name, rows=2, hint="Ihre Antwort ..."):
+        return (f'<div style="display:flex;gap:10px;align-items:center;margin-top:8px;">'
+                f'<button type="button" class="mic-btn gx-mic" data-target="{name}" title="Sprechen">🎤</button>'
+                f'<textarea name="{name}" id="{name}" rows="{rows}" maxlength="600" placeholder="{hint}" style="margin:0;flex:1;"></textarea></div>')
+
+    listen = lambda txt: say_btn("🔊 Hören", "de", "", txt, css="btn ghost", style="padding:4px 10px;font-size:12px;")
+    words_list = " · ".join(name for name, _k in GX_P1_ELEMENTS)
+    html1 = (f'<div class="gx-q"><h4>1. Stellen Sie sich bitte vor.</h4><div class="gx-text">{h(words_list)}</div>{answer_box("p1_vor", 4)}</div>'
+             f'<div class="gx-q"><h4>2. Buchstabieren Sie bitte: {h(GX_P1_WORDS[st["w"]])}</h4>{answer_box("p1_spell", 1, "Zum Beispiel: M - Ü - L - L - E - R")}</div>'
+             f'<div class="gx-q"><h4>3. Lesen Sie bitte die Telefonnummer vor: {h(GX_P1_NUMBERS[st["n"]])}</h4>{answer_box("p1_num", 1, "Sagen Sie die Zahlen einzeln.")}</div>')
+    html2 = ""
+    for k, i in enumerate(st["t2"]):
+        c = GX_P2[i]
+        html2 += (f'<div class="gx-q"><div class="gx-text" style="text-align:center;">Thema: <b>{h(c[0])}</b><br><span style="font-size:20px;font-weight:800;">{h(c[1])}</span></div>'
+                  f'<h4>a) Stellen Sie Ihrem Partner eine Frage mit diesem Wort.</h4>{answer_box(f"p2_q{k}")}'
+                  f'<h4 style="margin-top:12px;">b) Ihr Partner fragt: „{h(c[3])}“ {listen(c[3])}</h4>{answer_box(f"p2_a{k}")}</div>')
+    html3 = ""
+    for k, i in enumerate(st["t3"]):
+        c = GX_P3[i]
+        html3 += (f'<div class="gx-q"><div class="gx-text" style="text-align:center;"><span style="font-size:20px;font-weight:800;">{h(c[0])}</span></div>'
+                  f'<h4>a) Formulieren Sie eine Bitte mit dieser Karte.</h4>{answer_box(f"p3_b{k}")}'
+                  f'<h4 style="margin-top:12px;">b) Ihr Partner bittet: „{h(c[2])}“ {listen(c[2])}</h4>{answer_box(f"p3_r{k}")}</div>')
+    body = f"""{GX_CSS}
+    {_gx_head("Sprechen", "Modul Sprechen · 3 Teile · ca. 15 Minuten. Klicken Sie auf das Mikrofon und sprechen Sie Deutsch. Klicken Sie noch einmal: Die Aufnahme stoppt. Sie können Ihre Antwort auch schreiben.")}
+    <form method="post" id="gx-form">
+      {_gx_teil(1, "Sich vorstellen", "Stellen Sie sich vor. Dann buchstabieren Sie ein Wort und sagen eine Telefonnummer.")}
+      {html1}
+      {_gx_teil(2, "Um Informationen bitten und Informationen geben", "Sie bekommen zwei Karten. Stellen Sie eine Frage und antworten Sie auf die Frage Ihres Partners.")}
+      {html2}
+      {_gx_teil(3, "Bitten formulieren und darauf reagieren", "Sie bekommen zwei Karten. Formulieren Sie eine Bitte und reagieren Sie auf die Bitte Ihres Partners.")}
+      {html3}
+      <button class="btn ok" type="submit" style="margin-top:16px;">Prüfung abgeben</button>
+      <a href="/goethe" class="btn ghost">Abbrechen</a>
+    </form>
+    {GX_MIC_JS}
     """
-    return page(layout("Sprechen", body, {"is_admin": session.get("is_admin")}))
+    return _gx_page("Sprechen", body)
 
 # ---------------------------------------------------------
 # ADMIN
