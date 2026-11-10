@@ -4,6 +4,7 @@
 # + Apprendre à parler + Essentiels A1 + Mode nuit + Menu mobile
 # + NOM/AKK (Nominativ vs Akkusativ) + NEFERTI (bot Sprechen)
 # v4.1 : correctifs (sécurité, playlists, progression, Goethe, Neferti, contenu)
+# v4.3 : Neferti (recommencer, présentation unique, micro à envoi manuel) + Guide (alphabet, 450 verbes, séparables, Perfekt)
 # v4.2 : sécurité renforcée, cours Datif/Génitif, Neferti intelligente (1000+ questions), dialogues uniques
 # =========================================================
 
@@ -5360,6 +5361,15 @@ html[data-theme="dark"] .msg.user    { background: #1e4a35; color: #D4F5E3; }
 .neferti-tool label { display: block; font-size: 12px; color: var(--muted); margin-bottom: 4px; }
 .neferti-tool select { width: 100%; margin: 0; }
 .neferti-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+/* === v4.3 : guide === */
+.gd-row { padding: 8px 0; border-bottom: 1px dashed var(--border-light); display: flex; gap: 8px; align-items: center; justify-content: space-between; }
+.gd-main { flex: 1; font-size: 13px; line-height: 1.55; }
+.gd-ex { display: block; }
+.gd-btns { display: flex; gap: 6px; flex-shrink: 0; }
+.gd-pp { color: var(--warn); font-weight: 700; }
+.gd-alpha { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; }
+.gd-letter { background: var(--input-bg); border: 1px solid var(--border-light); border-radius: 12px; padding: 10px; text-align: center; font-size: 13px; }
+.gd-letter .big { font-size: 26px; font-weight: 800; display: block; }
 .neferti-example { flex-basis: 100%; background: var(--sky-light); border-radius: 10px; padding: 12px; font-size: 14px; line-height: 1.6; }
 </style>
 """
@@ -6123,6 +6133,8 @@ def layout(title, body, user=None):
               <a href="{url_for('apprendre_parler')}">Parler 🗨️</a>
               <a href="{url_for('essentiels_a1')}">Essentiels A1</a>
               <a href="{url_for('nom_akk')}">NOM/AKK</a>
+            <a href="{url_for('guide')}">Guide 📘</a>
+              <a href="{url_for('guide')}">Guide 📘</a>
             </div></details>
             <a href="{url_for('neferti')}">Neferti 🤖</a>
             <a href="{url_for('goethe')}">Examen Goethe</a>
@@ -6141,6 +6153,7 @@ def layout(title, body, user=None):
             <a href="{url_for('apprendre_parler')}">Parler 🗨️</a>
             <a href="{url_for('essentiels_a1')}">Essentiels A1</a>
             <a href="{url_for('nom_akk')}">NOM/AKK</a>
+            <a href="{url_for('guide')}">Guide 📘</a>
             <a href="{url_for('neferti')}">Neferti 🤖</a>
             <a href="{url_for('goethe')}">Examen Goethe</a>
             <a href="{url_for('progress')}">Progrès</a>
@@ -6252,7 +6265,7 @@ def layout(title, body, user=None):
 <audio id="natho-audio" preload="auto" playsinline></audio>
 
 <footer>
-    © NATHO — Plateforme d'apprentissage de l'allemand A1 · v4.2<br>
+    © NATHO — Plateforme d'apprentissage de l'allemand A1 · v4.3<br>
     <a href="/politique">Politique de confidentialité</a> |
     <a href="/cgu">Conditions d'utilisation</a> |
     <a href="/mentions">Mentions légales</a>
@@ -7157,7 +7170,11 @@ def _next_bank(db, user_id, mem, prefix_de="", prefix_fr=""):
         prefix_de = (prefix_de + " Wow, du hast alle Fragen geschafft! Wir fangen wieder an.").strip()
         prefix_fr = (prefix_fr + " Waouh, tu as répondu à toutes les questions ! On recommence.").strip()
     pl = _bank_payload(row, prefix_de, prefix_fr)
+    if mem.get("__step") == "sp:vorst":
+        _save_memory(user_id, "__vorst", "1")
+        mem["__vorst"] = "1"
     _save_memory(user_id, "__step", pl["step_key"])
+    mem["__step"] = pl["step_key"]
     _save_memory(user_id, "__lastcat", row["cat"])
     _save_memory(user_id, "__tryl", "0")
     _save_memory(user_id, "__trys", "0")
@@ -7216,6 +7233,106 @@ def _welcome(name, fresh):
                 f"Bonjour {name} ! Ravie de te voir. On recommence tout à zéro.")
     return (f"Willkommen zurück, {name}! Los geht's.", f"Content de te revoir, {name} ! C'est parti.")
 
+# ---- étapes spéciales (v4.3) : « Wie geht es dir? » après Recommencer, et la présentation (une seule fois)
+def _sp_payload(key, mem, prefix_de="", prefix_fr=""):
+    name = mem.get("name", "")
+    if key == "sp:hello":
+        de = f"Hallo {name}, schön, dich wiederzusehen! Wir fangen ganz von vorne an. Wie geht es dir heute?"
+        fr = f"Salut {name}, contente de te revoir ! On recommence tout à zéro. Comment vas-tu aujourd'hui ?"
+        m_de, m_fr = "Mir geht es gut, danke. Und dir?", "Je vais bien, merci. Et toi ?"
+        cat = "Salutations"
+    else:
+        key = "sp:vorst"
+        de = ("Stell dich bitte auf Deutsch vor: Wie heißt du, woher kommst du, wo wohnst du, "
+              "wie alt bist du und was machst du?")
+        fr = ("Présente-toi en allemand, s'il te plaît : comment tu t'appelles, d'où tu viens, où tu habites, "
+              "quel âge tu as et ce que tu fais ?")
+        m_de = f"Ich heiße {name}. Ich komme aus Kamerun und wohne in Yaoundé. Ich bin 25 Jahre alt und ich lerne Deutsch."
+        m_fr = f"Je m'appelle {name}. Je viens du Cameroun et j'habite à Yaoundé. J'ai 25 ans et j'apprends l'allemand."
+        cat = "Présentation (Vorstellung)"
+    return {"neferti_de": (prefix_de + " " + de).strip(), "neferti_fr": (prefix_fr + " " + fr).strip(),
+            "step_key": key, "category": cat, "model_de": m_de, "model_fr": m_fr, "lvl": 0}
+
+def _sp_enter(user_id, mem, key, prefix_de="", prefix_fr=""):
+    pl = _sp_payload(key, mem, prefix_de, prefix_fr)
+    _save_memory(user_id, "__step", pl["step_key"])
+    _save_memory(user_id, "__tryl", "0")
+    _save_memory(user_id, "__trys", "0")
+    mem["__step"] = pl["step_key"]
+    return pl
+
+def _answer_special(user_id, mem, step, heard):
+    db = get_db()
+    name = mem.get("name", "")
+    low = heard.lower()
+    toks = re.findall(r"[a-zäöüß]+", low)
+    tset = set(toks)
+    prog = lambda p: _progress_text(db, user_id, mem, p)
+
+    def finish(pl, score=-1):
+        _save_history(user_id, "neferti", pl["neferti_fr"], pl["neferti_de"])
+        return _json_step(pl, heard=heard, score=score, correction="", progress=prog(pl))
+
+    if step == "sp:hello":
+        _save_history(user_id, "user", "", heard, heard, 0)
+        bad = tset & {"schlecht", "müde", "krank", "traurig", "kaputt", "gestresst"}
+        if "nicht" in tset and tset & {"gut", "super", "toll"}:
+            bad = {"nicht"}
+        if "nicht" in tset and "schlecht" in tset:
+            bad = set()
+        if bad:
+            r_de, r_fr = "Oh, das tut mir leid! Ich hoffe, es geht dir bald besser.", "Oh, je suis désolée ! J'espère que tu iras vite mieux."
+        elif tset & {"gut", "super", "prima", "toll", "bestens", "wunderbar", "okay", "ok", "schlecht"}:
+            r_de, r_fr = "Das freut mich! Mir geht es auch gut.", "Ça me fait plaisir ! Moi aussi, je vais bien."
+        else:
+            r_de, r_fr = "Alles klar! Mir geht es gut, danke.", "D'accord ! Moi, je vais bien, merci."
+        if mem.get("__vorst") != "1":
+            return finish(_sp_enter(user_id, mem, "sp:vorst", r_de, r_fr))
+        pl = _next_bank(db, user_id, mem, r_de + " Los geht's mit den Fragen!", r_fr + " C'est parti pour les questions !")
+        if pl is None:
+            pl = _scenario_payload(_get_scenario("free_1"))
+        return finish(pl)
+
+    # --- présentation (Vorstellung) : demandée une seule fois ---
+    def _cnt(key):
+        try:
+            return int(mem.get(key, "0") or 0)
+        except Exception:
+            return 0
+    base = _sp_payload("sp:vorst", mem)
+
+    def again(de, fr, counter):
+        _save_history(user_id, "user", "", heard, heard, 0)
+        _save_memory(user_id, counter, str(_cnt(counter) + 1))
+        p = dict(base)
+        p["neferti_de"], p["neferti_fr"] = de, fr
+        return finish(p)
+
+    if _lang_guess(heard) in ("fr", "en") and _cnt("__tryl") < 2:
+        return again(f"Bitte auf Deutsch! Zum Beispiel: {base['model_de']}",
+                     f"En allemand, s'il te plaît ! Par exemple : {base['model_fr']}", "__tryl")
+    if len(toks) <= 3 and _cnt("__trys") < 1:
+        return again("Erzähl bitte ein bisschen mehr: dein Land, deine Stadt, dein Alter, dein Beruf oder deine Hobbys.",
+                     "Raconte un peu plus, s'il te plaît : ton pays, ta ville, ton âge, ton métier ou tes loisirs.", "__trys")
+    if re.search(r"\b(ich hei(ß|ss)e|mein name ist)\b", low):
+        nm = _extract_name(heard)
+        if nm:
+            _save_memory(user_id, "name", nm)
+            mem["name"] = nm
+            name = nm
+    hits = sum(1 for k in ("heiße", "heisse", "name", "komme", "wohne", "lebe", "bin", "jahre", "alt", "arbeite",
+                           "lerne", "studiere", "spreche", "habe", "mag", "hobby", "hobbys", "beruf") if k in tset)
+    score = int(max(30, min(100, 30 + 4 * min(len(toks), 12) + 6 * min(hits, 5))))
+    _save_history(user_id, "user", "", heard, heard, score)
+    _save_memory(user_id, "__vorst", "1")
+    mem["__vorst"] = "1"
+    pl = _next_bank(db, user_id, mem,
+                    f"Danke für deine Vorstellung, {name}! Jetzt kenne ich dich besser. Los geht's mit den Fragen!",
+                    f"Merci pour ta présentation, {name} ! Maintenant je te connais mieux. C'est parti pour les questions !")
+    if pl is None:
+        pl = _scenario_payload(_get_scenario("free_1"))
+    return finish(pl, score)
+
 def _bank_cats(db):
     return [r[0] for r in db.execute("SELECT cat FROM neferti_bank GROUP BY cat ORDER BY MIN(id)").fetchall()]
 
@@ -7230,7 +7347,9 @@ def neferti():
     name = mem.get("name", "")
 
     start = None
-    if step.startswith("bank:") and mode == "bank":
+    if step.startswith("sp:") and mode == "bank" and name:
+        start = _sp_payload(step, mem)
+    elif step.startswith("bank:") and mode == "bank":
         row = _bank_row(step[5:])
         if row:
             start = _bank_payload(row)
@@ -7244,12 +7363,18 @@ def neferti():
             start = _scenario_payload(sc)
         elif not name:
             start = _scenario_payload(_get_scenario("intro_1"))
+        elif mem.get("__fresh") == "1":
+            # après « Recommencer » : salut au prénom + « Wie geht es dir? », puis les questions
+            start = _sp_enter(user_id, mem, "sp:hello")
+            _del_memory(user_id, "__fresh")
+        elif mem.get("__vorst") != "1":
+            # la présentation (Vorstellung) est demandée UNE seule fois
+            start = _sp_enter(user_id, mem, "sp:vorst")
         else:
-            wde, wfr = _welcome(name, mem.get("__fresh") == "1")
+            wde, wfr = _welcome(name, False)
             start = _next_bank(db, user_id, mem, wde, wfr)
             if start is None:
                 start = _scenario_payload(_get_scenario("intro_1"))
-            _del_memory(user_id, "__fresh")
         _save_memory(user_id, "__step", start["step_key"])
 
     history = db.execute(
@@ -7325,7 +7450,7 @@ def neferti():
       </div>
     </div>
 
-    <div class="neferti-status" id="neferti-status">Clique sur le micro 🎤 et réponds en allemand.</div>
+    <div class="neferti-status" id="neferti-status">Clique sur le micro 🎤, réponds en allemand, puis clique sur « Envoyer ».</div>
     <div class="neferti-status" id="neferti-progress" style="margin-top:-4px;opacity:.85;">@@PROGRESS@@</div>
 
     <div class="neferti-controls">
@@ -7333,8 +7458,8 @@ def neferti():
     </div>
 
     <div class="neferti-inputs">
-      <input type="text" id="neferti-text-input" placeholder="Ou tape ta réponse en allemand ici…" maxlength="300" autocomplete="off">
-      <button class="btn" onclick="nefertiSendText()">Envoyer</button>
+      <input type="text" id="neferti-text-input" placeholder="Ta réponse apparaît ici (tu peux aussi l'écrire)…" maxlength="500" autocomplete="off">
+      <button class="btn ok" onclick="nefertiSendText()">📨 Envoyer</button>
     </div>
 
     <div class="card neferti-actions" style="margin-top:14px;">
@@ -7351,10 +7476,11 @@ def neferti():
       <h3>💡 Comment utiliser Neferti</h3>
       <ul style="padding-left:20px;line-height:1.8;color:var(--muted);font-size:14px;">
         <li>Clique sur <b>🎤</b> puis réponds <b>en allemand</b> avec une phrase complète. Chrome ou Edge conseillé.</li>
+        <li>Le micro <b>ne coupe plus tout seul</b> : prends ton temps, ta réponse s'écrit dans la case. Quand tu as fini, clique sur <b>📨 Envoyer</b>.</li>
         <li>Neferti ne répète jamais la même question tant qu'il en reste ; le niveau s'adapte à tes réponses.</li>
         <li>Bloqué ? Dis « <b>Hilfe</b> » (exemple), « <b>weiter</b> » (autre question) ou « <b>noch einmal</b> » (répéter).</li>
         <li>Tu peux aussi lui poser des questions : « Wie heißt du? », « Wie geht es dir? ».</li>
-        <li>« Recommencer à zéro » efface toute la conversation ; seul ton <b>prénom</b> est conservé.</li>
+        <li>« Recommencer à zéro » efface toute la conversation ; seul ton <b>prénom</b> est conservé, et Neferti ne repose pas les questions déjà posées.</li>
       </ul>
     </div>
 
@@ -7405,32 +7531,80 @@ def neferti():
         if (window.NefertiSay) window.NefertiSay(data.neferti_de);
       }
 
+      // --- Micro à ENVOI MANUEL : l'enregistrement ne coupe jamais tout seul. ---
+      // Le texte entendu s'écrit dans la case ; l'élève clique lui-même sur « Envoyer ».
+      var SRx = window.SpeechRecognition || window.webkitSpeechRecognition;
+      var inpEl = document.getElementById('neferti-text-input');
+      var rec = null, recOn = false, recBase = '', recSess = '';
+      var isAndroid = /Android/i.test(navigator.userAgent || '');
+      function recText(){ return (recBase + ' ' + recSess).replace(/ +/g, ' ').trim(); }
+      function recUi(on){
+        if (on) { micBtn.classList.add('listening'); avatar.classList.add('listening'); micBtn.textContent = '⏹'; }
+        else { micBtn.classList.remove('listening'); avatar.classList.remove('listening'); micBtn.textContent = '🎤'; }
+      }
+      function recStartSession(){
+        rec = new SRx();
+        rec.lang = 'de-DE';
+        rec.continuous = !isAndroid;
+        rec.interimResults = !isAndroid;
+        rec.maxAlternatives = 1;
+        rec.onresult = function(ev){
+          var s = '';
+          for (var i = 0; i < ev.results.length; i++) {
+            if (ev.results[i][0] && ev.results[i][0].transcript) s += ev.results[i][0].transcript + ' ';
+          }
+          recSess = s;
+          inpEl.value = recText().slice(0, 500);
+        };
+        rec.onerror = function(ev){
+          if (ev.error === 'not-allowed' || ev.error === 'service-not-allowed' || ev.error === 'audio-capture') {
+            recOn = false; recUi(false);
+            statusEl.textContent = "⚠️ Micro indisponible ou refusé. Autorise le micro, ou écris ta réponse dans la case.";
+          }
+        };
+        rec.onend = function(){
+          // le navigateur a coupé (silence) : on garde le texte et on RELANCE tant que l'élève n'a pas arrêté
+          recBase = recText(); recSess = '';
+          if (recOn) {
+            try { recStartSession(); }
+            catch(e) { recOn = false; recUi(false); statusEl.textContent = "Micro arrêté. Clique sur 🎤 pour continuer, ou sur « Envoyer »."; }
+          }
+        };
+        rec.start();
+      }
+      function recKill(){
+        recOn = false; recUi(false);
+        if (rec) {
+          rec.onresult = null; rec.onend = null; rec.onerror = null;
+          try { rec.abort(); } catch(e){}
+          rec = null;
+        }
+        recBase = ''; recSess = '';
+      }
       micBtn.addEventListener('click', function(){
-        if (!window.NefertiSupported) {
+        if (!SRx) {
           alert("Reconnaissance vocale non supportée. Utilise Chrome ou Edge, ou tape ta réponse en bas.");
           return;
         }
-        micBtn.classList.add('listening');
-        avatar.classList.add('listening');
-        statusEl.textContent = "🎙️ Neferti t'écoute… Parle en allemand !";
-        window.NefertiStartListening(function(text){
-          statusEl.textContent = "✅ J'ai entendu : « " + text + " »";
-          nefertiSend(text);
-        }, function(err){
-          micBtn.classList.remove('listening');
-          avatar.classList.remove('listening');
-          if (err && err !== 'aborted') {
-            statusEl.textContent = "⚠️ Erreur micro : " + err + ". Réessaie.";
-          } else {
-            statusEl.textContent = "Clique sur le micro 🎤 pour parler.";
-          }
-        });
+        if (recOn) {
+          // deuxième clic = pause (rien n'est envoyé)
+          recOn = false; recUi(false);
+          if (rec) { try { rec.stop(); } catch(e){} }
+          statusEl.textContent = "⏸️ Micro en pause. Vérifie ta réponse dans la case, puis clique sur « Envoyer » (ou sur 🎤 pour continuer).";
+          return;
+        }
+        recOn = true; recBase = inpEl.value.trim(); recSess = '';
+        recUi(true);
+        statusEl.textContent = "🎙️ Neferti t'écoute… Prends ton temps. Quand tu as fini, clique sur « Envoyer ».";
+        try { recStartSession(); }
+        catch(e) { recOn = false; recUi(false); statusEl.textContent = "⚠️ Impossible de démarrer le micro. Réessaie."; }
       });
 
       window.nefertiSendText = function(){
         var inp = document.getElementById('neferti-text-input');
+        recKill();
         var v = inp.value.trim();
-        if (!v) return;
+        if (!v) { statusEl.textContent = "Dis ou écris d'abord ta réponse, puis clique sur « Envoyer »."; return; }
         inp.value = '';
         nefertiSend(v);
       };
@@ -7453,7 +7627,7 @@ def neferti():
         post('/neferti/skip', {}).then(function(data){
           if (data.error) { statusEl.textContent = "⚠️ " + data.error; return; }
           addBot(data);
-          statusEl.textContent = "Clique sur le micro 🎤 pour répondre.";
+          statusEl.textContent = "Clique sur le micro 🎤, réponds, puis clique sur « Envoyer ».";
         }).catch(function(){ statusEl.textContent = "⚠️ Erreur réseau. Réessaie."; });
       };
 
@@ -7496,7 +7670,7 @@ def neferti():
               + '</div>';
           }
           addBot(data);
-          statusEl.textContent = "Clique sur le micro 🎤 pour répondre.";
+          statusEl.textContent = "Clique sur le micro 🎤, réponds, puis clique sur « Envoyer ».";
         }).catch(function(err){
           console.error(err);
           statusEl.textContent = "⚠️ Erreur réseau. Réessaie.";
@@ -7526,6 +7700,8 @@ def _progress_text(db, user_id, mem, pl):
         done = db.execute("SELECT COUNT(*) FROM neferti_asked WHERE user_id=?", (user_id,)).fetchone()[0]
         total = db.execute("SELECT COUNT(*) FROM neferti_bank").fetchone()[0]
         return f"Thème : {pl['category']} · Niveau {_lvl(mem)}/3 · {n} réponses données · {done}/{total} questions vues"
+    if str(pl.get("step_key", "")).startswith("sp:"):
+        return pl["category"]
     return f"Parcours guidé : {pl['category']}"
 
 # =========================================================
@@ -7570,7 +7746,10 @@ def _answer_scripted(user_id, mem, current, heard, mode):
     # Bonne nouvelle : en mode « questions libres », juste après le prénom, on passe à la banque
     if mode == "bank" and mem_key == "name":
         name = mem.get("name", "")
-        pl = _next_bank(db, user_id, mem, f"Freut mich, {name}!", f"Enchantée, {name} !")
+        if mem.get("__vorst") != "1":
+            pl = _sp_enter(user_id, mem, "sp:vorst", f"Freut mich, {name}!", f"Enchantée, {name} !")
+        else:
+            pl = _next_bank(db, user_id, mem, f"Freut mich, {name}!", f"Enchantée, {name} !")
         _save_memory(user_id, "__mode", "bank")
         _save_history(user_id, "neferti", pl["neferti_fr"], pl["neferti_de"])
         return _json_step(pl, heard=heard, score=score, correction=correction, progress=_progress_text(db, user_id, mem, pl))
@@ -7685,7 +7864,7 @@ def _answer_bank(user_id, mem, row, heard):
 @login_required
 def neferti_answer():
     data = request.get_json(silent=True) or {}
-    heard = re.sub(r"\s+", " ", str(data.get("text") or "")).strip()[:300]
+    heard = re.sub(r"\s+", " ", str(data.get("text") or "")).strip()[:500]
     user_id = session["user_id"]
     if not heard:
         return jsonify({"error": "Aucun texte reçu."}), 400
@@ -7697,6 +7876,8 @@ def neferti_answer():
     mode = mem.get("__mode", "bank")
     step = mem.get("__step", "")
 
+    if step.startswith("sp:") and mode == "bank" and mem.get("name"):
+        return _answer_special(user_id, mem, step, heard)
     if step.startswith("bank:"):
         row = _bank_row(step[5:])
         if row and mode == "bank":
@@ -7779,19 +7960,965 @@ def neferti_set():
 @app.route("/neferti/reset", methods=["POST"])
 @login_required
 def neferti_reset():
-    """Recommence À ZÉRO : efface la conversation, les questions déjà posées, la progression et la mémoire.
-    Seul le PRÉNOM est conservé (pour toujours)."""
+    """Recommence À ZÉRO : efface la conversation, la progression et la mémoire.
+    Seul le PRÉNOM est conservé (pour toujours). La liste des questions déjà posées est gardée
+    (invisible) pour que Neferti ne repose JAMAIS deux fois la même question, et la présentation
+    (Vorstellung) n'est pas redemandée."""
     user_id = session["user_id"]
     db = get_db()
     name_row = db.execute("SELECT mem_value FROM neferti_memory WHERE user_id=? AND mem_key='name'", (user_id,)).fetchone()
     db.execute("DELETE FROM neferti_history WHERE user_id=?", (user_id,))
-    db.execute("DELETE FROM neferti_asked WHERE user_id=?", (user_id,))
-    db.execute("DELETE FROM neferti_memory WHERE user_id=? AND mem_key!='name'", (user_id,))
+    db.execute("DELETE FROM neferti_memory WHERE user_id=? AND mem_key NOT IN ('name', '__vorst')", (user_id,))
     if name_row and name_row[0]:
         db.execute("INSERT OR REPLACE INTO neferti_memory(user_id, mem_key, mem_value) VALUES(?,?,?)",
                    (user_id, "__fresh", "1"))
     db.commit()
     return jsonify({"ok": True, "name_kept": bool(name_row and name_row[0])})
+
+
+# =========================================================
+# === GUIDE v4.3 : alphabet, 450 verbes, verbes séparables, Perfekt ===
+# =========================================================
+# Chaque entrée : (allemand, français, phrase allemande, phrase française)
+GUIDE_VERBS = [('Les indispensables',
+  [('sein', 'être', 'Ich bin heute sehr müde.', "Je suis très fatigué aujourd'hui."),
+   ('haben', 'avoir', 'Wir haben zwei Kinder.', 'Nous avons deux enfants.'),
+   ('werden', 'devenir', 'Mein Bruder wird Arzt.', 'Mon frère devient médecin.'),
+   ('können', 'pouvoir, savoir faire', 'Kannst du mir bitte helfen?', "Peux-tu m'aider, s'il te plaît ?"),
+   ('müssen', 'devoir', 'Ich muss morgen früh aufstehen.', 'Je dois me lever tôt demain.'),
+   ('wollen', 'vouloir', 'Sie will nach Deutschland reisen.', 'Elle veut voyager en Allemagne.'),
+   ('sollen', 'devoir (conseil, consigne)', 'Du sollst mehr Wasser trinken.', "Tu dois boire plus d'eau."),
+   ('dürfen', 'avoir le droit de', 'Darf ich hier parken?', 'Ai-je le droit de me garer ici ?'),
+   ('mögen', 'aimer bien', 'Ich mag Schokolade sehr.', "J'aime beaucoup le chocolat."),
+   ('möchten', 'souhaiter, vouloir (poli)', 'Ich möchte einen Kaffee, bitte.', "Je voudrais un café, s'il vous plaît."),
+   ('wissen', 'savoir', 'Weißt du, wo der Bahnhof ist?', 'Sais-tu où est la gare ?'),
+   ('machen', 'faire', 'Was machst du am Wochenende?', 'Que fais-tu ce week-end ?'),
+   ('gehen', 'aller (à pied)', 'Wir gehen heute Abend ins Kino.', 'Nous allons au cinéma ce soir.'),
+   ('kommen', 'venir', 'Woher kommst du?', "D'où viens-tu ?"),
+   ('sagen', 'dire', 'Was hat der Lehrer gesagt?', "Qu'a dit le professeur ?"),
+   ('geben', 'donner', 'Gib mir bitte das Salz.', "Donne-moi le sel, s'il te plaît."),
+   ('nehmen', 'prendre', 'Ich nehme den Bus um acht Uhr.', 'Je prends le bus à huit heures.'),
+   ('sehen', 'voir', 'Siehst du das rote Auto dort?', 'Vois-tu la voiture rouge là-bas ?'),
+   ('finden', 'trouver', 'Ich finde meinen Schlüssel nicht.', 'Je ne trouve pas ma clé.'),
+   ('bleiben', 'rester', 'Wir bleiben heute zu Hause.', "Nous restons à la maison aujourd'hui."),
+   ('stehen', 'être debout, se trouver', 'Der Bus steht schon an der Haltestelle.', "Le bus est déjà à l'arrêt."),
+   ('lassen', 'laisser', 'Lass mich bitte in Ruhe.', "Laisse-moi tranquille, s'il te plaît."),
+   ('heißen', "s'appeler", 'Wie heißt deine Schwester?', "Comment s'appelle ta sœur ?"),
+   ('brauchen', 'avoir besoin de', 'Ich brauche einen neuen Pass.', "J'ai besoin d'un nouveau passeport."),
+   ('denken', 'penser', 'Ich denke oft an meine Familie.', 'Je pense souvent à ma famille.'),
+   ('glauben', 'croire', 'Ich glaube, es regnet gleich.', "Je crois qu'il va bientôt pleuvoir."),
+   ('tun', 'faire', 'Was kann ich für Sie tun?', 'Que puis-je faire pour vous ?'),
+   ('bekommen', 'recevoir, obtenir', 'Ich bekomme jeden Monat mein Gehalt.', 'Je reçois mon salaire chaque mois.'),
+   ('bringen', 'apporter', 'Bringst du bitte Brot mit nach Hause?', "Rapportes-tu du pain à la maison, s'il te plaît ?"),
+   ('liegen', 'être couché, se trouver', 'Das Handy liegt auf dem Tisch.', 'Le téléphone est sur la table.')]),
+ ('Parler et communiquer',
+  [('sprechen', 'parler', 'Ich spreche ein bisschen Deutsch.', 'Je parle un peu allemand.'),
+   ('reden', 'parler, discuter', 'Wir müssen über das Problem reden.', 'Nous devons parler du problème.'),
+   ('fragen', 'demander, poser une question', 'Darf ich Sie etwas fragen?', 'Puis-je vous demander quelque chose ?'),
+   ('antworten', 'répondre', 'Er antwortet nicht auf meine Nachricht.', 'Il ne répond pas à mon message.'),
+   ('erzählen', 'raconter', 'Oma erzählt uns eine Geschichte.', 'Mamie nous raconte une histoire.'),
+   ('erklären', 'expliquer', 'Können Sie mir das bitte erklären?', "Pouvez-vous m'expliquer cela, s'il vous plaît ?"),
+   ('verstehen', 'comprendre', 'Ich verstehe diese Frage nicht.', 'Je ne comprends pas cette question.'),
+   ('meinen', 'vouloir dire, penser', 'Was meinst du damit?', 'Que veux-tu dire par là ?'),
+   ('rufen', 'appeler (crier)', 'Die Mutter ruft die Kinder zum Essen.', 'La mère appelle les enfants pour manger.'),
+   ('anrufen', 'téléphoner à', 'Ich rufe dich heute Abend an.', "Je t'appelle ce soir."),
+   ('schreiben', 'écrire', 'Ich schreibe meiner Freundin eine Nachricht.', "J'écris un message à mon amie."),
+   ('lesen', 'lire', 'Abends lese ich gern ein Buch.', "Le soir, j'aime lire un livre."),
+   ('hören', 'entendre, écouter', 'Hörst du die Musik von nebenan?', "Entends-tu la musique d'à côté ?"),
+   ('zuhören', 'écouter attentivement', 'Hör mir bitte gut zu!', "Écoute-moi bien, s'il te plaît !"),
+   ('wiederholen', 'répéter', 'Können Sie das bitte wiederholen?', "Pouvez-vous répéter, s'il vous plaît ?"),
+   ('übersetzen', 'traduire', 'Kannst du diesen Satz übersetzen?', 'Peux-tu traduire cette phrase ?'),
+   ('buchstabieren', 'épeler', 'Bitte buchstabieren Sie Ihren Namen.', 'Veuillez épeler votre nom.'),
+   ('grüßen', 'saluer', 'Grüß deine Eltern von mir!', 'Salue tes parents de ma part !'),
+   ('begrüßen', 'accueillir, saluer', 'Der Chef begrüßt die neuen Kollegen.', 'Le chef accueille les nouveaux collègues.'),
+   ('sich vorstellen', 'se présenter', 'Darf ich mich kurz vorstellen?', 'Puis-je me présenter rapidement ?'),
+   ('danken', 'remercier', 'Ich danke dir für deine Hilfe.', 'Je te remercie pour ton aide.'),
+   ('bitten', 'prier, demander poliment', 'Ich bitte dich um einen Gefallen.', 'Je te demande un service.'),
+   ('sich entschuldigen', "s'excuser", 'Ich entschuldige mich für die Verspätung.', "Je m'excuse pour le retard."),
+   ('versprechen', 'promettre', 'Ich verspreche dir, pünktlich zu sein.', "Je te promets d'être à l'heure."),
+   ('lügen', 'mentir', 'Du sollst nicht lügen.', 'Tu ne dois pas mentir.'),
+   ('diskutieren', 'discuter, débattre', 'Wir diskutieren oft über Fußball.', 'Nous discutons souvent de football.'),
+   ('streiten', 'se disputer', 'Die Geschwister streiten um das Spielzeug.', 'Les frères et sœurs se disputent le jouet.'),
+   ('schreien', 'crier', 'Das Baby schreit die ganze Nacht.', 'Le bébé crie toute la nuit.'),
+   ('flüstern', 'chuchoter', 'In der Bibliothek flüstern wir nur.', 'À la bibliothèque, nous ne faisons que chuchoter.'),
+   ('schweigen', 'se taire', 'Manchmal ist es besser zu schweigen.', 'Parfois, il vaut mieux se taire.')]),
+ ('La journée et la routine',
+  [('aufwachen', 'se réveiller', 'Ich wache jeden Tag um sechs Uhr auf.', 'Je me réveille chaque jour à six heures.'),
+   ('aufstehen', 'se lever', 'Am Sonntag stehe ich spät auf.', 'Le dimanche, je me lève tard.'),
+   ('sich waschen', 'se laver', 'Ich wasche mich mit kaltem Wasser.', "Je me lave à l'eau froide."),
+   ('duschen', 'se doucher', 'Ich dusche jeden Morgen.', 'Je me douche chaque matin.'),
+   ('baden', 'se baigner, prendre un bain', 'Die Kinder baden am Abend.', 'Les enfants prennent leur bain le soir.'),
+   ('sich anziehen', "s'habiller", 'Zieh dich schnell an, wir sind spät dran!', 'Habille-toi vite, nous sommes en retard !'),
+   ('sich ausziehen', 'se déshabiller', 'Er zieht sich aus und geht ins Bett.', 'Il se déshabille et va au lit.'),
+   ('sich kämmen', 'se peigner', 'Sie kämmt sich vor dem Spiegel.', 'Elle se peigne devant le miroir.'),
+   ('sich rasieren', 'se raser', 'Mein Vater rasiert sich jeden Tag.', 'Mon père se rase tous les jours.'),
+   ('putzen', 'nettoyer, brosser', 'Ich putze mir die Zähne nach dem Essen.', 'Je me brosse les dents après le repas.'),
+   ('frühstücken', 'prendre le petit-déjeuner', 'Wir frühstücken um sieben Uhr.', 'Nous prenons le petit-déjeuner à sept heures.'),
+   ('schlafen', 'dormir', 'Das Kind schläft schon.', "L'enfant dort déjà."),
+   ('einschlafen', "s'endormir", 'Ich schlafe vor dem Fernseher ein.', "Je m'endors devant la télévision."),
+   ('ausschlafen', 'faire la grasse matinée', 'Am Samstag kann ich endlich ausschlafen.', 'Le samedi, je peux enfin faire la grasse matinée.'),
+   ('träumen', 'rêver', 'Ich träume von einem Haus am Meer.', "Je rêve d'une maison au bord de la mer."),
+   ('sich ausruhen', 'se reposer', 'Nach der Arbeit ruhe ich mich aus.', 'Après le travail, je me repose.'),
+   ('sich beeilen', 'se dépêcher', 'Beeil dich, der Zug fährt gleich!', 'Dépêche-toi, le train part bientôt !'),
+   ('wecken', "réveiller (quelqu'un)", 'Weck mich bitte um halb sieben.', "Réveille-moi à six heures et demie, s'il te plaît."),
+   ('sich schminken', 'se maquiller', 'Sie schminkt sich für die Party.', 'Elle se maquille pour la fête.'),
+   ('sich umziehen', 'se changer', 'Ich ziehe mich nach dem Sport um.', 'Je me change après le sport.'),
+   ('anfangen', 'commencer', 'Der Film fängt um acht Uhr an.', 'Le film commence à huit heures.'),
+   ('beginnen', 'commencer, débuter', 'Der Unterricht beginnt um neun.', 'Le cours commence à neuf heures.'),
+   ('aufhören', 'arrêter, cesser', 'Hör bitte mit dem Lärm auf!', "Arrête ce bruit, s'il te plaît !"),
+   ('enden', 'se terminer', 'Die Schule endet um drei Uhr.', "L'école se termine à trois heures."),
+   ('dauern', 'durer', 'Die Fahrt dauert zwei Stunden.', 'Le trajet dure deux heures.'),
+   ('warten', 'attendre', 'Ich warte seit zwanzig Minuten auf den Bus.', "J'attends le bus depuis vingt minutes."),
+   ('sich verspäten', 'être en retard', 'Der Zug verspätet sich um zehn Minuten.', 'Le train a dix minutes de retard.'),
+   ('sich setzen', "s'asseoir", 'Setzen Sie sich bitte!', 'Asseyez-vous, je vous en prie !'),
+   ('sitzen', 'être assis', 'Wir sitzen im Garten und trinken Tee.', 'Nous sommes assis dans le jardin et buvons du thé.'),
+   ('sich hinlegen', "s'allonger", 'Ich lege mich kurz hin.', "Je m'allonge un petit moment.")]),
+ ('Manger, boire et cuisiner',
+  [('essen', 'manger', 'Wir essen heute Abend Reis mit Hähnchen.', 'Ce soir, nous mangeons du riz au poulet.'),
+   ('trinken', 'boire', 'Ich trinke morgens immer Tee.', 'Le matin, je bois toujours du thé.'),
+   ('kochen', 'cuisiner', 'Mein Mann kocht sehr gut.', 'Mon mari cuisine très bien.'),
+   ('backen', 'faire cuire au four', 'Sie backt einen Kuchen für den Geburtstag.', "Elle fait un gâteau pour l'anniversaire."),
+   ('braten', 'faire frire, rôtir', 'Ich brate den Fisch in der Pfanne.', 'Je fais frire le poisson à la poêle.'),
+   ('schneiden', 'couper', 'Schneide bitte die Zwiebeln klein.', "Coupe les oignons en petits morceaux, s'il te plaît."),
+   ('schälen', 'éplucher', 'Kannst du die Kartoffeln schälen?', 'Peux-tu éplucher les pommes de terre ?'),
+   ('mischen', 'mélanger', 'Mischen Sie das Mehl mit der Milch.', 'Mélangez la farine avec le lait.'),
+   ('rühren', 'remuer', 'Du musst die Suppe gut rühren.', 'Tu dois bien remuer la soupe.'),
+   ('würzen', 'assaisonner', 'Ich würze das Fleisch mit Pfeffer.', "J'assaisonne la viande avec du poivre."),
+   ('salzen', 'saler', 'Hast du die Nudeln schon gesalzen?', 'As-tu déjà salé les pâtes ?'),
+   ('probieren', 'goûter, essayer', 'Probier mal diese Soße!', 'Goûte donc cette sauce !'),
+   ('schmecken', 'avoir bon goût', 'Das Essen schmeckt sehr gut.', 'Le repas est très bon.'),
+   ('bestellen', 'commander', 'Wir bestellen heute eine Pizza.', "Nous commandons une pizza aujourd'hui."),
+   ('servieren', 'servir', 'Der Kellner serviert das Essen.', 'Le serveur sert le repas.'),
+   ('einladen', 'inviter', 'Ich lade dich zum Abendessen ein.', "Je t'invite à dîner."),
+   ('decken', 'mettre (la table)', 'Die Kinder decken den Tisch.', 'Les enfants mettent la table.'),
+   ('abräumen', 'débarrasser', 'Wer räumt heute den Tisch ab?', "Qui débarrasse la table aujourd'hui ?"),
+   ('spülen', 'faire la vaisselle, rincer', 'Ich spüle das Geschirr nach dem Essen.', 'Je fais la vaisselle après le repas.'),
+   ('abtrocknen', 'essuyer', 'Trocknest du bitte die Teller ab?', "Essuies-tu les assiettes, s'il te plaît ?"),
+   ('füllen', 'remplir', 'Er füllt die Flasche mit Wasser.', "Il remplit la bouteille d'eau."),
+   ('gießen', 'verser, arroser', 'Ich gieße die Blumen jeden Abend.', "J'arrose les fleurs tous les soirs."),
+   ('öffnen', 'ouvrir', 'Können Sie bitte das Fenster öffnen?', "Pouvez-vous ouvrir la fenêtre, s'il vous plaît ?"),
+   ('schließen', 'fermer', 'Der Supermarkt schließt um zwanzig Uhr.', 'Le supermarché ferme à vingt heures.'),
+   ('aufmachen', 'ouvrir (courant)', 'Mach bitte die Tür auf!', "Ouvre la porte, s'il te plaît !"),
+   ('zumachen', 'fermer (courant)', 'Mach das Fenster zu, es ist kalt.', 'Ferme la fenêtre, il fait froid.'),
+   ('kühlen', 'refroidir, garder au frais', 'Wir kühlen die Getränke im Kühlschrank.', 'Nous gardons les boissons au frais dans le réfrigérateur.'),
+   ('wärmen', 'réchauffer', 'Ich wärme die Suppe in der Mikrowelle.', 'Je réchauffe la soupe au micro-ondes.'),
+   ('grillen', 'faire griller', 'Im Sommer grillen wir im Garten.', 'En été, nous faisons des grillades dans le jardin.'),
+   ('naschen', 'grignoter (des sucreries)', 'Die Kinder naschen gern Bonbons.', 'Les enfants aiment grignoter des bonbons.')]),
+ ('La maison et le ménage',
+  [('wohnen', 'habiter', 'Ich wohne in einer kleinen Wohnung.', "J'habite dans un petit appartement."),
+   ('leben', 'vivre', 'Meine Eltern leben in Kamerun.', 'Mes parents vivent au Cameroun.'),
+   ('mieten', 'louer (prendre en location)', 'Wir mieten eine Wohnung im Zentrum.', 'Nous louons un appartement dans le centre.'),
+   ('vermieten', 'louer (donner en location)', 'Er vermietet ein Zimmer an Studenten.', 'Il loue une chambre à des étudiants.'),
+   ('einziehen', 'emménager', 'Nächsten Monat ziehen wir in das neue Haus ein.', 'Le mois prochain, nous emménageons dans la nouvelle maison.'),
+   ('umziehen', 'déménager', 'Meine Schwester zieht nach Berlin um.', 'Ma sœur déménage à Berlin.'),
+   ('aufräumen', 'ranger', 'Räum bitte dein Zimmer auf!', "Range ta chambre, s'il te plaît !"),
+   ('staubsaugen', "passer l'aspirateur", 'Ich staubsauge jeden Samstag.', "Je passe l'aspirateur tous les samedis."),
+   ('wischen', 'essuyer, passer la serpillière', 'Sie wischt den Boden in der Küche.', 'Elle passe la serpillière dans la cuisine.'),
+   ('fegen', 'balayer', 'Ich fege den Hof vor dem Haus.', 'Je balaie la cour devant la maison.'),
+   ('bügeln', 'repasser', 'Ich bügle mein Hemd für morgen.', 'Je repasse ma chemise pour demain.'),
+   ('aufhängen', 'accrocher, étendre', 'Ich hänge die Wäsche im Garten auf.', "J'étends le linge dans le jardin."),
+   ('reparieren', 'réparer', 'Der Techniker repariert die Waschmaschine.', 'Le technicien répare la machine à laver.'),
+   ('bauen', 'construire', 'Mein Onkel baut ein Haus im Dorf.', 'Mon oncle construit une maison au village.'),
+   ('renovieren', 'rénover', 'Wir renovieren das Badezimmer.', 'Nous rénovons la salle de bains.'),
+   ('streichen', 'peindre (un mur)', 'Am Wochenende streichen wir die Wände.', 'Ce week-end, nous peignons les murs.'),
+   ('einrichten', 'aménager', 'Sie richtet ihr neues Zimmer ein.', 'Elle aménage sa nouvelle chambre.'),
+   ('stellen', 'poser (debout)', 'Stell die Flasche bitte auf den Tisch.', "Pose la bouteille sur la table, s'il te plaît."),
+   ('legen', 'poser (à plat)', 'Ich lege das Buch auf das Bett.', 'Je pose le livre sur le lit.'),
+   ('hängen', 'accrocher, être accroché', 'Das Bild hängt an der Wand.', 'Le tableau est accroché au mur.'),
+   ('klingeln', 'sonner', 'Jemand klingelt an der Tür.', "Quelqu'un sonne à la porte."),
+   ('klopfen', 'frapper (à la porte)', 'Bitte klopfen Sie vor dem Eintreten.', "Veuillez frapper avant d'entrer."),
+   ('abschließen', 'fermer à clé', 'Vergiss nicht, die Tür abzuschließen.', "N'oublie pas de fermer la porte à clé."),
+   ('einschalten', 'allumer (un appareil)', 'Schalte bitte den Fernseher ein.', "Allume la télévision, s'il te plaît."),
+   ('ausschalten', 'éteindre (un appareil)', 'Ich schalte den Computer am Abend aus.', "J'éteins l'ordinateur le soir."),
+   ('anmachen', 'allumer (courant)', 'Mach bitte das Licht an.', "Allume la lumière, s'il te plaît."),
+   ('ausmachen', 'éteindre (courant)', 'Mach den Herd aus, das Essen ist fertig.', 'Éteins la cuisinière, le repas est prêt.'),
+   ('heizen', 'chauffer', 'Im Winter heizen wir das ganze Haus.', 'En hiver, nous chauffons toute la maison.'),
+   ('lüften', 'aérer', 'Ich lüfte jeden Morgen das Schlafzimmer.', "J'aère la chambre chaque matin."),
+   ('wegwerfen', 'jeter', 'Wirf die alten Zeitungen bitte weg.', "Jette les vieux journaux, s'il te plaît.")]),
+ ('Se déplacer et voyager',
+  [('fahren', 'aller (en véhicule), conduire', 'Ich fahre mit dem Bus zur Arbeit.', 'Je vais au travail en bus.'),
+   ('laufen', 'courir, marcher', 'Wir laufen jeden Morgen im Park.', 'Nous courons chaque matin dans le parc.'),
+   ('rennen', 'courir vite', 'Die Kinder rennen über den Schulhof.', "Les enfants courent dans la cour de l'école."),
+   ('fliegen', "voler, prendre l'avion", 'Morgen fliege ich nach Frankfurt.', "Demain, je prends l'avion pour Francfort."),
+   ('reisen', 'voyager', 'Wir reisen gern mit dem Zug.', 'Nous aimons voyager en train.'),
+   ('ankommen', 'arriver', 'Der Zug kommt um zehn Uhr an.', 'Le train arrive à dix heures.'),
+   ('abfahren', 'partir (véhicule)', 'Der Bus fährt in fünf Minuten ab.', 'Le bus part dans cinq minutes.'),
+   ('abfliegen', 'décoller', 'Das Flugzeug fliegt pünktlich ab.', "L'avion décolle à l'heure."),
+   ('landen', 'atterrir', 'Wir landen um sechzehn Uhr in Douala.', 'Nous atterrissons à seize heures à Douala.'),
+   ('einsteigen', 'monter (dans un véhicule)', 'Bitte steigen Sie schnell ein!', "Montez vite, s'il vous plaît !"),
+   ('aussteigen', "descendre (d'un véhicule)", 'Ich steige an der nächsten Haltestelle aus.', 'Je descends au prochain arrêt.'),
+   ('umsteigen', 'changer (de train, de bus)', 'In Köln müssen Sie umsteigen.', 'Vous devez changer à Cologne.'),
+   ('abholen', 'aller chercher', 'Ich hole dich am Flughafen ab.', "Je viens te chercher à l'aéroport."),
+   ('mitnehmen', 'emmener, emporter', 'Nimm einen Regenschirm mit!', 'Emporte un parapluie !'),
+   ('zurückkommen', 'revenir', 'Wann kommst du aus dem Urlaub zurück?', 'Quand reviens-tu de vacances ?'),
+   ('weggehen', "s'en aller", 'Er geht ohne ein Wort weg.', "Il s'en va sans un mot."),
+   ('verlassen', 'quitter', 'Ich verlasse das Büro um siebzehn Uhr.', 'Je quitte le bureau à dix-sept heures.'),
+   ('überqueren', 'traverser', 'Wir überqueren die Straße an der Ampel.', 'Nous traversons la rue au feu.'),
+   ('abbiegen', 'tourner', 'Biegen Sie an der Kreuzung links ab.', 'Tournez à gauche au carrefour.'),
+   ('parken', 'se garer', 'Hier darf man nicht parken.', "On n'a pas le droit de se garer ici."),
+   ('tanken', 'faire le plein', 'Ich muss noch schnell tanken.', 'Je dois encore vite faire le plein.'),
+   ('bremsen', 'freiner', 'Der Fahrer bremst vor der Schule.', "Le chauffeur freine devant l'école."),
+   ('überholen', 'doubler, dépasser', 'Das Motorrad überholt den Lastwagen.', 'La moto double le camion.'),
+   ('buchen', 'réserver (voyage)', 'Ich buche ein Hotel für drei Nächte.', 'Je réserve un hôtel pour trois nuits.'),
+   ('reservieren', 'réserver (table, place)', 'Ich möchte einen Tisch für zwei Personen reservieren.', 'Je voudrais réserver une table pour deux personnes.'),
+   ('packen', 'faire (sa valise)', 'Heute Abend packe ich meinen Koffer.', 'Ce soir, je fais ma valise.'),
+   ('besichtigen', 'visiter (un lieu)', 'Wir besichtigen morgen das Schloss.', 'Demain, nous visitons le château.'),
+   ('übernachten', 'passer la nuit', 'Wir übernachten bei Freunden.', 'Nous passons la nuit chez des amis.'),
+   ('sich verlaufen', 'se perdre (à pied)', 'Ich habe mich in der Stadt verlaufen.', 'Je me suis perdu dans la ville.'),
+   ('wandern', 'faire de la randonnée', 'Am Sonntag wandern wir in den Bergen.', 'Dimanche, nous faisons une randonnée en montagne.')]),
+ ("Les courses et l'argent",
+  [('kaufen', 'acheter', 'Ich kaufe Brot beim Bäcker.', "J'achète du pain chez le boulanger."),
+   ('verkaufen', 'vendre', 'Meine Tante verkauft Obst auf dem Markt.', 'Ma tante vend des fruits au marché.'),
+   ('einkaufen', 'faire les courses', 'Samstags kaufen wir im Supermarkt ein.', 'Le samedi, nous faisons les courses au supermarché.'),
+   ('bezahlen', 'payer', 'Kann ich mit Karte bezahlen?', 'Puis-je payer par carte ?'),
+   ('zahlen', 'payer, régler', 'Wir möchten bitte zahlen.', "Nous voudrions payer, s'il vous plaît."),
+   ('kosten', 'coûter', 'Was kostet ein Kilo Tomaten?', 'Combien coûte un kilo de tomates ?'),
+   ('sparen', 'économiser', 'Ich spare für ein neues Handy.', "J'économise pour un nouveau téléphone."),
+   ('ausgeben', 'dépenser', 'Er gibt zu viel Geld für Kleidung aus.', "Il dépense trop d'argent en vêtements."),
+   ('verdienen', "gagner (de l'argent)", 'Sie verdient gut in ihrem Beruf.', 'Elle gagne bien sa vie dans son métier.'),
+   ('leihen', 'prêter, emprunter', 'Kannst du mir zehn Euro leihen?', 'Peux-tu me prêter dix euros ?'),
+   ('schulden', "devoir (de l'argent)", 'Ich schulde dir noch fünf Euro.', 'Je te dois encore cinq euros.'),
+   ('wechseln', 'changer, échanger', 'Können Sie mir fünfzig Euro wechseln?', 'Pouvez-vous me faire la monnaie de cinquante euros ?'),
+   ('abheben', "retirer (de l'argent)", 'Ich hebe Geld am Automaten ab.', "Je retire de l'argent au distributeur."),
+   ('überweisen', "virer (de l'argent)", 'Ich überweise die Miete jeden Monat.', 'Je vire le loyer chaque mois.'),
+   ('umtauschen', 'échanger (un article)', 'Ich möchte diese Hose umtauschen.', 'Je voudrais échanger ce pantalon.'),
+   ('zurückgeben', 'rendre', 'Gib mir bitte mein Buch zurück.', "Rends-moi mon livre, s'il te plaît."),
+   ('anprobieren', 'essayer (un vêtement)', 'Kann ich die Jacke anprobieren?', 'Puis-je essayer la veste ?'),
+   ('passen', 'aller (taille), convenir', 'Die Schuhe passen mir nicht.', 'Les chaussures ne me vont pas.'),
+   ('wiegen', 'peser', 'Die Verkäuferin wiegt die Bananen.', 'La vendeuse pèse les bananes.'),
+   ('einpacken', 'emballer', 'Können Sie das Geschenk einpacken?', 'Pouvez-vous emballer le cadeau ?'),
+   ('auspacken', 'déballer', 'Die Kinder packen ihre Geschenke aus.', 'Les enfants déballent leurs cadeaux.'),
+   ('liefern', 'livrer', 'Die Firma liefert die Möbel am Montag.', "L'entreprise livre les meubles lundi."),
+   ('handeln', 'marchander, agir', 'Auf dem Markt kann man handeln.', 'Au marché, on peut marchander.'),
+   ('vergleichen', 'comparer', 'Ich vergleiche immer die Preise.', 'Je compare toujours les prix.'),
+   ('auswählen', 'choisir, sélectionner', 'Wähl dir ein Eis aus!', 'Choisis-toi une glace !'),
+   ('anbieten', 'proposer, offrir', 'Der Laden bietet heute Rabatte an.', "Le magasin propose des réductions aujourd'hui."),
+   ('schenken', 'offrir (un cadeau)', 'Ich schenke meiner Mutter Blumen.', "J'offre des fleurs à ma mère."),
+   ('suchen', 'chercher', 'Ich suche eine Apotheke in der Nähe.', 'Je cherche une pharmacie à proximité.'),
+   ('holen', 'aller chercher (une chose)', 'Ich hole schnell Milch aus dem Laden.', 'Je vais vite chercher du lait au magasin.'),
+   ('tragen', 'porter', 'Er trägt die schweren Taschen nach Hause.', 'Il porte les sacs lourds à la maison.')]),
+ ('Le travail',
+  [('arbeiten', 'travailler', 'Ich arbeite in einem Krankenhaus.', 'Je travaille dans un hôpital.'),
+   ('verdanken', "devoir (quelque chose à quelqu'un)", 'Diese Stelle verdanke ich meinem Onkel.', 'Je dois ce poste à mon oncle.'),
+   ('sich bewerben', 'postuler', 'Ich bewerbe mich um eine neue Stelle.', 'Je postule à un nouveau poste.'),
+   ('einstellen', 'embaucher, régler', 'Die Firma stellt zehn neue Mitarbeiter ein.', "L'entreprise embauche dix nouveaux employés."),
+   ('kündigen', 'démissionner, licencier', 'Er kündigt seinen Job im Dezember.', 'Il démissionne de son travail en décembre.'),
+   ('leiten', 'diriger', 'Frau Weber leitet unsere Abteilung.', 'Madame Weber dirige notre service.'),
+   ('planen', 'planifier', 'Wir planen ein Treffen für nächste Woche.', 'Nous planifions une réunion pour la semaine prochaine.'),
+   ('organisieren', 'organiser', 'Sie organisiert die Feier im Büro.', 'Elle organise la fête au bureau.'),
+   ('vorbereiten', 'préparer', 'Ich bereite die Präsentation vor.', 'Je prépare la présentation.'),
+   ('erledigen', 'régler, accomplir', 'Ich muss heute viele Aufgaben erledigen.', "Je dois accomplir beaucoup de tâches aujourd'hui."),
+   ('schaffen', 'réussir à faire', 'Schaffst du das bis morgen?', "Arrives-tu à faire ça d'ici demain ?"),
+   ('schicken', 'envoyer', 'Ich schicke dir die Datei per E-Mail.', "Je t'envoie le fichier par e-mail."),
+   ('senden', 'envoyer, transmettre', 'Bitte senden Sie uns Ihre Unterlagen.', 'Veuillez nous envoyer vos documents.'),
+   ('unterschreiben', 'signer', 'Unterschreiben Sie bitte hier unten.', "Signez ici en bas, s'il vous plaît."),
+   ('ausfüllen', 'remplir (un formulaire)', 'Sie müssen dieses Formular ausfüllen.', 'Vous devez remplir ce formulaire.'),
+   ('kopieren', 'copier, photocopier', 'Kannst du die Seite für mich kopieren?', 'Peux-tu photocopier la page pour moi ?'),
+   ('drucken', 'imprimer', 'Ich drucke den Vertrag zweimal.', "J'imprime le contrat en deux exemplaires."),
+   ('speichern', 'enregistrer (un fichier)', 'Speichere das Dokument, bevor du gehst.', 'Enregistre le document avant de partir.'),
+   ('löschen', 'supprimer, éteindre (un feu)', 'Ich lösche die alten E-Mails.', 'Je supprime les anciens e-mails.'),
+   ('tippen', 'taper (au clavier)', 'Sie tippt sehr schnell am Computer.', "Elle tape très vite à l'ordinateur."),
+   ('telefonieren', 'téléphoner', 'Der Chef telefoniert gerade mit einem Kunden.', 'Le chef est au téléphone avec un client.'),
+   ('besprechen', 'discuter de', 'Wir besprechen das Projekt am Montag.', 'Nous discutons du projet lundi.'),
+   ('vereinbaren', 'convenir de', 'Ich möchte einen Termin vereinbaren.', 'Je voudrais prendre un rendez-vous.'),
+   ('absagen', 'annuler (un rendez-vous)', 'Ich muss den Termin leider absagen.', 'Je dois malheureusement annuler le rendez-vous.'),
+   ('verschieben', 'reporter', 'Können wir das Treffen auf Freitag verschieben?', 'Pouvons-nous reporter la réunion à vendredi ?'),
+   ('teilnehmen', 'participer', 'Ich nehme an einem Deutschkurs teil.', "Je participe à un cours d'allemand."),
+   ('vertreten', 'remplacer, représenter', 'Heute vertrete ich meine Kollegin.', "Aujourd'hui, je remplace ma collègue."),
+   ('beraten', 'conseiller', 'Die Verkäuferin berät die Kunden gut.', 'La vendeuse conseille bien les clients.'),
+   ('bedienen', 'servir (un client)', 'Der Kellner bedient die Gäste freundlich.', 'Le serveur sert les clients aimablement.'),
+   ('entwickeln', 'développer', 'Mein Freund entwickelt Apps für Handys.', 'Mon ami développe des applications pour téléphones.')]),
+ ('Apprendre et penser',
+  [('lernen', 'apprendre', 'Ich lerne seit drei Monaten Deutsch.', "J'apprends l'allemand depuis trois mois."),
+   ('lehren', 'enseigner', 'Er lehrt Mathematik an der Universität.', "Il enseigne les mathématiques à l'université."),
+   ('unterrichten', 'donner des cours', 'Frau Klein unterrichtet Deutsch.', "Madame Klein donne des cours d'allemand."),
+   ('studieren', 'faire des études', 'Meine Tochter studiert Medizin.', 'Ma fille fait des études de médecine.'),
+   ('üben', "s'exercer", 'Wir üben jeden Tag die Aussprache.', 'Nous nous exerçons chaque jour à la prononciation.'),
+   ('sich konzentrieren', 'se concentrer', 'Bei dem Lärm kann ich mich nicht konzentrieren.', "Avec ce bruit, je n'arrive pas à me concentrer."),
+   ('bestehen', 'réussir (un examen)', 'Ich will die A1-Prüfung bestehen.', "Je veux réussir l'examen A1."),
+   ('durchfallen', 'échouer (à un examen)', 'Er ist leider in der Prüfung durchgefallen.', "Il a malheureusement échoué à l'examen."),
+   ('rechnen', 'calculer', 'Die Schüler rechnen ohne Taschenrechner.', 'Les élèves calculent sans calculatrice.'),
+   ('zählen', 'compter', 'Das Kind zählt schon bis zwanzig.', "L'enfant compte déjà jusqu'à vingt."),
+   ('zeichnen', 'dessiner', 'Meine Tochter zeichnet gern Tiere.', 'Ma fille aime dessiner des animaux.'),
+   ('malen', 'peindre', 'Die Kinder malen ein Bild für Oma.', 'Les enfants peignent un dessin pour mamie.'),
+   ('notieren', 'noter', 'Ich notiere mir die neue Adresse.', 'Je note la nouvelle adresse.'),
+   ('markieren', 'surligner, marquer', 'Markieren Sie die wichtigen Wörter.', 'Surlignez les mots importants.'),
+   ('korrigieren', 'corriger', 'Die Lehrerin korrigiert unsere Hausaufgaben.', 'La professeure corrige nos devoirs.'),
+   ('verbessern', 'améliorer', 'Ich möchte mein Deutsch verbessern.', 'Je voudrais améliorer mon allemand.'),
+   ('vergessen', 'oublier', 'Ich vergesse oft meinen Regenschirm.', "J'oublie souvent mon parapluie."),
+   ('sich erinnern', 'se souvenir', 'Erinnerst du dich an unseren Lehrer?', 'Te souviens-tu de notre professeur ?'),
+   ('sich merken', 'retenir, mémoriser', 'Ich kann mir Zahlen nicht gut merken.', 'Je ne retiens pas bien les chiffres.'),
+   ('kennen', 'connaître', 'Kennst du meinen Nachbarn?', 'Connais-tu mon voisin ?'),
+   ('kennenlernen', 'faire la connaissance de', 'Ich möchte deine Familie kennenlernen.', 'Je voudrais faire la connaissance de ta famille.'),
+   ('bedeuten', 'signifier', 'Was bedeutet dieses Wort?', 'Que signifie ce mot ?'),
+   ('aussprechen', 'prononcer', 'Wie spricht man dieses Wort aus?', 'Comment prononce-t-on ce mot ?'),
+   ('nachdenken', 'réfléchir', 'Ich muss über das Angebot nachdenken.', "Je dois réfléchir à l'offre."),
+   ('überlegen', 'réfléchir, considérer', 'Ich überlege, ob ich mitkomme.', 'Je me demande si je viens avec vous.'),
+   ('entscheiden', 'décider', 'Du musst dich heute entscheiden.', "Tu dois te décider aujourd'hui."),
+   ('raten', 'deviner, conseiller', 'Rate mal, wen ich getroffen habe!', "Devine qui j'ai rencontré !"),
+   ('prüfen', 'vérifier, examiner', 'Bitte prüfen Sie Ihre Angaben.', 'Veuillez vérifier vos informations.'),
+   ('lösen', 'résoudre', 'Kannst du diese Aufgabe lösen?', 'Peux-tu résoudre cet exercice ?'),
+   ('aufpassen', 'faire attention', 'Pass auf, die Straße ist glatt!', 'Fais attention, la route est glissante !')]),
+ ('Sentiments et relations',
+  [('lieben', "aimer (d'amour)", 'Ich liebe meine Familie über alles.', "J'aime ma famille plus que tout."),
+   ('hassen', 'détester', 'Ich hasse es, im Stau zu stehen.', 'Je déteste être dans les embouteillages.'),
+   ('gefallen', 'plaire', 'Dein neues Kleid gefällt mir sehr.', 'Ta nouvelle robe me plaît beaucoup.'),
+   ('sich freuen', 'se réjouir', 'Ich freue mich auf das Wochenende.', 'Je me réjouis du week-end.'),
+   ('lachen', 'rire', 'Wir lachen viel zusammen.', 'Nous rions beaucoup ensemble.'),
+   ('lächeln', 'sourire', 'Die Verkäuferin lächelt immer freundlich.', 'La vendeuse sourit toujours aimablement.'),
+   ('weinen', 'pleurer', 'Das Kind weint, weil es Hunger hat.', "L'enfant pleure parce qu'il a faim."),
+   ('sich ärgern', "se fâcher, s'énerver", 'Ich ärgere mich über den Stau.', "Je m'énerve à cause des embouteillages."),
+   ('sich aufregen', "s'énerver", 'Reg dich nicht so auf!', "Ne t'énerve pas comme ça !"),
+   ('sich beruhigen', 'se calmer', 'Beruhige dich, alles wird gut.', 'Calme-toi, tout ira bien.'),
+   ('sich fürchten', 'avoir peur', 'Mein Sohn fürchtet sich vor Hunden.', 'Mon fils a peur des chiens.'),
+   ('hoffen', 'espérer', 'Ich hoffe, du kommst bald wieder.', "J'espère que tu reviendras bientôt."),
+   ('wünschen', 'souhaiter', 'Ich wünsche dir einen schönen Tag.', 'Je te souhaite une bonne journée.'),
+   ('fühlen', 'ressentir, se sentir', 'Ich fühle mich heute viel besser.', "Je me sens beaucoup mieux aujourd'hui."),
+   ('vermissen', "manquer (regretter l'absence)", 'Ich vermisse meine Heimat sehr.', 'Mon pays me manque beaucoup.'),
+   ('vertrauen', 'faire confiance', 'Ich vertraue meinem besten Freund.', 'Je fais confiance à mon meilleur ami.'),
+   ('sich verlieben', 'tomber amoureux', 'Er hat sich in seine Nachbarin verliebt.', 'Il est tombé amoureux de sa voisine.'),
+   ('heiraten', 'se marier', 'Meine Cousine heiratet im August.', 'Ma cousine se marie en août.'),
+   ('sich trennen', 'se séparer', 'Meine Nachbarn haben sich getrennt.', 'Mes voisins se sont séparés.'),
+   ('küssen', 'embrasser', 'Die Mutter küsst ihr Baby.', 'La mère embrasse son bébé.'),
+   ('umarmen', 'prendre dans ses bras', 'Zum Abschied umarmen wir uns.', 'Pour nous dire au revoir, nous nous prenons dans les bras.'),
+   ('treffen', 'rencontrer', 'Ich treffe meine Freunde im Café.', 'Je retrouve mes amis au café.'),
+   ('besuchen', 'rendre visite, visiter', 'Am Sonntag besuchen wir die Großeltern.', 'Dimanche, nous rendons visite aux grands-parents.'),
+   ('helfen', 'aider', 'Kannst du mir beim Umzug helfen?', "Peux-tu m'aider pour le déménagement ?"),
+   ('sich kümmern', "s'occuper de", 'Sie kümmert sich um ihre kranke Mutter.', "Elle s'occupe de sa mère malade."),
+   ('stören', 'déranger', 'Entschuldigung, störe ich Sie?', 'Excusez-moi, est-ce que je vous dérange ?'),
+   ('gratulieren', 'féliciter', 'Ich gratuliere dir zum Geburtstag!', 'Je te félicite pour ton anniversaire !'),
+   ('feiern', 'fêter', 'Wir feiern Silvester mit Freunden.', 'Nous fêtons le Nouvel An avec des amis.'),
+   ('verzeihen', 'pardonner', 'Kannst du mir verzeihen?', 'Peux-tu me pardonner ?'),
+   ('sich verabschieden', 'dire au revoir', 'Ich verabschiede mich jetzt, bis morgen!', 'Je vous dis au revoir maintenant, à demain !')]),
+ ('La santé et le corps',
+  [('wehtun', 'faire mal', 'Mein Kopf tut seit heute Morgen weh.', "J'ai mal à la tête depuis ce matin."),
+   ('sich erkälten', "s'enrhumer", 'Zieh eine Jacke an, sonst erkältest du dich.', "Mets une veste, sinon tu vas t'enrhumer."),
+   ('husten', 'tousser', 'Das Kind hustet die ganze Nacht.', "L'enfant tousse toute la nuit."),
+   ('niesen', 'éternuer', 'Im Frühling muss ich oft niesen.', "Au printemps, j'éternue souvent."),
+   ('bluten', 'saigner', 'Dein Finger blutet ja!', 'Mais ton doigt saigne !'),
+   ('sich verletzen', 'se blesser', 'Er hat sich beim Fußball verletzt.', "Il s'est blessé au football."),
+   ('brechen', 'casser, se fracturer', 'Sie hat sich den Arm gebrochen.', "Elle s'est cassé le bras."),
+   ('untersuchen', 'examiner', 'Die Ärztin untersucht den Patienten.', 'La docteure examine le patient.'),
+   ('verschreiben', 'prescrire', 'Der Arzt verschreibt mir Tabletten.', 'Le médecin me prescrit des comprimés.'),
+   ('einnehmen', 'prendre (un médicament)', 'Nehmen Sie die Tablette nach dem Essen ein.', 'Prenez le comprimé après le repas.'),
+   ('impfen', 'vacciner', 'Der Arzt impft das Baby heute.', "Le médecin vaccine le bébé aujourd'hui."),
+   ('operieren', 'opérer', 'Morgen wird mein Vater am Knie operiert.', 'Demain, mon père se fait opérer du genou.'),
+   ('heilen', 'guérir', 'Die Wunde heilt langsam.', 'La plaie guérit lentement.'),
+   ('sich erholen', 'se rétablir, se reposer', 'Im Urlaub erhole ich mich gut.', 'En vacances, je me repose bien.'),
+   ('atmen', 'respirer', 'Atmen Sie bitte tief ein und aus.', "Inspirez et expirez profondément, s'il vous plaît."),
+   ('schwitzen', 'transpirer', 'Beim Sport schwitze ich sehr.', 'Je transpire beaucoup en faisant du sport.'),
+   ('frieren', 'avoir froid, geler', 'Ich friere, mach bitte die Heizung an.', "J'ai froid, allume le chauffage, s'il te plaît."),
+   ('zittern', 'trembler', 'Er zittert vor Kälte.', 'Il tremble de froid.'),
+   ('abnehmen', 'maigrir, décrocher', 'Ich möchte fünf Kilo abnehmen.', 'Je voudrais perdre cinq kilos.'),
+   ('zunehmen', 'grossir, augmenter', 'Im Winter nehme ich immer zu.', 'En hiver, je grossis toujours.'),
+   ('rauchen', 'fumer', 'Hier darf man nicht rauchen.', 'Il est interdit de fumer ici.'),
+   ('sterben', 'mourir', 'Sein Großvater ist letztes Jahr gestorben.', "Son grand-père est mort l'année dernière."),
+   ('geboren werden', 'naître', 'Meine Tochter wurde im Mai geboren.', 'Ma fille est née en mai.'),
+   ('wachsen', 'grandir, pousser', 'Die Kinder wachsen so schnell.', 'Les enfants grandissent si vite.'),
+   ('pflegen', 'soigner, prendre soin de', 'Sie pflegt ihren kranken Vater.', 'Elle soigne son père malade.'),
+   ('schützen', 'protéger', 'Die Creme schützt die Haut vor der Sonne.', 'La crème protège la peau du soleil.'),
+   ('riechen', 'sentir (odeur)', 'Hier riecht es nach frischem Brot.', 'Ça sent le pain frais ici.'),
+   ('berühren', 'toucher', 'Bitte die Ware nicht berühren.', 'Prière de ne pas toucher la marchandise.'),
+   ('kauen', 'mâcher', 'Du musst das Fleisch gut kauen.', 'Tu dois bien mâcher la viande.'),
+   ('schlucken', 'avaler', 'Ich kann die Tablette nicht schlucken.', "Je n'arrive pas à avaler le comprimé.")]),
+ ('Loisirs, sport et médias',
+  [('spielen', 'jouer', 'Die Kinder spielen im Hof Fußball.', 'Les enfants jouent au football dans la cour.'),
+   ('singen', 'chanter', 'Sie singt im Chor der Kirche.', "Elle chante dans la chorale de l'église."),
+   ('tanzen', 'danser', 'Auf der Hochzeit tanzen alle Gäste.', 'Au mariage, tous les invités dansent.'),
+   ('schwimmen', 'nager', 'Im Sommer schwimmen wir im See.', 'En été, nous nageons dans le lac.'),
+   ('trainieren', "s'entraîner", 'Er trainiert dreimal pro Woche.', "Il s'entraîne trois fois par semaine."),
+   ('gewinnen', 'gagner', 'Unsere Mannschaft gewinnt heute bestimmt.', "Notre équipe gagne sûrement aujourd'hui."),
+   ('verlieren', 'perdre', 'Ich verliere immer beim Kartenspielen.', 'Je perds toujours aux cartes.'),
+   ('werfen', 'lancer', 'Wirf mir bitte den Ball zu!', "Lance-moi le ballon, s'il te plaît !"),
+   ('fangen', 'attraper', 'Der Torwart fängt den Ball.', 'Le gardien attrape le ballon.'),
+   ('springen', 'sauter', 'Die Kinder springen ins Wasser.', "Les enfants sautent dans l'eau."),
+   ('klettern', 'grimper', 'Die Katze klettert auf den Baum.', "Le chat grimpe à l'arbre."),
+   ('reiten', 'monter à cheval', 'Meine Nichte reitet jeden Samstag.', 'Ma nièce monte à cheval tous les samedis.'),
+   ('angeln', 'pêcher à la ligne', 'Mein Opa angelt gern am Fluss.', 'Mon grand-père aime pêcher au bord du fleuve.'),
+   ('fernsehen', 'regarder la télévision', 'Abends sehen wir zusammen fern.', 'Le soir, nous regardons la télévision ensemble.'),
+   ('schauen', 'regarder', 'Schau mal, da kommt der Bus!', 'Regarde, voilà le bus qui arrive !'),
+   ('gucken', 'regarder (familier)', 'Wir gucken heute Abend einen Film.', 'Nous regardons un film ce soir.'),
+   ('fotografieren', 'photographier', 'Sie fotografiert gern Blumen.', 'Elle aime photographier les fleurs.'),
+   ('filmen', 'filmer', 'Er filmt das Konzert mit dem Handy.', 'Il filme le concert avec son téléphone.'),
+   ('chatten', 'discuter en ligne', 'Ich chatte jeden Abend mit meiner Schwester.', 'Je discute en ligne chaque soir avec ma sœur.'),
+   ('surfen', 'naviguer (sur Internet)', 'Die Jugendlichen surfen viel im Internet.', 'Les jeunes naviguent beaucoup sur Internet.'),
+   ('herunterladen', 'télécharger', 'Ich lade die App auf mein Handy herunter.', "Je télécharge l'application sur mon téléphone."),
+   ('hochladen', 'mettre en ligne', 'Sie lädt die Fotos ins Internet hoch.', 'Elle met les photos en ligne.'),
+   ('posten', 'publier (en ligne)', 'Er postet jeden Tag ein Video.', 'Il publie une vidéo chaque jour.'),
+   ('teilen', 'partager', 'Wir teilen die Pizza durch vier.', 'Nous partageons la pizza en quatre.'),
+   ('basteln', 'bricoler (travaux manuels)', 'Die Kinder basteln Sterne aus Papier.', 'Les enfants fabriquent des étoiles en papier.'),
+   ('stricken', 'tricoter', 'Meine Oma strickt mir einen Schal.', 'Ma grand-mère me tricote une écharpe.'),
+   ('nähen', 'coudre', 'Die Schneiderin näht ein Kleid.', 'La couturière coud une robe.'),
+   ('spazieren gehen', 'se promener', 'Nach dem Essen gehen wir spazieren.', 'Après le repas, nous allons nous promener.'),
+   ('ausgehen', 'sortir (le soir)', 'Am Freitag gehen wir mit Freunden aus.', 'Vendredi, nous sortons avec des amis.'),
+   ('sich unterhalten', "bavarder, s'entretenir", 'Wir unterhalten uns über den Film.', 'Nous parlons du film.')]),
+ ('Météo, nature et animaux',
+  [('regnen', 'pleuvoir', 'Es regnet schon den ganzen Tag.', 'Il pleut déjà toute la journée.'),
+   ('schneien', 'neiger', 'In den Bergen schneit es im Winter.', 'En montagne, il neige en hiver.'),
+   ('scheinen', 'briller, sembler', 'Heute scheint endlich die Sonne.', "Aujourd'hui, le soleil brille enfin."),
+   ('donnern', 'tonner', 'Hörst du, wie es donnert?', 'Entends-tu le tonnerre ?'),
+   ('blitzen', 'faire des éclairs', 'Draußen blitzt es sehr stark.', 'Dehors, il y a de gros éclairs.'),
+   ('wehen', 'souffler (vent)', 'Am Meer weht immer ein starker Wind.', 'Au bord de la mer, un vent fort souffle toujours.'),
+   ('tauen', 'dégeler, fondre', 'Im Frühling taut der Schnee.', 'Au printemps, la neige fond.'),
+   ('blühen', 'fleurir', 'Im Mai blühen die Rosen im Garten.', 'En mai, les roses fleurissent dans le jardin.'),
+   ('pflanzen', 'planter', 'Wir pflanzen Tomaten hinter dem Haus.', 'Nous plantons des tomates derrière la maison.'),
+   ('ernten', 'récolter', 'Im Herbst ernten die Bauern den Mais.', 'En automne, les paysans récoltent le maïs.'),
+   ('pflücken', 'cueillir', 'Die Kinder pflücken Mangos vom Baum.', "Les enfants cueillent des mangues sur l'arbre."),
+   ('säen', 'semer', 'Der Bauer sät im Frühling den Weizen.', 'Le paysan sème le blé au printemps.'),
+   ('graben', 'creuser', 'Der Hund gräbt ein Loch im Garten.', 'Le chien creuse un trou dans le jardin.'),
+   ('füttern', 'nourrir (un animal)', 'Ich füttere die Katze zweimal am Tag.', 'Je nourris le chat deux fois par jour.'),
+   ('bellen', 'aboyer', 'Der Hund vom Nachbarn bellt die ganze Nacht.', 'Le chien du voisin aboie toute la nuit.'),
+   ('beißen', 'mordre', 'Keine Angst, mein Hund beißt nicht.', "N'aie pas peur, mon chien ne mord pas."),
+   ('jagen', 'chasser', 'Die Katze jagt eine Maus.', 'Le chat chasse une souris.'),
+   ('fließen', 'couler', 'Der Fluss fließt durch die Stadt.', 'Le fleuve coule à travers la ville.'),
+   ('brennen', 'brûler', 'Im Kamin brennt ein Feuer.', 'Un feu brûle dans la cheminée.'),
+   ('leuchten', 'luire, éclairer', 'In der Nacht leuchten die Sterne.', 'La nuit, les étoiles brillent.'),
+   ('aufgehen', "se lever (soleil), s'ouvrir", 'Die Sonne geht um sechs Uhr auf.', 'Le soleil se lève à six heures.'),
+   ('untergehen', 'se coucher (soleil), couler', 'Am Abend geht die Sonne im Westen unter.', "Le soir, le soleil se couche à l'ouest."),
+   ('schmelzen', 'fondre', 'Das Eis schmilzt in der Sonne.', 'La glace fond au soleil.'),
+   ('trocknen', 'sécher', 'Die Wäsche trocknet schnell im Wind.', 'Le linge sèche vite au vent.'),
+   ('stinken', 'puer', 'Der Müll stinkt, bring ihn bitte raus.', "La poubelle pue, sors-la s'il te plaît."),
+   ('fallen', 'tomber', 'Im Herbst fallen die Blätter von den Bäumen.', 'En automne, les feuilles tombent des arbres.'),
+   ('steigen', 'monter, augmenter', 'Die Temperaturen steigen auf dreißig Grad.', 'Les températures montent à trente degrés.'),
+   ('sinken', 'baisser, couler', 'Nachts sinkt die Temperatur unter null.', 'La nuit, la température descend en dessous de zéro.'),
+   ('sich verändern', 'changer, se transformer', 'Das Wetter verändert sich schnell.', 'Le temps change vite.'),
+   ('verschmutzen', 'polluer, salir', 'Die Autos verschmutzen die Luft.', "Les voitures polluent l'air.")]),
+ ('Actions du quotidien',
+  [('benutzen', 'utiliser', 'Darf ich kurz dein Handy benutzen?', 'Puis-je utiliser ton téléphone un instant ?'),
+   ('verwenden', 'employer, utiliser', 'Für den Kuchen verwende ich Butter.', "Pour le gâteau, j'utilise du beurre."),
+   ('halten', "tenir, s'arrêter", 'Kannst du bitte meine Tasche halten?', "Peux-tu tenir mon sac, s'il te plaît ?"),
+   ('ziehen', 'tirer', 'Bitte an der Tür ziehen, nicht drücken.', "Tirez la porte, s'il vous plaît, ne poussez pas."),
+   ('drücken', 'appuyer, pousser', 'Drücken Sie den grünen Knopf.', 'Appuyez sur le bouton vert.'),
+   ('schieben', 'pousser (faire rouler)', 'Er schiebt das Fahrrad den Berg hinauf.', "Il pousse le vélo jusqu'en haut de la côte."),
+   ('heben', 'soulever', 'Kannst du mir helfen, den Tisch zu heben?', "Peux-tu m'aider à soulever la table ?"),
+   ('drehen', 'tourner', 'Dreh den Schlüssel nach rechts.', 'Tourne la clé vers la droite.'),
+   ('schütteln', 'secouer', 'Die Flasche vor dem Öffnen schütteln.', "Secouer la bouteille avant de l'ouvrir."),
+   ('binden', 'attacher, nouer', 'Das Kind bindet seine Schuhe allein.', "L'enfant attache ses chaussures tout seul."),
+   ('kleben', 'coller', 'Ich klebe eine Briefmarke auf den Brief.', 'Je colle un timbre sur la lettre.'),
+   ('falten', 'plier', 'Sie faltet die Handtücher ordentlich.', 'Elle plie soigneusement les serviettes.'),
+   ('wickeln', 'enrouler, langer', 'Der Vater wickelt das Baby.', 'Le père change la couche du bébé.'),
+   ('zeigen', 'montrer', 'Zeigen Sie mir bitte Ihren Ausweis.', "Montrez-moi votre pièce d'identité, s'il vous plaît."),
+   ('verstecken', 'cacher', 'Die Kinder verstecken sich hinter dem Sofa.', 'Les enfants se cachent derrière le canapé.'),
+   ('aufheben', 'ramasser, conserver', 'Heb bitte das Papier vom Boden auf.', "Ramasse le papier par terre, s'il te plaît."),
+   ('behalten', 'garder', 'Sie können das Wechselgeld behalten.', 'Vous pouvez garder la monnaie.'),
+   ('wählen', 'choisir, voter, composer', 'Wählen Sie die Nummer eins eins zwei.', 'Composez le numéro un un deux.'),
+   ('erreichen', 'atteindre, joindre', 'Ich kann dich telefonisch nicht erreichen.', "Je n'arrive pas à te joindre par téléphone."),
+   ('verpassen', 'rater, manquer', 'Ich habe heute Morgen den Bus verpasst.', "J'ai raté le bus ce matin."),
+   ('versuchen', 'essayer', 'Versuch es bitte noch einmal.', "Essaie encore une fois, s'il te plaît."),
+   ('gelingen', 'réussir (impersonnel)', 'Der Kuchen ist mir gut gelungen.', "J'ai bien réussi le gâteau."),
+   ('passieren', 'se passer, arriver', 'Was ist denn hier passiert?', "Mais que s'est-il passé ici ?"),
+   ('geschehen', 'se produire', 'Der Unfall geschah gestern Abend.', "L'accident s'est produit hier soir."),
+   ('ändern', 'modifier, changer', 'Ich möchte mein Passwort ändern.', 'Je voudrais changer mon mot de passe.'),
+   ('funktionieren', 'fonctionner', 'Der Drucker funktioniert nicht mehr.', "L'imprimante ne fonctionne plus."),
+   ('kaputtgehen', 'se casser, tomber en panne', 'Mein Handy ist gestern kaputtgegangen.', 'Mon téléphone est tombé en panne hier.'),
+   ('fehlen', 'manquer', 'In der Suppe fehlt noch Salz.', 'Il manque encore du sel dans la soupe.'),
+   ('gehören', 'appartenir', 'Wem gehört dieser Rucksack?', 'À qui appartient ce sac à dos ?'),
+   ('reichen', 'suffire, tendre', 'Danke, das reicht für heute.', "Merci, ça suffit pour aujourd'hui.")]),
+ ('Administration, ville et société',
+  [('anmelden', 'inscrire, déclarer', 'Ich muss mich beim Bürgeramt anmelden.', 'Je dois me déclarer à la mairie.'),
+   ('abmelden', 'désinscrire', 'Ich melde mein altes Auto ab.', 'Je fais radier mon ancienne voiture.'),
+   ('beantragen', 'faire une demande de', 'Ich beantrage ein Visum für Deutschland.', "Je fais une demande de visa pour l'Allemagne."),
+   ('verlängern', 'prolonger', 'Ich muss meinen Pass verlängern.', 'Je dois faire prolonger mon passeport.'),
+   ('abgeben', 'remettre, déposer', 'Bitte geben Sie das Formular am Schalter ab.', 'Veuillez remettre le formulaire au guichet.'),
+   ('erhalten', 'recevoir (formel)', 'Sie erhalten den Brief in drei Tagen.', 'Vous recevrez la lettre dans trois jours.'),
+   ('bestätigen', 'confirmer', 'Bitte bestätigen Sie den Termin per E-Mail.', 'Veuillez confirmer le rendez-vous par e-mail.'),
+   ('erlauben', 'permettre', 'Meine Eltern erlauben mir, länger zu bleiben.', 'Mes parents me permettent de rester plus longtemps.'),
+   ('verbieten', 'interdire', 'Der Arzt verbietet mir Zucker.', "Le médecin m'interdit le sucre."),
+   ('informieren', 'informer', 'Bitte informieren Sie mich rechtzeitig.', "Veuillez m'informer à temps."),
+   ('sich beschweren', 'se plaindre', 'Die Nachbarn beschweren sich über den Lärm.', 'Les voisins se plaignent du bruit.'),
+   ('fordern', 'exiger', 'Die Arbeiter fordern mehr Lohn.', 'Les ouvriers exigent un meilleur salaire.'),
+   ('empfehlen', 'recommander', 'Können Sie mir ein gutes Restaurant empfehlen?', 'Pouvez-vous me recommander un bon restaurant ?'),
+   ('vorschlagen', 'proposer, suggérer', 'Ich schlage vor, wir gehen zu Fuß.', 'Je propose que nous y allions à pied.'),
+   ('zustimmen', 'approuver', 'Ich stimme deinem Vorschlag zu.', "J'approuve ta proposition."),
+   ('ablehnen', 'refuser', 'Er lehnt die Einladung höflich ab.', "Il refuse poliment l'invitation."),
+   ('annehmen', 'accepter', 'Ich nehme das Angebot gern an.', "J'accepte volontiers l'offre."),
+   ('melden', 'signaler, annoncer', 'Ich melde den Diebstahl bei der Polizei.', 'Je signale le vol à la police.'),
+   ('stehlen', 'voler (dérober)', 'Jemand hat mein Fahrrad gestohlen.', "Quelqu'un a volé mon vélo."),
+   ('kontrollieren', 'contrôler', 'Die Polizei kontrolliert die Ausweise.', "La police contrôle les papiers d'identité."),
+   ('retten', 'sauver', 'Die Feuerwehr rettet die Katze vom Dach.', 'Les pompiers sauvent le chat sur le toit.'),
+   ('warnen', 'avertir', 'Ich warne dich: Der Hund ist gefährlich.', "Je t'avertis : le chien est dangereux."),
+   ('folgen', 'suivre', 'Bitte folgen Sie mir zum Ausgang.', 'Veuillez me suivre vers la sortie.'),
+   ('führen', 'guider, mener', 'Diese Straße führt direkt zum Bahnhof.', 'Cette rue mène directement à la gare.'),
+   ('begleiten', 'accompagner', 'Ich begleite meine Mutter zum Arzt.', "J'accompagne ma mère chez le médecin."),
+   ('einwerfen', 'poster, insérer', 'Wirf den Brief bitte in den Briefkasten ein.', "Mets la lettre dans la boîte aux lettres, s'il te plaît."),
+   ('abstimmen', 'voter', 'Wir stimmen über den Vorschlag ab.', 'Nous votons sur la proposition.'),
+   ('spenden', 'faire un don', 'Wir spenden Kleidung für arme Familien.', 'Nous donnons des vêtements pour les familles pauvres.'),
+   ('gründen', 'fonder', 'Mein Freund gründet eine eigene Firma.', 'Mon ami fonde sa propre entreprise.'),
+   ('gelten', 'être valable', 'Das Ticket gilt nur heute.', "Le ticket n'est valable qu'aujourd'hui.")])]
+GUIDE_TRENNBAR = [('auf+stehen', 'se lever', 'Ich stehe um halb sieben auf.', 'Je me lève à six heures et demie.'),
+ ('auf+wachen', 'se réveiller', 'Das Baby wacht nachts oft auf.', 'Le bébé se réveille souvent la nuit.'),
+ ('auf+machen', 'ouvrir', 'Der Laden macht um neun Uhr auf.', 'Le magasin ouvre à neuf heures.'),
+ ('auf+räumen', 'ranger', 'Am Samstag räume ich die Küche auf.', 'Samedi, je range la cuisine.'),
+ ('auf+hören', 'arrêter', 'Der Regen hört endlich auf.', "La pluie s'arrête enfin."),
+ ('auf+passen', 'faire attention', 'Die Oma passt auf die Kinder auf.', 'La grand-mère surveille les enfants.'),
+ ('auf+schreiben', 'noter', 'Ich schreibe mir die Telefonnummer auf.', 'Je note le numéro de téléphone.'),
+ ('auf+hängen', 'accrocher', 'Er hängt seine Jacke im Flur auf.', 'Il accroche sa veste dans le couloir.'),
+ ('an+rufen', 'téléphoner', 'Meine Mutter ruft mich jeden Sonntag an.', "Ma mère m'appelle tous les dimanches."),
+ ('an+fangen', 'commencer', 'Die Arbeit fängt um acht Uhr an.', 'Le travail commence à huit heures.'),
+ ('an+kommen', 'arriver', 'Wir kommen gegen Mittag in Hamburg an.', 'Nous arrivons vers midi à Hambourg.'),
+ ('an+ziehen', 'mettre (un vêtement)', 'Heute ziehe ich meinen warmen Mantel an.', "Aujourd'hui, je mets mon manteau chaud."),
+ ('an+machen', 'allumer', 'Sie macht das Radio in der Küche an.', 'Elle allume la radio dans la cuisine.'),
+ ('an+sehen', 'regarder', 'Sieh dir dieses Foto an!', 'Regarde cette photo !'),
+ ('an+bieten', 'proposer', 'Ich biete meinem Gast einen Tee an.', 'Je propose un thé à mon invité.'),
+ ('an+melden', 'inscrire', 'Ich melde meinen Sohn in der Schule an.', "J'inscris mon fils à l'école."),
+ ('an+probieren', 'essayer (vêtement)', 'Sie probiert drei Kleider an.', 'Elle essaie trois robes.'),
+ ('an+halten', "s'arrêter", 'Der Bus hält vor dem Krankenhaus an.', "Le bus s'arrête devant l'hôpital."),
+ ('aus+gehen', 'sortir', 'Wir gehen selten unter der Woche aus.', 'Nous sortons rarement en semaine.'),
+ ('aus+steigen', 'descendre', 'Alle Fahrgäste steigen am Bahnhof aus.', 'Tous les passagers descendent à la gare.'),
+ ('aus+machen', 'éteindre', 'Mach bitte die Lampe aus.', "Éteins la lampe, s'il te plaît."),
+ ('aus+sehen', "avoir l'air", 'Du siehst heute sehr müde aus.', "Tu as l'air très fatigué aujourd'hui."),
+ ('aus+füllen', 'remplir', 'Ich fülle den Antrag online aus.', 'Je remplis la demande en ligne.'),
+ ('aus+ziehen', 'enlever (un vêtement)', 'Zieh bitte deine Schuhe aus.', "Enlève tes chaussures, s'il te plaît."),
+ ('aus+packen', 'déballer', 'Nach der Reise packe ich den Koffer aus.', 'Après le voyage, je défais la valise.'),
+ ('aus+geben', 'dépenser', 'Wir geben viel Geld für Essen aus.', "Nous dépensons beaucoup d'argent pour la nourriture."),
+ ('aus+schlafen', 'dormir tout son soûl', 'Im Urlaub schlafen wir jeden Tag aus.', 'En vacances, nous faisons la grasse matinée tous les jours.'),
+ ('aus+ruhen', 'se reposer', 'Ruh dich nach der Arbeit ein bisschen aus.', 'Repose-toi un peu après le travail.'),
+ ('ein+kaufen', 'faire les courses', 'Ich kaufe heute auf dem Markt ein.', "Aujourd'hui, je fais les courses au marché."),
+ ('ein+laden', 'inviter', 'Wir laden die Nachbarn zum Kaffee ein.', 'Nous invitons les voisins à prendre le café.'),
+ ('ein+steigen', 'monter (véhicule)', 'Die Kinder steigen in den Schulbus ein.', 'Les enfants montent dans le bus scolaire.'),
+ ('ein+schlafen', "s'endormir", 'Das Kind schläft sofort ein.', "L'enfant s'endort tout de suite."),
+ ('ein+packen', 'emballer', 'Ich packe warme Kleidung für die Reise ein.', "J'emporte des vêtements chauds pour le voyage."),
+ ('ein+ziehen', 'emménager', 'Die neuen Mieter ziehen morgen ein.', 'Les nouveaux locataires emménagent demain.'),
+ ('ein+schalten', 'allumer', 'Er schaltet die Waschmaschine ein.', 'Il met la machine à laver en marche.'),
+ ('mit+kommen', 'venir avec', 'Kommst du heute Abend ins Kino mit?', 'Viens-tu avec nous au cinéma ce soir ?'),
+ ('mit+nehmen', 'emporter', 'Ich nehme mein Mittagessen ins Büro mit.', "J'emporte mon déjeuner au bureau."),
+ ('mit+bringen', 'apporter', 'Bring bitte deine Schwester zur Party mit.', "Amène ta sœur à la fête, s'il te plaît."),
+ ('mit+machen', 'participer', 'Alle Schüler machen beim Spiel mit.', 'Tous les élèves participent au jeu.'),
+ ('mit+spielen', 'jouer avec', 'Mein kleiner Bruder spielt auch mit.', 'Mon petit frère joue aussi avec nous.'),
+ ('ab+fahren', 'partir', 'Unser Zug fährt von Gleis drei ab.', 'Notre train part de la voie trois.'),
+ ('ab+holen', 'aller chercher', 'Der Vater holt die Tochter vom Kindergarten ab.', 'Le père va chercher sa fille à la maternelle.'),
+ ('ab+geben', 'remettre', 'Ich gebe meine Hausaufgaben morgen ab.', 'Je rends mes devoirs demain.'),
+ ('ab+schließen', 'fermer à clé', 'Sie schließt das Büro jeden Abend ab.', 'Elle ferme le bureau à clé tous les soirs.'),
+ ('ab+sagen', 'annuler', 'Der Arzt sagt alle Termine ab.', 'Le médecin annule tous les rendez-vous.'),
+ ('ab+nehmen', 'maigrir, décrocher', 'Niemand nimmt das Telefon ab.', 'Personne ne décroche le téléphone.'),
+ ('zu+machen', 'fermer', 'Die Bank macht um sechzehn Uhr zu.', 'La banque ferme à seize heures.'),
+ ('zu+hören', 'écouter', 'Die Schüler hören dem Lehrer zu.', 'Les élèves écoutent le professeur.'),
+ ('zu+nehmen', 'grossir', 'Der Hund nimmt zu, er frisst zu viel.', 'Le chien grossit, il mange trop.'),
+ ('zurück+kommen', 'revenir', 'Mein Mann kommt am Freitag zurück.', 'Mon mari revient vendredi.'),
+ ('zurück+geben', 'rendre', 'Ich gebe das Buch in der Bibliothek zurück.', 'Je rends le livre à la bibliothèque.'),
+ ('zurück+rufen', 'rappeler', 'Ich rufe Sie in zehn Minuten zurück.', 'Je vous rappelle dans dix minutes.'),
+ ('vor+stellen', 'présenter', 'Ich stelle dir meinen Kollegen vor.', 'Je te présente mon collègue.'),
+ ('vor+bereiten', 'préparer', 'Die Mutter bereitet das Frühstück vor.', 'La mère prépare le petit-déjeuner.'),
+ ('vor+haben', "avoir l'intention de", 'Was hast du heute Abend vor?', "Qu'as-tu prévu ce soir ?"),
+ ('vor+lesen', 'lire à voix haute', 'Der Vater liest den Kindern ein Märchen vor.', 'Le père lit un conte aux enfants.'),
+ ('weg+gehen', 'partir', 'Sie geht früh von der Party weg.', 'Elle part tôt de la fête.'),
+ ('weg+werfen', 'jeter', 'Ich werfe den kaputten Stuhl weg.', 'Je jette la chaise cassée.'),
+ ('fern+sehen', 'regarder la télévision', 'Mein Opa sieht jeden Nachmittag fern.', 'Mon grand-père regarde la télévision tous les après-midi.'),
+ ('teil+nehmen', 'participer', 'Viele Leute nehmen an dem Fest teil.', 'Beaucoup de gens participent à la fête.'),
+ ('statt+finden', 'avoir lieu', 'Das Konzert findet im Stadtpark statt.', 'Le concert a lieu dans le parc municipal.'),
+ ('kennen+lernen', 'faire connaissance', 'Im Kurs lerne ich nette Leute kennen.', 'Au cours, je fais la connaissance de gens sympathiques.'),
+ ('um+ziehen', 'déménager', 'Wir ziehen im Sommer in eine größere Wohnung um.', 'En été, nous déménageons dans un appartement plus grand.'),
+ ('um+steigen', 'changer (transport)', 'Ich steige am Hauptbahnhof in die U-Bahn um.', 'À la gare centrale, je change pour le métro.'),
+ ('nach+denken', 'réfléchir', 'Er denkt lange über die Frage nach.', 'Il réfléchit longtemps à la question.'),
+ ('her+kommen', 'venir ici', 'Komm bitte kurz her!', "Viens ici un instant, s'il te plaît !")]
+GUIDE_PERFEKT_HABEN = [('machen', 'hat gemacht', 'Ich habe gestern meine Hausaufgaben gemacht.', "Hier, j'ai fait mes devoirs."),
+ ('kaufen', 'hat gekauft', 'Wir haben ein neues Sofa gekauft.', 'Nous avons acheté un nouveau canapé.'),
+ ('kochen', 'hat gekocht', 'Meine Mutter hat Suppe gekocht.', 'Ma mère a préparé de la soupe.'),
+ ('lernen', 'hat gelernt', 'Er hat den ganzen Abend Deutsch gelernt.', "Il a appris l'allemand toute la soirée."),
+ ('spielen', 'hat gespielt', 'Die Kinder haben im Garten gespielt.', 'Les enfants ont joué dans le jardin.'),
+ ('arbeiten', 'hat gearbeitet', 'Ich habe heute zehn Stunden gearbeitet.', "J'ai travaillé dix heures aujourd'hui."),
+ ('wohnen', 'hat gewohnt', 'Wir haben fünf Jahre in Douala gewohnt.', 'Nous avons habité cinq ans à Douala.'),
+ ('fragen', 'hat gefragt', 'Sie hat den Polizisten nach dem Weg gefragt.', 'Elle a demandé son chemin au policier.'),
+ ('sagen', 'hat gesagt', 'Was hast du gerade gesagt?', "Qu'est-ce que tu viens de dire ?"),
+ ('hören', 'hat gehört', 'Hast du die Nachrichten gehört?', 'As-tu écouté les informations ?'),
+ ('suchen', 'hat gesucht', 'Ich habe überall meine Brille gesucht.', "J'ai cherché mes lunettes partout."),
+ ('brauchen', 'hat gebraucht', 'Für den Weg haben wir eine Stunde gebraucht.', 'Il nous a fallu une heure pour le trajet.'),
+ ('zeigen', 'hat gezeigt', 'Er hat mir seine neue Wohnung gezeigt.', "Il m'a montré son nouvel appartement."),
+ ('warten', 'hat gewartet', 'Wir haben lange auf den Arzt gewartet.', 'Nous avons attendu longtemps le médecin.'),
+ ('kosten', 'hat gekostet', 'Das Ticket hat vierzig Euro gekostet.', 'Le billet a coûté quarante euros.'),
+ ('putzen', 'hat geputzt', 'Ich habe am Morgen das Bad geputzt.', "Ce matin, j'ai nettoyé la salle de bains."),
+ ('tanzen', 'hat getanzt', 'Wir haben die ganze Nacht getanzt.', 'Nous avons dansé toute la nuit.'),
+ ('lachen', 'hat gelacht', 'Über den Witz haben alle gelacht.', 'Tout le monde a ri de la blague.'),
+ ('weinen', 'hat geweint', 'Das Mädchen hat beim Abschied geweint.', 'La fillette a pleuré au moment des adieux.'),
+ ('regnen', 'hat geregnet', 'Gestern hat es den ganzen Tag geregnet.', 'Hier, il a plu toute la journée.'),
+ ('schneien', 'hat geschneit', 'In der Nacht hat es geschneit.', 'Il a neigé pendant la nuit.'),
+ ('frühstücken', 'hat gefrühstückt', 'Hast du heute schon gefrühstückt?', "As-tu déjà pris ton petit-déjeuner aujourd'hui ?"),
+ ('duschen', 'hat geduscht', 'Nach dem Training habe ich geduscht.', "Après l'entraînement, je me suis douché."),
+ ('packen', 'hat gepackt', 'Sie hat ihren Koffer schon gepackt.', 'Elle a déjà fait sa valise.'),
+ ('schicken', 'hat geschickt', 'Ich habe dir gestern ein Foto geschickt.', "Je t'ai envoyé une photo hier."),
+ ('schenken', 'hat geschenkt', 'Mein Mann hat mir eine Uhr geschenkt.', "Mon mari m'a offert une montre."),
+ ('danken', 'hat gedankt', 'Sie hat mir herzlich für die Hilfe gedankt.', "Elle m'a chaleureusement remercié pour l'aide."),
+ ('glauben', 'hat geglaubt', 'Niemand hat ihm die Geschichte geglaubt.', "Personne n'a cru son histoire."),
+ ('leben', 'hat gelebt', 'Mein Großvater hat lange im Dorf gelebt.', 'Mon grand-père a longtemps vécu au village.'),
+ ('lieben', 'hat geliebt', 'Sie hat ihren Beruf immer geliebt.', 'Elle a toujours aimé son métier.'),
+ ('öffnen', 'hat geöffnet', 'Wer hat das Fenster geöffnet?', 'Qui a ouvert la fenêtre ?'),
+ ('rauchen', 'hat geraucht', 'Früher hat mein Onkel viel geraucht.', 'Autrefois, mon oncle fumait beaucoup.'),
+ ('träumen', 'hat geträumt', 'Ich habe heute Nacht schlecht geträumt.', "J'ai fait un mauvais rêve cette nuit."),
+ ('feiern', 'hat gefeiert', 'Wir haben meinen Geburtstag im Restaurant gefeiert.', 'Nous avons fêté mon anniversaire au restaurant.'),
+ ('heiraten', 'hat geheiratet', 'Meine Eltern haben sehr jung geheiratet.', 'Mes parents se sont mariés très jeunes.'),
+ ('bezahlen', 'hat bezahlt', 'Ich habe die Rechnung schon bezahlt.', "J'ai déjà payé la facture."),
+ ('besuchen', 'hat besucht', 'Am Wochenende haben wir meine Tante besucht.', 'Ce week-end, nous avons rendu visite à ma tante.'),
+ ('bestellen', 'hat bestellt', 'Er hat einen Salat und ein Wasser bestellt.', 'Il a commandé une salade et une eau.'),
+ ('erzählen', 'hat erzählt', 'Oma hat uns von ihrer Kindheit erzählt.', 'Mamie nous a parlé de son enfance.'),
+ ('erklären', 'hat erklärt', 'Die Lehrerin hat die Regel zweimal erklärt.', 'La professeure a expliqué la règle deux fois.'),
+ ('verkaufen', 'hat verkauft', 'Wir haben unser altes Auto verkauft.', 'Nous avons vendu notre vieille voiture.'),
+ ('verdienen', 'hat verdient', 'Letzten Monat hat sie gut verdient.', 'Le mois dernier, elle a bien gagné sa vie.'),
+ ('vermissen', 'hat vermisst', 'Ich habe dich so sehr vermisst!', "Tu m'as tellement manqué !"),
+ ('versuchen', 'hat versucht', 'Ich habe dreimal versucht, dich anzurufen.', "J'ai essayé trois fois de t'appeler."),
+ ('wiederholen', 'hat wiederholt', 'Der Lehrer hat den Satz langsam wiederholt.', 'Le professeur a répété la phrase lentement.'),
+ ('übersetzen', 'hat übersetzt', 'Sie hat den Brief ins Französische übersetzt.', 'Elle a traduit la lettre en français.'),
+ ('studieren', 'hat studiert', 'Mein Bruder hat in Bonn studiert.', 'Mon frère a fait ses études à Bonn.'),
+ ('telefonieren', 'hat telefoniert', 'Ich habe lange mit meiner Mutter telefoniert.', "J'ai longuement téléphoné à ma mère."),
+ ('reparieren', 'hat repariert', 'Der Nachbar hat mein Fahrrad repariert.', 'Le voisin a réparé mon vélo.'),
+ ('probieren', 'hat probiert', 'Hast du schon den Kuchen probiert?', 'As-tu déjà goûté le gâteau ?'),
+ ('fotografieren', 'hat fotografiert', 'Die Touristen haben den Dom fotografiert.', 'Les touristes ont photographié la cathédrale.'),
+ ('gratulieren', 'hat gratuliert', 'Alle haben mir zur Prüfung gratuliert.', "Tout le monde m'a félicité pour l'examen."),
+ ('einkaufen', 'hat eingekauft', 'Ich habe heute Morgen im Supermarkt eingekauft.', "Ce matin, j'ai fait les courses au supermarché."),
+ ('aufräumen', 'hat aufgeräumt', 'Die Kinder haben ihr Zimmer aufgeräumt.', 'Les enfants ont rangé leur chambre.'),
+ ('aufmachen', 'hat aufgemacht', 'Wer hat die Tür aufgemacht?', 'Qui a ouvert la porte ?'),
+ ('zumachen', 'hat zugemacht', 'Ich habe alle Fenster zugemacht.', "J'ai fermé toutes les fenêtres."),
+ ('abholen', 'hat abgeholt', 'Papa hat mich von der Schule abgeholt.', "Papa est venu me chercher à l'école."),
+ ('zuhören', 'hat zugehört', 'Du hast mir gar nicht zugehört!', "Tu ne m'as pas écouté du tout !"),
+ ('aufhören', 'hat aufgehört', 'Es hat endlich aufgehört zu regnen.', 'Il a enfin arrêté de pleuvoir.'),
+ ('vorbereiten', 'hat vorbereitet', 'Sie hat das Essen für die Gäste vorbereitet.', 'Elle a préparé le repas pour les invités.'),
+ ('ausfüllen', 'hat ausgefüllt', 'Ich habe das Formular schon ausgefüllt.', "J'ai déjà rempli le formulaire."),
+ ('essen', 'hat gegessen', 'Zu Mittag haben wir Fisch gegessen.', 'À midi, nous avons mangé du poisson.'),
+ ('trinken', 'hat getrunken', 'Ich habe heute zu viel Kaffee getrunken.', "J'ai bu trop de café aujourd'hui."),
+ ('schlafen', 'hat geschlafen', 'Hast du gut geschlafen?', 'As-tu bien dormi ?'),
+ ('lesen', 'hat gelesen', 'Sie hat das Buch in zwei Tagen gelesen.', 'Elle a lu le livre en deux jours.'),
+ ('schreiben', 'hat geschrieben', 'Ich habe meinem Chef eine E-Mail geschrieben.', "J'ai écrit un e-mail à mon chef."),
+ ('sehen', 'hat gesehen', 'Hast du meinen Schlüssel gesehen?', 'As-tu vu ma clé ?'),
+ ('sprechen', 'hat gesprochen', 'Wir haben über die Ferien gesprochen.', 'Nous avons parlé des vacances.'),
+ ('nehmen', 'hat genommen', 'Er hat ein Taxi zum Flughafen genommen.', "Il a pris un taxi pour l'aéroport."),
+ ('geben', 'hat gegeben', 'Die Lehrerin hat uns viele Hausaufgaben gegeben.', 'La professeure nous a donné beaucoup de devoirs.'),
+ ('finden', 'hat gefunden', 'Ich habe zwanzig Euro auf der Straße gefunden.', "J'ai trouvé vingt euros dans la rue."),
+ ('helfen', 'hat geholfen', 'Mein Freund hat mir beim Umzug geholfen.', "Mon ami m'a aidé pour le déménagement."),
+ ('treffen', 'hat getroffen', 'Ich habe Anna zufällig in der Stadt getroffen.', "J'ai rencontré Anna par hasard en ville."),
+ ('singen', 'hat gesungen', 'Der Chor hat sehr schön gesungen.', 'La chorale a très bien chanté.'),
+ ('bringen', 'hat gebracht', 'Der Postbote hat ein Paket gebracht.', 'Le facteur a apporté un colis.'),
+ ('denken', 'hat gedacht', 'Ich habe den ganzen Tag an dich gedacht.', "J'ai pensé à toi toute la journée."),
+ ('wissen', 'hat gewusst', 'Das habe ich wirklich nicht gewusst.', 'Je ne le savais vraiment pas.'),
+ ('kennen', 'hat gekannt', 'Ich habe ihn schon als Kind gekannt.', "Je le connaissais déjà quand j'étais enfant."),
+ ('stehen', 'hat gestanden', 'Wir haben eine Stunde im Stau gestanden.', 'Nous sommes restés une heure dans les embouteillages.'),
+ ('sitzen', 'hat gesessen', 'Im Kino habe ich neben Paul gesessen.', "Au cinéma, j'étais assis à côté de Paul."),
+ ('liegen', 'hat gelegen', 'Das Geld hat auf dem Küchentisch gelegen.', "L'argent était sur la table de la cuisine."),
+ ('tragen', 'hat getragen', 'Zur Hochzeit hat sie ein blaues Kleid getragen.', 'Pour le mariage, elle a porté une robe bleue.'),
+ ('waschen', 'hat gewaschen', 'Ich habe gestern das Auto gewaschen.', "Hier, j'ai lavé la voiture."),
+ ('schneiden', 'hat geschnitten', 'Der Friseur hat mir die Haare geschnitten.', "Le coiffeur m'a coupé les cheveux."),
+ ('schließen', 'hat geschlossen', 'Der Bäcker hat heute früher geschlossen.', "Le boulanger a fermé plus tôt aujourd'hui."),
+ ('verlieren', 'hat verloren', 'Ich habe im Bus mein Portemonnaie verloren.', "J'ai perdu mon portefeuille dans le bus."),
+ ('gewinnen', 'hat gewonnen', 'Unsere Mannschaft hat zwei zu null gewonnen.', 'Notre équipe a gagné deux à zéro.'),
+ ('vergessen', 'hat vergessen', 'Ich habe meinen Termin beim Zahnarzt vergessen.', "J'ai oublié mon rendez-vous chez le dentiste."),
+ ('verstehen', 'hat verstanden', 'Hast du die Aufgabe verstanden?', "As-tu compris l'exercice ?"),
+ ('bekommen', 'hat bekommen', 'Sie hat eine gute Note bekommen.', 'Elle a eu une bonne note.'),
+ ('beginnen', 'hat begonnen', 'Der Kurs hat letzte Woche begonnen.', 'Le cours a commencé la semaine dernière.'),
+ ('gefallen', 'hat gefallen', 'Der Film hat mir sehr gut gefallen.', "Le film m'a beaucoup plu."),
+ ('empfehlen', 'hat empfohlen', 'Der Kellner hat uns den Fisch empfohlen.', 'Le serveur nous a recommandé le poisson.'),
+ ('versprechen', 'hat versprochen', 'Du hast mir versprochen, pünktlich zu sein.', "Tu m'avais promis d'être à l'heure."),
+ ('unterschreiben', 'hat unterschrieben', 'Ich habe gestern den Mietvertrag unterschrieben.', "Hier, j'ai signé le contrat de location."),
+ ('anrufen', 'hat angerufen', 'Deine Schwester hat vorhin angerufen.', "Ta sœur a appelé tout à l'heure."),
+ ('anfangen', 'hat angefangen', 'Das Spiel hat schon angefangen.', 'Le match a déjà commencé.'),
+ ('einladen', 'hat eingeladen', 'Wir haben zwanzig Gäste eingeladen.', 'Nous avons invité vingt personnes.'),
+ ('mitbringen', 'hat mitgebracht', 'Ich habe dir etwas aus Paris mitgebracht.', "Je t'ai rapporté quelque chose de Paris."),
+ ('mitnehmen', 'hat mitgenommen', 'Er hat seinen Hund ins Büro mitgenommen.', 'Il a emmené son chien au bureau.'),
+ ('fernsehen', 'hat ferngesehen', 'Gestern Abend haben wir lange ferngesehen.', 'Hier soir, nous avons regardé la télévision longtemps.'),
+ ('anziehen', 'hat angezogen', 'Sie hat ihre neuen Schuhe angezogen.', 'Elle a mis ses nouvelles chaussures.'),
+ ('ausgeben', 'hat ausgegeben', 'Im Urlaub haben wir viel Geld ausgegeben.', "En vacances, nous avons dépensé beaucoup d'argent."),
+ ('teilnehmen', 'hat teilgenommen', 'Ich habe an einem Kochkurs teilgenommen.', "J'ai participé à un cours de cuisine."),
+ ('stattfinden', 'hat stattgefunden', 'Die Feier hat im Garten stattgefunden.', 'La fête a eu lieu dans le jardin.'),
+ ('bitten', 'hat gebeten', 'Er hat mich um Hilfe gebeten.', "Il m'a demandé de l'aide."),
+ ('leihen', 'hat geliehen', 'Ich habe ihm mein Fahrrad geliehen.', 'Je lui ai prêté mon vélo.'),
+ ('rufen', 'hat gerufen', 'Die Nachbarin hat die Polizei gerufen.', 'La voisine a appelé la police.'),
+ ('haben', 'hat gehabt', 'Letzte Woche habe ich Fieber gehabt.', "La semaine dernière, j'ai eu de la fièvre."),
+ ('backen', 'hat gebacken', 'Zum Fest hat sie drei Kuchen gebacken.', 'Pour la fête, elle a fait trois gâteaux.')]
+GUIDE_PERFEKT_SEIN = [('gehen', 'ist gegangen', 'Ich bin gestern früh ins Bett gegangen.', 'Hier, je suis allé au lit tôt.'),
+ ('kommen', 'ist gekommen', 'Mein Bruder ist heute zu spät gekommen.', "Mon frère est arrivé trop tard aujourd'hui."),
+ ('fahren', 'ist gefahren', 'Wir sind mit dem Zug nach München gefahren.', 'Nous sommes allés à Munich en train.'),
+ ('fliegen', 'ist geflogen', 'Sie ist letzte Woche nach Paris geflogen.', "Elle a pris l'avion pour Paris la semaine dernière."),
+ ('laufen', 'ist gelaufen', 'Ich bin heute zehn Kilometer gelaufen.', "J'ai couru dix kilomètres aujourd'hui."),
+ ('rennen', 'ist gerannt', 'Der Junge ist schnell nach Hause gerannt.', 'Le garçon a couru vite à la maison.'),
+ ('schwimmen', 'ist geschwommen', 'Wir sind im Meer geschwommen.', 'Nous avons nagé dans la mer.'),
+ ('reisen', 'ist gereist', 'Meine Tante ist viel durch Afrika gereist.', "Ma tante a beaucoup voyagé à travers l'Afrique."),
+ ('wandern', 'ist gewandert', 'Am Sonntag sind wir im Wald gewandert.', 'Dimanche, nous avons randonné dans la forêt.'),
+ ('springen', 'ist gesprungen', 'Die Katze ist auf den Tisch gesprungen.', 'Le chat a sauté sur la table.'),
+ ('fallen', 'ist gefallen', 'Das Glas ist auf den Boden gefallen.', 'Le verre est tombé par terre.'),
+ ('steigen', 'ist gestiegen', 'Der Preis für Benzin ist wieder gestiegen.', "Le prix de l'essence a encore augmenté."),
+ ('sinken', 'ist gesunken', 'Die Temperatur ist in der Nacht gesunken.', 'La température a baissé pendant la nuit.'),
+ ('bleiben', 'ist geblieben', 'Am Wochenende bin ich zu Hause geblieben.', 'Ce week-end, je suis resté à la maison.'),
+ ('sein', 'ist gewesen', 'Ich bin noch nie in Berlin gewesen.', 'Je ne suis encore jamais allé à Berlin.'),
+ ('werden', 'ist geworden', 'Meine Schwester ist Lehrerin geworden.', 'Ma sœur est devenue professeure.'),
+ ('passieren', 'ist passiert', 'Auf der Autobahn ist ein Unfall passiert.', "Un accident s'est produit sur l'autoroute."),
+ ('geschehen', 'ist geschehen', 'Zum Glück ist nichts Schlimmes geschehen.', "Heureusement, il ne s'est rien passé de grave."),
+ ('sterben', 'ist gestorben', 'Unsere alte Katze ist im Winter gestorben.', 'Notre vieux chat est mort en hiver.'),
+ ('wachsen', 'ist gewachsen', 'Die Tomaten im Garten sind schnell gewachsen.', 'Les tomates du jardin ont vite poussé.'),
+ ('folgen', 'ist gefolgt', 'Der Hund ist mir bis zur Tür gefolgt.', "Le chien m'a suivi jusqu'à la porte."),
+ ('landen', 'ist gelandet', 'Das Flugzeug ist pünktlich gelandet.', "L'avion a atterri à l'heure."),
+ ('klettern', 'ist geklettert', 'Die Kinder sind auf den Baum geklettert.', "Les enfants ont grimpé à l'arbre."),
+ ('reiten', 'ist geritten', 'Im Urlaub sind wir am Strand geritten.', 'En vacances, nous avons fait du cheval sur la plage.'),
+ ('fließen', 'ist geflossen', 'Das Wasser ist in den Keller geflossen.', "L'eau a coulé dans la cave."),
+ ('schmelzen', 'ist geschmolzen', 'Der Schnee ist schon geschmolzen.', 'La neige a déjà fondu.'),
+ ('gelingen', 'ist gelungen', 'Die Überraschung ist uns gelungen.', 'Nous avons réussi la surprise.'),
+ ('begegnen', 'ist begegnet', 'Ich bin meinem alten Lehrer begegnet.', "J'ai croisé mon ancien professeur."),
+ ('aufstehen', 'ist aufgestanden', 'Heute bin ich um fünf Uhr aufgestanden.', "Aujourd'hui, je me suis levé à cinq heures."),
+ ('aufwachen', 'ist aufgewacht', 'Ich bin mitten in der Nacht aufgewacht.', 'Je me suis réveillé en pleine nuit.'),
+ ('einschlafen', 'ist eingeschlafen', 'Das Baby ist im Auto eingeschlafen.', "Le bébé s'est endormi dans la voiture."),
+ ('ankommen', 'ist angekommen', 'Das Paket ist heute Morgen angekommen.', 'Le colis est arrivé ce matin.'),
+ ('abfahren', 'ist abgefahren', 'Der Bus ist vor zwei Minuten abgefahren.', 'Le bus est parti il y a deux minutes.'),
+ ('abfliegen', 'ist abgeflogen', 'Unser Flugzeug ist mit Verspätung abgeflogen.', 'Notre avion a décollé avec du retard.'),
+ ('einsteigen', 'ist eingestiegen', 'Sie ist in den falschen Zug eingestiegen.', 'Elle est montée dans le mauvais train.'),
+ ('aussteigen', 'ist ausgestiegen', 'Wir sind am Marktplatz ausgestiegen.', 'Nous sommes descendus à la place du marché.'),
+ ('umsteigen', 'ist umgestiegen', 'In Frankfurt bin ich umgestiegen.', "J'ai changé à Francfort."),
+ ('umziehen', 'ist umgezogen', 'Letztes Jahr sind wir nach Köln umgezogen.', "L'année dernière, nous avons déménagé à Cologne."),
+ ('einziehen', 'ist eingezogen', 'Die neue Nachbarin ist gestern eingezogen.', 'La nouvelle voisine a emménagé hier.'),
+ ('ausgehen', 'ist ausgegangen', 'Am Samstag sind wir tanzen ausgegangen.', 'Samedi, nous sommes sortis danser.'),
+ ('weggehen', 'ist weggegangen', 'Er ist ohne Jacke weggegangen.', 'Il est parti sans veste.'),
+ ('zurückkommen', 'ist zurückgekommen', 'Wann bist du aus Kamerun zurückgekommen?', 'Quand es-tu revenu du Cameroun ?'),
+ ('mitkommen', 'ist mitgekommen', 'Meine Freundin ist zum Arzt mitgekommen.', 'Mon amie est venue avec moi chez le médecin.'),
+ ('vorbeikommen', 'ist vorbeigekommen', 'Gestern ist mein Cousin kurz vorbeigekommen.', 'Hier, mon cousin est passé un moment.'),
+ ('hereinkommen', 'ist hereingekommen', 'Der Lehrer ist leise hereingekommen.', 'Le professeur est entré sans bruit.'),
+ ('spazieren gehen', 'ist spazieren gegangen', 'Nach dem Essen sind wir spazieren gegangen.', 'Après le repas, nous sommes allés nous promener.'),
+ ('einkaufen gehen', 'ist einkaufen gegangen', 'Mama ist schon einkaufen gegangen.', 'Maman est déjà partie faire les courses.'),
+ ('schwimmen gehen', 'ist schwimmen gegangen', 'Am Nachmittag sind die Kinder schwimmen gegangen.', "L'après-midi, les enfants sont allés nager."),
+ ('aufgehen', 'ist aufgegangen', 'Die Sonne ist heute um sechs Uhr aufgegangen.', "Le soleil s'est levé à six heures aujourd'hui."),
+ ('untergehen', 'ist untergegangen', 'Die Sonne ist schon untergegangen.', 'Le soleil est déjà couché.'),
+ ('kaputtgehen', 'ist kaputtgegangen', 'Unser Fernseher ist kaputtgegangen.', 'Notre télévision est tombée en panne.'),
+ ('durchfallen', 'ist durchgefallen', 'Mein Freund ist bei der Fahrprüfung durchgefallen.', "Mon ami a échoué à l'examen du permis de conduire."),
+ ('hinfallen', 'ist hingefallen', 'Das Kind ist auf dem Spielplatz hingefallen.', "L'enfant est tombé sur l'aire de jeux."),
+ ('losfahren', 'ist losgefahren', 'Wir sind um sieben Uhr losgefahren.', 'Nous sommes partis à sept heures.'),
+ ('wegfahren', 'ist weggefahren', 'Die Nachbarn sind in den Urlaub weggefahren.', 'Les voisins sont partis en vacances.'),
+ ('zurückfahren', 'ist zurückgefahren', 'Am Abend sind wir nach Hause zurückgefahren.', 'Le soir, nous sommes rentrés à la maison.'),
+ ('verschwinden', 'ist verschwunden', 'Meine Tasche ist plötzlich verschwunden.', 'Mon sac a soudain disparu.'),
+ ('erscheinen', 'ist erschienen', 'Sein neues Buch ist im März erschienen.', 'Son nouveau livre est paru en mars.'),
+ ('entstehen', 'ist entstanden', 'Hier ist ein neues Stadtviertel entstanden.', 'Un nouveau quartier a vu le jour ici.'),
+ ('platzen', 'ist geplatzt', 'Der Reifen vom Fahrrad ist geplatzt.', 'Le pneu du vélo a éclaté.'),
+ ('explodieren', 'ist explodiert', 'In der Fabrik ist ein Tank explodiert.', "Une cuve a explosé dans l'usine."),
+ ('ausrutschen', 'ist ausgerutscht', 'Ich bin auf dem nassen Boden ausgerutscht.', "J'ai glissé sur le sol mouillé."),
+ ('stolpern', 'ist gestolpert', 'Er ist über einen Stein gestolpert.', 'Il a trébuché sur une pierre.'),
+ ('erschrecken', 'ist erschrocken', 'Ich bin bei dem lauten Knall erschrocken.', "J'ai sursauté à cause de la forte détonation."),
+ ('gefrieren', 'ist gefroren', 'Das Wasser im Eimer ist gefroren.', "L'eau dans le seau a gelé."),
+ ('trocknen', 'ist getrocknet', 'Die Wäsche ist in der Sonne schnell getrocknet.', 'Le linge a vite séché au soleil.'),
+ ('heilen', 'ist geheilt', 'Die Wunde ist gut geheilt.', 'La plaie a bien guéri.'),
+ ('auswandern', 'ist ausgewandert', 'Mein Onkel ist nach Kanada ausgewandert.', 'Mon oncle a émigré au Canada.'),
+ ('fliehen', 'ist geflohen', 'Viele Menschen sind vor dem Krieg geflohen.', 'Beaucoup de gens ont fui la guerre.'),
+ ('kriechen', 'ist gekrochen', 'Das Baby ist durch das ganze Zimmer gekrochen.', 'Le bébé a rampé dans toute la pièce.')]
+# (lettre, nom de la lettre « à la française », mot exemple, traduction)
+GUIDE_ALPHABET = [
+    ("A", "a", "der Apfel", "la pomme"), ("B", "bé", "das Brot", "le pain"), ("C", "tsé", "der Computer", "l'ordinateur"),
+    ("D", "dé", "die Dose", "la boîte"), ("E", "é", "die Ente", "le canard"), ("F", "èf", "der Fisch", "le poisson"),
+    ("G", "gué", "der Garten", "le jardin"), ("H", "ha", "das Haus", "la maison"), ("I", "i", "die Insel", "l'île"),
+    ("J", "yot", "die Jacke", "la veste"), ("K", "ka", "die Katze", "le chat"), ("L", "èl", "die Lampe", "la lampe"),
+    ("M", "èm", "die Mutter", "la mère"), ("N", "èn", "die Nase", "le nez"), ("O", "o", "das Obst", "les fruits"),
+    ("P", "pé", "das Papier", "le papier"), ("Q", "kou", "die Quelle", "la source"), ("R", "èr", "der Regen", "la pluie"),
+    ("S", "ès", "die Sonne", "le soleil"), ("T", "té", "der Tisch", "la table"), ("U", "ou", "die Uhr", "la montre"),
+    ("V", "faou", "der Vater", "le père"), ("W", "vé", "das Wasser", "l'eau"), ("X", "iks", "das Xylofon", "le xylophone"),
+    ("Y", "upsilone", "das Yoga", "le yoga"), ("Z", "tsèt", "die Zeit", "le temps"),
+    ("Ä", "è (a tréma)", "der Käse", "le fromage"), ("Ö", "eu (o tréma)", "das Öl", "l'huile"),
+    ("Ü", "u (u tréma)", "die Tür", "la porte"), ("ß", "ès-tsèt (s dur)", "die Straße", "la rue"),
+]
+_GUIDE_ALPHA_FR = {"Ä": "A tréma", "Ö": "O tréma", "Ü": "U tréma", "ß": "Eszett, le S dur"}
+# (graphie, comment ça se prononce, mot exemple, traduction)
+GUIDE_SOUNDS = [
+    ("ei", "se dit « aï »", "das Ei", "l'œuf"), ("ie", "se dit « i » long", "die Liebe", "l'amour"),
+    ("eu", "se dit « oï »", "der Freund", "l'ami"), ("äu", "se dit « oï »", "die Häuser", "les maisons"),
+    ("au", "se dit « aou »", "das Auto", "la voiture"), ("ch", "son soufflé, comme dans « ich »", "ich", "je"),
+    ("ch", "son raclé après a, o, u", "das Buch", "le livre"), ("sch", "se dit « ch »", "die Schule", "l'école"),
+    ("sp", "au début d'un mot : « chp »", "der Sport", "le sport"), ("st", "au début d'un mot : « cht »", "die Stadt", "la ville"),
+    ("z", "se dit « ts »", "der Zug", "le train"), ("v", "se dit souvent « f »", "der Vogel", "l'oiseau"),
+    ("w", "se dit « v »", "der Wein", "le vin"), ("j", "se dit « y »", "das Jahr", "l'année"),
+    ("qu", "se dit « kv »", "die Qualität", "la qualité"), ("h", "après une voyelle : il allonge la voyelle", "der Stuhl", "la chaise"),
+    ("s", "devant une voyelle : « z »", "die Sonne", "le soleil"), ("ig", "à la fin d'un mot : « ich »", "billig", "bon marché"),
+    ("pf", "on prononce les deux lettres", "das Pferd", "le cheval"), ("tsch", "se dit « tch »", "Deutsch", "allemand"),
+]
+
+def _guide_playlists():
+    """Playlists du guide. Règle stricte : « fr » = texte FRANÇAIS (voix française), « de » = texte ALLEMAND (voix allemande)."""
+    pls = {}
+    pls["Guide : l'alphabet allemand"] = [
+        {"fr": "La lettre " + _GUIDE_ALPHA_FR.get(L, L), "de": f"{L}, wie {w}"} for L, _n, w, _f in GUIDE_ALPHABET]
+    for title, rows in GUIDE_VERBS:
+        pls["Guide verbes : " + title] = [{"fr": f"{vfr} : {sfr}", "de": f"{v}. {sde}"} for v, vfr, sde, sfr in rows]
+    pls["Guide : verbes séparables"] = [
+        {"fr": f"{vfr} : {sfr}", "de": f"{v.replace('+', '')}. {sde}"} for v, vfr, sde, sfr in GUIDE_TRENNBAR]
+    pls["Guide : Perfekt avec haben"] = [{"fr": sfr, "de": f"{v}, {pp}. {sde}"} for v, pp, sde, sfr in GUIDE_PERFEKT_HABEN]
+    pls["Guide : Perfekt avec sein"] = [{"fr": sfr, "de": f"{v}, {pp}. {sde}"} for v, pp, sde, sfr in GUIDE_PERFEKT_SEIN]
+    return pls
+
+@app.route("/guide")
+@login_required
+def guide():
+    small = "padding:4px 10px;font-size:12px;"
+    pls = _guide_playlists()
+
+    def row(head_html, sde, sfr, de_say, key):
+        # 🇩🇪 = allemand seul (voix allemande) ; ▶ = phrase française (voix française) puis phrase allemande (voix allemande)
+        return f"""
+        <div class="gd-row" data-k="{h(key.lower(), quote=True)}">
+          <div class="gd-main">{head_html}
+            <span class="gd-ex">🇩🇪 {h(sde)}</span>
+            <span class="gd-ex nk-fr">🇫🇷 {h(sfr)}</span>
+          </div>
+          <div class="gd-btns">
+            {say_btn("🇩🇪", "de", "", de_say, css="btn ghost", style=small)}
+            {say_btn("▶", "pair", sfr, sde, css="btn ghost", style=small)}
+          </div>
+        </div>"""
+
+    def head(title, sub, pl_title, anchor):
+        return f"""
+        <div class="card nk-group" id="{anchor}" style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;border-left:5px solid var(--warn);">
+          <div><h2 style="margin:0">{h(title)}</h2>
+          <p style="color:var(--muted);font-size:13px;margin:4px 0 0 0;">{h(sub)}</p></div>
+          {playlist_btn("▶ Écouter cette partie", "guide", pl_title, css="btn ok")}
+        </div>"""
+
+    # --- 1. alphabet ---
+    letters = ""
+    for L, nm, w, wfr in GUIDE_ALPHABET:
+        shown = L if L == "ß" else f"{L} {L.lower()}"
+        letters += f"""
+        <div class="gd-letter"><span class="big">{h(shown)}</span>
+          <span class="nk-fr">se dit « {h(nm)} »</span><br><b>{h(w)}</b> <span class="nk-fr">— {h(wfr)}</span><br>
+          {say_btn("🔊 " + h(L), "de", "", L, css="btn ghost", style=small)}
+          {say_btn("🔊 mot", "de", "", w, css="btn ghost", style=small)}
+        </div>"""
+    sounds = ""
+    for g, how, w, wfr in GUIDE_SOUNDS:
+        sounds += f"""
+        <div class="nk-pair"><div class="nk-txt"><b>{h(g)}</b> <span class="nk-fr">— {h(how)}</span> · <b>{h(w)}</b> <span class="nk-fr">— {h(wfr)}</span></div>
+          {say_btn("🔊", "de", "", w, css="btn ghost", style=small)}</div>"""
+    alpha_html = head("L'alphabet allemand", "26 lettres + Ä, Ö, Ü et ß — avec un mot pour chaque lettre",
+                      "Guide : l'alphabet allemand", "gd-alpha") + f"""
+        <div class="nomakk-section"><h3>Les 30 lettres</h3>
+          <div class="gd-alpha">{letters}</div>
+          <div class="explanation">💡 Pour épeler ton nom au téléphone, dis les lettres une par une. Exemple : N-A-T-H-O.</div>
+        </div>
+        <div class="nomakk-section"><h3>Les sons particuliers</h3>
+          <div class="content nk-content">{sounds}</div>
+          <div class="explanation">💡 En allemand, on prononce presque toutes les lettres. Retiens surtout : ei = « aï », ie = « i », eu = « oï », w = « v », z = « ts ».</div>
+        </div>"""
+
+    # --- 2. les 450 verbes ---
+    n_verbs = sum(len(rows) for _t, rows in GUIDE_VERBS)
+    verbs_html = f"""
+        <div class="card nk-group" id="gd-verbes" style="border-left:5px solid var(--warn);">
+          <h2 style="margin:0">Les {n_verbs} verbes les plus utilisés</h2>
+          <p style="color:var(--muted);font-size:13px;margin:4px 0 10px 0;">Chaque verbe a sa phrase de la vie de tous les jours. 🇩🇪 = écouter l'allemand · ▶ = français puis allemand.</p>
+          <input type="text" id="gd-search" placeholder="🔎 Chercher un verbe (allemand ou français)…" autocomplete="off" style="margin:0;">
+          <p id="gd-count" style="color:var(--muted);font-size:12px;margin:6px 0 0 0;"></p>
+        </div>"""
+    num = 0
+    for gi, (title, rows) in enumerate(GUIDE_VERBS):
+        body_rows = ""
+        for v, vfr, sde, sfr in rows:
+            num += 1
+            body_rows += row(f'<b>{num}. {h(v)}</b> <span class="nk-fr">— {h(vfr)}</span>', sde, sfr, f"{v}. {sde}", f"{v} {vfr}")
+        verbs_html += f"""
+        <div class="nomakk-section gd-vgroup" id="gd-v{gi + 1}">
+          <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;">
+            <h3 style="margin:0">{h(title)}</h3>
+            {playlist_btn("▶ Écouter", "guide", "Guide verbes : " + title, css="btn ok")}
+          </div>
+          <div class="content nk-content">{body_rows}</div>
+        </div>"""
+
+    # --- 3. verbes séparables ---
+    tr_rows = ""
+    for v, vfr, sde, sfr in GUIDE_TRENNBAR:
+        pre, _, base = v.partition("+")
+        tr_rows += row(f'<b><span class="gd-pp">{h(pre)}</span>{h(base)}</b> <span class="nk-fr">— {h(vfr)}</span>',
+                       sde, sfr, f"{pre + base}. {sde}", f"{pre + base} {vfr}")
+    trenn_html = head("Les verbes séparables (trennbare Verben)", f"{len(GUIDE_TRENNBAR)} verbes avec une phrase chacun",
+                      "Guide : verbes séparables", "gd-trennbar") + f"""
+        <div class="nomakk-section"><h3>La règle</h3>
+          <div class="content nk-content">
+            <div class="nk-line">Un verbe séparable = un petit mot (la particule) + un verbe : <b><span class="gd-pp">auf</span>stehen</b>, <b><span class="gd-pp">an</span>rufen</b>, <b><span class="gd-pp">ein</span>kaufen</b>.</div>
+            <div class="nk-line">1) Au présent, le verbe est conjugué en 2ᵉ position et la particule part <b>à la fin</b> de la phrase : Ich <b>stehe</b> um sechs Uhr <b>auf</b>.</div>
+            <div class="nk-line">2) Avec un verbe de modalité, le verbe reste entier à la fin : Ich muss um sechs Uhr <b>aufstehen</b>.</div>
+            <div class="nk-line">3) Au Perfekt, « ge » se met au milieu : auf<b>ge</b>standen, an<b>ge</b>rufen, ein<b>ge</b>kauft.</div>
+            <div class="nk-line">Particules séparables courantes : ab, an, auf, aus, ein, mit, vor, zu, zurück, weg, her, fern, teil, statt, um, nach.</div>
+            <div class="nk-line">Attention : be-, ge-, er-, ver-, zer-, ent-, emp-, miss- ne se séparent jamais (besuchen, verstehen, erzählen).</div>
+          </div>
+        </div>
+        <div class="nomakk-section"><h3>Les verbes et leurs phrases</h3>
+          <div class="content nk-content">{tr_rows}</div>
+          <div class="explanation">💡 La particule (en couleur) porte l'accent : on dit AUFstehen, ANrufen, EINkaufen.</div>
+        </div>"""
+
+    # --- 4. Perfekt ---
+    def perfekt_rows(data):
+        out = ""
+        for v, pp, sde, sfr in data:
+            out += row(f'<b>{h(v)}</b> → <span class="gd-pp">{h(pp)}</span>', sde, sfr, f"{v}, {pp}. {sde}", f"{v} {pp}")
+        return out
+    n_perf = len(GUIDE_PERFEKT_HABEN) + len(GUIDE_PERFEKT_SEIN)
+    perfekt_html = f"""
+        <div class="card nk-group" id="gd-perfekt" style="border-left:5px solid var(--warn);">
+          <h2 style="margin:0">Le Perfekt (le passé) avec haben et sein</h2>
+          <p style="color:var(--muted);font-size:13px;margin:4px 0 0 0;">{n_perf} exemples : {len(GUIDE_PERFEKT_HABEN)} avec haben, {len(GUIDE_PERFEKT_SEIN)} avec sein</p>
+        </div>
+        <div class="nomakk-section"><h3>La règle</h3>
+          <div class="content nk-content">
+            <div class="nk-line">Perfekt = <b>haben</b> ou <b>sein</b> conjugué (2ᵉ position) + <b>participe passé</b> à la fin : Ich <b>habe</b> Brot <b>gekauft</b>. Ich <b>bin</b> nach Hause <b>gegangen</b>.</div>
+            <div class="nk-line">• <b>haben</b> : la grande majorité des verbes (machen, essen, kaufen, sehen…).</div>
+            <div class="nk-line">• <b>sein</b> : les verbes de <b>déplacement</b> (gehen, fahren, fliegen, kommen), de <b>changement d'état</b> (aufwachen, einschlafen, wachsen, sterben) et trois exceptions : <b>sein, bleiben, werden</b>.</div>
+            <div class="nk-line">• Participe régulier : ge + radical + t → machen : <b>gemacht</b>. Participe irrégulier : ge + radical + en → sehen : <b>gesehen</b>.</div>
+            <div class="nk-line">• Verbes en -ieren et verbes en be-, ver-, er- : pas de « ge » → studiert, besucht, verkauft, erzählt.</div>
+            <div class="nk-line">• Verbes séparables : « ge » au milieu → eingekauft, aufgestanden.</div>
+          </div>
+        </div>
+        <div class="nomakk-section" id="gd-haben">
+          <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;">
+            <h3 style="margin:0">Perfekt avec haben — {len(GUIDE_PERFEKT_HABEN)} exemples</h3>
+            {playlist_btn("▶ Écouter", "guide", "Guide : Perfekt avec haben", css="btn ok")}
+          </div>
+          <div class="content nk-content">{perfekt_rows(GUIDE_PERFEKT_HABEN)}</div>
+        </div>
+        <div class="nomakk-section" id="gd-sein">
+          <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;">
+            <h3 style="margin:0">Perfekt avec sein — {len(GUIDE_PERFEKT_SEIN)} exemples</h3>
+            {playlist_btn("▶ Écouter", "guide", "Guide : Perfekt avec sein", css="btn ok")}
+          </div>
+          <div class="content nk-content">{perfekt_rows(GUIDE_PERFEKT_SEIN)}</div>
+          <div class="explanation">💡 Astuce : si le verbe exprime un déplacement d'un point A à un point B ou un changement d'état, utilise sein. Sinon, haben.</div>
+        </div>"""
+
+    chips = ('<a class="nk-chip" href="#gd-alpha">🔤 Alphabet</a>'
+             f'<a class="nk-chip" href="#gd-verbes">📗 {n_verbs} verbes</a>'
+             '<a class="nk-chip" href="#gd-trennbar">✂️ Verbes séparables</a>'
+             '<a class="nk-chip" href="#gd-haben">⏪ Perfekt haben</a>'
+             '<a class="nk-chip" href="#gd-sein">⏪ Perfekt sein</a>')
+    script = """
+    <script>
+    (function(){
+      var inp = document.getElementById('gd-search');
+      var cnt = document.getElementById('gd-count');
+      if (!inp) return;
+      inp.addEventListener('input', function(){
+        var q = inp.value.trim().toLowerCase();
+        var shown = 0;
+        var groups = document.querySelectorAll('.gd-vgroup');
+        for (var g = 0; g < groups.length; g++) {
+          var rows = groups[g].querySelectorAll('.gd-row');
+          var any = false;
+          for (var i = 0; i < rows.length; i++) {
+            var ok = !q || (rows[i].getAttribute('data-k') || '').indexOf(q) !== -1;
+            rows[i].style.display = ok ? '' : 'none';
+            if (ok) { any = true; shown++; }
+          }
+          groups[g].style.display = any ? '' : 'none';
+        }
+        cnt.textContent = q ? (shown + ' verbe(s) trouvé(s)') : '';
+      });
+    })();
+    </script>
+    """
+    body = f"""
+    <h1>Guide 📘</h1>
+    <p style="margin-bottom:16px;color:#5B7A90;">
+      Ton aide-mémoire : l'alphabet, les {n_verbs} verbes les plus utilisés au quotidien avec une phrase pour chacun,
+      les verbes séparables et le Perfekt avec haben et sein ({n_perf} exemples).
+      L'allemand est toujours lu par la voix allemande et le français par la voix française.
+    </p>
+    <div class="nk-chips">{chips}</div>
+    {alpha_html}
+    {verbs_html}
+    {trenn_html}
+    {perfekt_html}
+    {playlist_data_script({"guide": pls})}
+    {script}
+    """
+    return page(layout("Guide", body, {"is_admin": session.get("is_admin")}))
+
 
 @app.route("/playlists")
 @login_required
