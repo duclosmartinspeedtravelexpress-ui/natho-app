@@ -4,6 +4,7 @@
 # + Apprendre à parler + Essentiels A1 + Mode nuit + Menu mobile
 # + NOM/AKK (Nominativ vs Akkusativ) + NEFERTI (bot Sprechen)
 # v4.1 : correctifs (sécurité, playlists, progression, Goethe, Neferti, contenu)
+# v4.9 : page Playlists — ajout des 500 verbes, du dictionnaire (A à Z) et du Guide, avec « Lire tout »
 # v4.8 : écran éteint — chaque élément de playlist est un MP3 assemblé par le serveur (préparé à l'avance), plus rien à calculer sur le téléphone
 # v4.7 : lecture en arrière-plan fiable (voix serveur intégrée sans gTTS, un fichier audio de 5,5 s+ par élément pour les commandes de l'écran de verrouillage), test de la voix dans l'admin
 # v4.6 : écoute écran éteint (lecteur type Spotify + barre de défilement), dictionnaire FR→DE de 3000+ mots, installation directe de l'app, CSS mobile
@@ -5444,6 +5445,8 @@ html.standalone .install-btn { display: none !important; }
   .stat-grid { grid-template-columns: 1fr 1fr; gap: 8px; }
 }
 
+.pl-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 0 12px; }
+@media (max-width: 560px) { .pl-grid { grid-template-columns: 1fr 1fr; } .pl-grid .card { padding: 12px; flex-direction: column; align-items: stretch !important; } .pl-grid .card .btn { width: 100%; } }
 .neferti-example { flex-basis: 100%; background: var(--sky-light); border-radius: 10px; padding: 12px; font-size: 14px; line-height: 1.6; }
 </style>
 """
@@ -5546,7 +5549,10 @@ AUDIO_JS = r"""
     vocab: 'Tout le vocabulaire',
     lessons: 'Toutes les phrases',
     mix: 'Phrases + vocabulaire',
-    dialogues: 'Tous les dialogues'
+    dialogues: 'Tous les dialogues',
+    'kind:verbes500': 'Les 500 verbes du quotidien',
+    'kind:dico': 'Tout le dictionnaire français → allemand',
+    'kind:guide': 'Tout le Guide (alphabet, verbes, séparables, Perfekt)'
   };
 
   function sleep(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
@@ -6093,6 +6099,7 @@ AUDIO_JS = r"""
       if (key === 'lessons') return flat('lessons');
       if (key === 'mix') return flat('lessons').concat(flat('vocab'));
       if (key === 'dialogues') return flat('dialogues');
+      if (key && key.indexOf('kind:') === 0) return flat(key.slice(5));
       return null;
     }
     return d[kind] && d[kind][key];
@@ -6613,7 +6620,7 @@ def layout(title, body, user=None):
 <audio id="natho-audio" preload="auto" playsinline></audio>
 
 <footer>
-    © NATHO — Plateforme d'apprentissage de l'allemand A1 · v4.8<br>
+    © NATHO — Plateforme d'apprentissage de l'allemand A1 · v4.9<br>
     <a href="/politique">Politique de confidentialité</a> |
     <a href="/cgu">Conditions d'utilisation</a> |
     <a href="/mentions">Mentions légales</a>
@@ -12883,7 +12890,7 @@ def _dico_key(fr):
         if s.startswith(p) and len(s) > len(p) + 1:
             s = s[len(p):]
             break
-    s = unicodedata.normalize("NFD", s)
+    s = unicodedata.normalize("NFD", s.replace("œ", "oe").replace("æ", "ae"))
     return "".join(c for c in s if not unicodedata.combining(c))
 
 def _dico_norm(s):
@@ -13002,7 +13009,19 @@ def playlists():
     n_vocab = sum(len(v) for v in playlist_data_vocab.values())
     n_dialogues = sum(len(v) for v in playlist_data_dialogues.values())
 
+    # v4.9 : 500 verbes, dictionnaire (A à Z) et Guide aussi dans les playlists
+    playlist_data_verbes500 = _verbes500_playlists()
+    playlist_data_dico = {f"Dictionnaire : lettre {l}": [{"fr": fr, "de": de} for fr, de in DICO_BY_LETTER.get(l, [])]
+                          for l in DICO_LETTERS if DICO_BY_LETTER.get(l)}
+    playlist_data_guide = _guide_playlists()
+    n_verbes500 = sum(len(v) for v in playlist_data_verbes500.values())
+    n_dico = sum(len(v) for v in playlist_data_dico.values())
+    n_guide = sum(len(v) for v in playlist_data_guide.values())
+
     js_payload = ({
+        "verbes500": playlist_data_verbes500,
+        "dico": playlist_data_dico,
+        "guide": playlist_data_guide,
         "lessons": playlist_data_lessons,
         "vocab": playlist_data_vocab,
         "dialogues": playlist_data_dialogues,
@@ -13115,12 +13134,61 @@ def playlists():
         </div>
         """
 
+    def _pl_card(title, sub, kind, key, css="btn ok", extra=""):
+        return f"""
+        <div class="card" style="display:flex; justify-content:space-between; align-items:center; gap:10px;{extra}">
+            <div style="min-width:0;">
+                <h3 style="margin:0">{h(title)}</h3>
+                <p style="color:var(--muted);font-size:14px;margin:4px 0 0 0">{h(sub)}</p>
+            </div>
+            {playlist_btn("▶ Playlist", kind, key, css=css)}
+        </div>"""
+
+    cards_all += f"""
+        <div class="card" style="display:flex; justify-content:space-between; align-items:center;">
+            <div>
+                <h3 style="margin:0">Les 500 verbes du quotidien</h3>
+                <p style="color:var(--muted);font-size:14px;margin:4px 0 0 0">{n_verbes500} verbes avec leur phrase, en un seul bloc.</p>
+            </div>
+            {playlist_btn("▶ Lire tout", "all", "kind:verbes500", css="btn ok")}
+        </div>
+        <div class="card" style="display:flex; justify-content:space-between; align-items:center;">
+            <div>
+                <h3 style="margin:0">Tout le dictionnaire de A à Z</h3>
+                <p style="color:var(--muted);font-size:14px;margin:4px 0 0 0">{n_dico} mots en un seul bloc.</p>
+            </div>
+            {playlist_btn("▶ Lire tout", "all", "kind:dico", css="btn ok")}
+        </div>
+        <div class="card" style="display:flex; justify-content:space-between; align-items:center;">
+            <div>
+                <h3 style="margin:0">Tout le Guide</h3>
+                <p style="color:var(--muted);font-size:14px;margin:4px 0 0 0">{n_guide} éléments : alphabet, verbes, séparables, Perfekt.</p>
+            </div>
+            {playlist_btn("▶ Lire tout", "all", "kind:guide", css="btn ok")}
+        </div>
+    """
+    cards_verbes500 = "".join(_pl_card(t.replace("500 verbes : ", ""), f"{len(v)} verbes avec leur phrase.", "verbes500", t)
+                              for t, v in playlist_data_verbes500.items())
+    cards_dico = "".join(_pl_card(t.replace("Dictionnaire : lettre ", "Lettre "), f"{len(v)} mots.", "dico", t)
+                         for t, v in playlist_data_dico.items())
+    cards_guide = "".join(_pl_card(t.replace("Guide verbes : ", "Verbes : ").replace("Guide : ", ""), f"{len(v)} éléments.", "guide", t)
+                          for t, v in playlist_data_guide.items())
+
     body = f"""
     <h1>Playlists Audio 🎵</h1>
     <p style="margin-bottom:20px;color:var(--muted);">Le mode Spotify de NATHO. Choisis ce que tu veux écouter.</p>
 
     <h2>🎧 Blocs complets</h2>
     {cards_all}
+
+    <h2 style="margin-top:30px;">🇫🇷🇩🇪 Les 500 verbes du quotidien</h2>
+    {cards_verbes500}
+
+    <h2 style="margin-top:30px;">📕 Dictionnaire de A à Z</h2>
+    <div class="pl-grid">{cards_dico}</div>
+
+    <h2 style="margin-top:30px;">📘 Guide</h2>
+    {cards_guide}
 
     <h2 style="margin-top:30px;">⚖️ NOM/AKK/DATIV/GENITIV</h2>
     {cards_nomakk}
