@@ -4,6 +4,8 @@
 # + Apprendre à parler + Essentiels A1 + Mode nuit + Menu mobile
 # + NOM/AKK (Nominativ vs Akkusativ) + NEFERTI (bot Sprechen)
 # v4.1 : correctifs (sécurité, playlists, progression, Goethe, Neferti, contenu)
+# v4.6 : écoute écran éteint (lecteur type Spotify + barre de défilement), dictionnaire FR→DE de 3000+ mots, installation directe de l'app, CSS mobile
+# v4.5 : bouton « Télécharger l'app » (APK Android) + page « 500 verbes » français → allemand
 # v4.4 : examen Goethe A1 refait (Hören 3 Teile, Lesen 4, Schreiben 2, Sprechen 3), tout en allemand, noté sur 100
 # v4.3 : Neferti (recommencer, présentation unique, micro à envoi manuel) + Guide (alphabet, 450 verbes, séparables, Perfekt)
 # v4.2 : sécurité renforcée, cours Datif/Génitif, Neferti intelligente (1000+ questions), dialogues uniques
@@ -18,6 +20,8 @@ import random
 import re
 import stat
 import hmac
+import unicodedata
+import base64
 import time
 from html import escape as h
 from urllib.parse import urlparse
@@ -5371,9 +5375,132 @@ html[data-theme="dark"] .msg.user    { background: #1e4a35; color: #D4F5E3; }
 .gd-alpha { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; }
 .gd-letter { background: var(--input-bg); border: 1px solid var(--border-light); border-radius: 12px; padding: 10px; text-align: center; font-size: 13px; }
 .gd-letter .big { font-size: 26px; font-weight: 800; display: block; }
+.apk-btn { background: #2ecc71; color: #fff !important; text-decoration: none; font-weight: 700; font-size: 13px;
+  padding: 7px 12px; border-radius: 999px; white-space: nowrap; box-shadow: 0 2px 6px rgba(0,0,0,.15); }
+.apk-btn:hover { background: #27ae60; }
+.apk-btn.apk-missing { background: #f39c12; }
+@media (max-width: 560px) { .apk-btn { font-size: 12px; padding: 6px 10px; } }
+/* === v4.6 : dictionnaire, lecteur audio, installation, mobile === */
+.dico-search { display: flex; gap: 8px; align-items: center; }
+.dico-search input { flex: 1; min-width: 0; }
+.dico-letters { display: grid; grid-template-columns: repeat(13, 1fr); gap: 6px; margin: 12px 0 16px; }
+.dico-l { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 7px 0; border-radius: 10px;
+  background: var(--card-bg); border: 1px solid var(--border-light); color: var(--ink); text-decoration: none; font-weight: 800; font-size: 16px; }
+.dico-l small { font-size: 10px; font-weight: 600; color: var(--muted); }
+.dico-l.active { background: var(--sky-dark); color: #fff; border-color: var(--sky-dark); }
+.dico-l.active small { color: #e8f6fd; }
+.dico-row { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 8px 0; border-bottom: 1px dashed var(--border-light); }
+.dico-w { flex: 1; min-width: 0; font-size: 14px; line-height: 1.5; overflow-wrap: anywhere; }
+.dico-arrow { color: var(--muted); }
+.dico-de { color: var(--sky-dark); font-weight: 700; }
+@media (max-width: 560px) { .dico-letters { grid-template-columns: repeat(7, 1fr); } }
+
+#global-player { flex-direction: column; align-items: stretch; gap: 8px; padding: 10px 16px calc(10px + env(safe-area-inset-bottom)); }
+#global-player .gp-top { display: flex; justify-content: space-between; align-items: center; gap: 12px; min-width: 0; }
+#global-player .gp-seekrow { display: flex; align-items: center; gap: 10px; font-size: 12px; color: #87CEEB; font-variant-numeric: tabular-nums; }
+#global-player .gp-seekrow input[type=range] { flex: 1; margin: 0; padding: 0; height: 28px; border: none; background: transparent; accent-color: #87CEEB; cursor: pointer; touch-action: none; }
+#global-player .gp-seekrow span { min-width: 42px; text-align: center; }
+
+.install-btn { display: none; }
+.install-btn.has-apk, html.can-install .install-btn { display: inline-flex; align-items: center; gap: 4px; }
+html.standalone .install-btn { display: none !important; }
+.install-help { position: fixed; inset: 0; background: rgba(0,0,0,.55); z-index: 1000; display: none; align-items: flex-end; justify-content: center; }
+.install-help.show { display: flex; }
+.install-help .box { background: var(--card-bg); color: var(--ink); border-radius: 18px 18px 0 0; padding: 20px 20px calc(20px + env(safe-area-inset-bottom)); max-width: 520px; width: 100%; line-height: 1.6; }
+.install-help ol { margin: 10px 0 14px 20px; }
+
+@media (max-width: 800px) {
+  html, body { overflow-x: hidden; }
+  body { padding-bottom: 150px; }
+  .container { padding: 16px 12px 60px; }
+  .card { padding: 16px; border-radius: 14px; }
+  h1 { font-size: 22px; line-height: 1.25; }
+  h2 { font-size: 18px; }
+  .hero { padding: 26px 18px; }
+  .hero h1 { font-size: 24px; }
+  .btn { padding: 10px 16px; }
+  input, select, textarea { font-size: 16px; }
+  table { display: block; overflow-x: auto; -webkit-overflow-scrolling: touch; white-space: nowrap; }
+  img, video, iframe { max-width: 100%; height: auto; }
+  .container * { overflow-wrap: break-word; }
+  .grid { grid-template-columns: 1fr; }
+  .stat-grid { grid-template-columns: repeat(2, 1fr); }
+  .gd-row, .nk-pair { align-items: flex-start; }
+  #global-player .gp-btn { padding: 9px 12px; font-size: 15px; }
+  #global-player .gp-lbl { display: none; }
+  #global-player .info { font-size: 13px; }
+  #cookie-banner { flex-direction: column; gap: 10px; align-items: stretch; text-align: center; padding-bottom: calc(15px + env(safe-area-inset-bottom)); }
+  #cookie-banner button { margin-left: 0; }
+  .nav .brand { font-size: 15px; gap: 6px; }
+  .mobile-drawer { width: 86vw; right: -90vw; overflow-y: auto; }
+  .mobile-drawer.open { right: 0; }
+}
+@media (max-width: 380px) {
+  .nav .brand { font-size: 13px; }
+  .apk-btn { font-size: 11px; padding: 5px 8px; }
+  .stat-grid { grid-template-columns: 1fr 1fr; gap: 8px; }
+}
+
 .neferti-example { flex-basis: 100%; background: var(--sky-light); border-radius: 10px; padding: 12px; font-size: 14px; line-height: 1.6; }
 </style>
 """
+
+# v4.6 : installation de l'application (écran d'accueil) — script placé dans <head>
+INSTALL_JS = """<script>
+(function(){
+  var root = document.documentElement;
+  var standalone = (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) || window.navigator.standalone === true
+                   || document.referrer.indexOf('android-app://') === 0;
+  if (standalone) root.classList.add('standalone');
+  var deferred = null;
+  window.addEventListener('beforeinstallprompt', function(e){
+    e.preventDefault();
+    deferred = e;
+    root.classList.add('can-install');
+  });
+  window.addEventListener('appinstalled', function(){
+    deferred = null;
+    root.classList.remove('can-install');
+    root.classList.add('standalone');
+  });
+  var isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent || '');
+  if (isIOS && !standalone) root.classList.add('can-install');
+  function help(html){
+    var box = document.getElementById('install-help');
+    var txt = document.getElementById('install-help-text');
+    if (!box || !txt) return;
+    txt.innerHTML = html;
+    box.classList.add('show');
+  }
+  document.addEventListener('click', function(e){
+    var b = e.target && e.target.closest ? e.target.closest('#install-btn') : null;
+    if (!b) return;
+    if (deferred) {
+      e.preventDefault();
+      deferred.prompt();
+      deferred.userChoice.then(function(){ deferred = null; root.classList.remove('can-install'); }).catch(function(){});
+      return;
+    }
+    if (isIOS) {
+      e.preventDefault();
+      help('<ol><li>Appuie sur le bouton <b>Partager</b> ⬆️ en bas de Safari.</li>'
+         + '<li>Choisis <b>« Sur l\\'écran d\\'accueil »</b>.</li><li>Appuie sur <b>Ajouter</b> : NATHO apparaît sur ton écran.</li></ol>');
+      return;
+    }
+    if (!b.classList.contains('has-apk')) {
+      e.preventDefault();
+      help('<ol><li>Ouvre ce site avec <b>Chrome</b>.</li><li>Appuie sur le menu <b>⋮</b> en haut à droite.</li>'
+         + '<li>Choisis <b>« Ajouter à l\\'écran d\\'accueil »</b> ou <b>« Installer l\\'application »</b>.</li></ol>');
+      return;
+    }
+    // sinon : le lien télécharge l'APK ; on rappelle comment l'ouvrir
+    setTimeout(function(){
+      help('<p>Le fichier <b>NATHO.apk</b> se télécharge.</p><ol><li>Ouvre-le depuis la notification ou le dossier <b>Téléchargements</b>.</li>'
+         + '<li>Si Android le demande, autorise l\\'installation depuis cette source.</li><li>Appuie sur <b>Installer</b> : l\\'icône NATHO apparaît sur ton écran.</li></ol>');
+    }, 600);
+  }, true);
+})();
+</script>"""
 
 AUDIO_JS = r"""
 (function () {
@@ -5395,6 +5522,11 @@ AUDIO_JS = r"""
   var auResolve = null;
   var silCache = {};
   var mediaReady = false;
+  var cum = [0];
+  var phase = 0;
+  var dragging = false;
+  var lastPos = 0;
+  var auHooked = false;
 
   var RATE_FR = 0.9;
   var RATE_DE = 0.75;
@@ -5532,6 +5664,22 @@ AUDIO_JS = r"""
       au.setAttribute('playsinline', '');
       document.body.appendChild(au);
     }
+    if (!auHooked) {
+      auHooked = true;
+      // la barre avance pendant la lecture (aussi écran éteint, pour l'écran de verrouillage)
+      au.addEventListener('timeupdate', function () { updSeek(false); });
+      // le téléphone a mis en pause (appel, casque débranché…) : on synchronise l'état
+      au.addEventListener('pause', function () {
+        setTimeout(function () {
+          if (list.length && au.paused && !au.ended && auResolve && !paused && curMode === 'mp3') {
+            paused = true; uiPause();
+          }
+        }, 400);
+      });
+      au.addEventListener('play', function () {
+        if (paused && list.length) { paused = false; uiPause(); }
+      });
+    }
     return au;
   }
 
@@ -5641,6 +5789,63 @@ AUDIO_JS = r"""
 
   function el(id) { return document.getElementById(id); }
 
+  // --- Barre de défilement : durée estimée de chaque élément de la playlist ---
+  function estSeg(t, isDe) { return 0.6 + (t ? t.length : 0) * (isDe ? 0.085 / MP3_RATE_DE : 0.07); }
+  function phaseLens(it) { return [estSeg(it.fr, false), GAP_FR_DE / 1000, estSeg(it.de, true), GAP_NEXT / 1000]; }
+  function buildCum() {
+    cum = [0];
+    for (var i = 0; i < list.length; i++) {
+      var p = phaseLens(list[i]);
+      cum.push(cum[i] + p[0] + p[1] + p[2] + p[3]);
+    }
+  }
+  function total() { return cum[list.length] || 0; }
+  function curPos() {
+    if (!list.length || cum.length !== list.length + 1) return 0;
+    var p = phaseLens(list[idx]);
+    var start = 0;
+    for (var k = 0; k < phase; k++) start += p[k];
+    var t = (curMode === 'mp3' && au && isFinite(au.currentTime)) ? au.currentTime : 0;
+    return Math.min(cum[idx + 1] - 0.05, cum[idx] + start + Math.min(t, p[phase] + 3));
+  }
+  function fmt(s) {
+    s = Math.max(0, Math.round(s));
+    var m = Math.floor(s / 60), r = s % 60;
+    if (m >= 60) { var hh = Math.floor(m / 60); m = m % 60; return hh + ':' + (m < 10 ? '0' : '') + m + ':' + (r < 10 ? '0' : '') + r; }
+    return m + ':' + (r < 10 ? '0' : '') + r;
+  }
+  function itemAt(t) {
+    var lo = 0, hi = list.length - 1;
+    while (lo < hi) { var mid = (lo + hi + 1) >> 1; if (cum[mid] <= t) lo = mid; else hi = mid - 1; }
+    return lo;
+  }
+  function setPos(p, force) {
+    if (!('mediaSession' in navigator) || !navigator.mediaSession.setPositionState || !list.length) return;
+    var now = Date.now();
+    if (!force && now - lastPos < 4000) return;
+    lastPos = now;
+    try {
+      var d = Math.max(1, total());
+      navigator.mediaSession.setPositionState({ duration: d, playbackRate: 1, position: Math.max(0, Math.min(p, d)) });
+    } catch (e) {}
+  }
+  function updSeek(force) {
+    if (!list.length) return;
+    var p = curPos();
+    if (!dragging && (force || !document.hidden)) {
+      var s = el('gp-seek');
+      if (s) { s.max = String(Math.max(1, Math.ceil(total()))); s.value = String(Math.floor(p)); }
+      var c = el('gp-cur'); if (c) c.textContent = fmt(p);
+      var d = el('gp-dur'); if (d) d.textContent = fmt(total());
+    }
+    setPos(p, force);
+  }
+  function uiPause() {
+    try { navigator.mediaSession.playbackState = paused ? 'paused' : 'playing'; } catch (e) {}
+    var b = el('gp-pause');
+    if (b) b.textContent = paused ? '▶' : '⏸';
+  }
+
   function hidePlayer() {
     var p = el('global-player');
     if (p) p.style.display = 'none';
@@ -5657,6 +5862,8 @@ AUDIO_JS = r"""
     if (r) r.style.display = 'none';
     var b = el('gp-pause');
     if (b) { b.style.display = ''; b.textContent = paused ? '▶' : '⏸'; }
+    var sr = el('gp-seekrow');
+    if (sr) sr.style.display = '';
   }
 
   function showResumeBar(title, i, n) {
@@ -5671,6 +5878,8 @@ AUDIO_JS = r"""
     if (r) r.style.display = '';
     var b = el('gp-pause');
     if (b) b.style.display = 'none';
+    var sr = el('gp-seekrow');
+    if (sr) sr.style.display = 'none';
   }
 
   function initMedia() {
@@ -5678,10 +5887,16 @@ AUDIO_JS = r"""
     mediaReady = true;
     var ms = navigator.mediaSession;
     function setH(name, fn) { try { ms.setActionHandler(name, fn); } catch (e) {} }
-    setH('play', function () { if (paused) togglePause(); });
+    setH('play', function () {
+      if (paused) togglePause();
+      else if (curMode === 'mp3' && au && au.paused) { var p = au.play(); if (p && p.catch) p.catch(function () {}); }
+    });
     setH('pause', function () { if (!paused) togglePause(); });
     setH('previoustrack', function () { jump(-1); });
     setH('nexttrack', function () { jump(1); });
+    setH('seekbackward', function () { jump(-1); });
+    setH('seekforward', function () { jump(1); });
+    setH('seekto', function (d) { if (list.length && d && isFinite(d.seekTime)) jumpTo(itemAt(d.seekTime)); });
     setH('stop', function () { stopPlaylist(); });
   }
 
@@ -5692,7 +5907,11 @@ AUDIO_JS = r"""
       navigator.mediaSession.metadata = new MediaMetadata({
         title: item.de,
         artist: item.fr,
-        album: 'NATHO · Deutsch A1'
+        album: listTitle || 'NATHO · Deutsch A1',
+        artwork: [
+          { src: '/icon-192.png', sizes: '192x192', type: 'image/png' },
+          { src: '/icon-512.png', sizes: '512x512', type: 'image/png' }
+        ]
       });
       navigator.mediaSession.playbackState = paused ? 'paused' : 'playing';
     } catch (e) {}
@@ -5762,13 +5981,18 @@ AUDIO_JS = r"""
       saveIdx();
       showPlayer(it);
       setMedia(it);
+      phase = 0;
+      updSeek(true);
       prefetch(idx + 1);
       await seg(it.fr, 'fr', my);
       if (my !== token) return;
+      phase = 1;
       await gap(GAP_FR_DE, my);
       if (my !== token) return;
+      phase = 2;
       await seg(it.de, 'de', my);
       if (my !== token) return;
+      phase = 3;
       await gap(GAP_NEXT, my);
       if (my !== token) return;
       idx++;
@@ -5785,6 +6009,7 @@ AUDIO_JS = r"""
     list = items;
     idx = 0;
     listTitle = title || '';
+    buildCum();
     saveItems();
     loop(my);
   }
@@ -5832,6 +6057,7 @@ AUDIO_JS = r"""
     list = items;
     idx = Math.min(i, items.length - 1);
     listTitle = title;
+    buildCum();
     saveItems();
     loop(my);
   }
@@ -5852,9 +6078,10 @@ AUDIO_JS = r"""
     clearState();
   }
 
-  async function jump(delta) {
+  function jump(delta) { return jumpTo(idx + delta); }
+
+  async function jumpTo(n) {
     if (!list.length) return;
-    var n = idx + delta;
     if (n < 0) n = 0;
     if (n >= list.length) { stopPlaylist(); return; }
     var busy = supported && (synth.speaking || synth.pending);
@@ -5966,6 +6193,24 @@ AUDIO_JS = r"""
 
   window.addEventListener('popstate', function () {
     go(window.location.href, { credentials: 'same-origin', cache: 'no-cache' }, false);
+  });
+
+  // --- glisser la barre pour avancer ou revenir ---
+  function seekPreview(t) {
+    if (!list.length) return;
+    var i = itemAt(t);
+    var c = el('gp-cur'); if (c) c.textContent = fmt(t);
+    var n = el('gp-count'); if (n) n.textContent = '→ ' + (i + 1) + ' / ' + list.length;
+    var x = el('gp-text'); if (x) x.textContent = list[i].de + '  —  ' + list[i].fr;
+  }
+  document.addEventListener('input', function (e) {
+    if (e.target && e.target.id === 'gp-seek') { dragging = true; seekPreview(+e.target.value); }
+  });
+  document.addEventListener('change', function (e) {
+    if (e.target && e.target.id === 'gp-seek') {
+      dragging = false;
+      if (list.length) jumpTo(itemAt(+e.target.value));
+    }
   });
 
   initResume();
@@ -6134,9 +6379,10 @@ def layout(title, body, user=None):
               <a href="{url_for('apprendre_parler')}">Parler 🗨️</a>
               <a href="{url_for('essentiels_a1')}">Essentiels A1</a>
               <a href="{url_for('nom_akk')}">NOM/AKK</a>
-            <a href="{url_for('guide')}">Guide 📘</a>
               <a href="{url_for('guide')}">Guide 📘</a>
             </div></details>
+            <a href="{url_for('verbes_500')}">500 verbes 🇫🇷🇩🇪</a>
+            <a href="{url_for('dictionnaire')}">Dictionnaire 📕</a>
             <a href="{url_for('neferti')}">Neferti 🤖</a>
             <a href="{url_for('goethe')}">Examen Goethe</a>
             <details class="nav-dd"><summary>Mon espace ▾</summary><div class="nav-dd-menu">
@@ -6155,6 +6401,8 @@ def layout(title, body, user=None):
             <a href="{url_for('essentiels_a1')}">Essentiels A1</a>
             <a href="{url_for('nom_akk')}">NOM/AKK</a>
             <a href="{url_for('guide')}">Guide 📘</a>
+            <a href="{url_for('verbes_500')}">500 verbes 🇫🇷🇩🇪</a>
+            <a href="{url_for('dictionnaire')}">Dictionnaire 📕</a>
             <a href="{url_for('neferti')}">Neferti 🤖</a>
             <a href="{url_for('goethe')}">Examen Goethe</a>
             <a href="{url_for('progress')}">Progrès</a>
@@ -6215,12 +6463,29 @@ def layout(title, body, user=None):
     flashes = ''.join(f'<div class="flash {h(str(k))}">{h(str(m))}</div>'
                       for k, m in get_flashed_messages(with_categories=True))
 
+    # v4.5 : bouton de téléchargement de l'application Android (visible dès qu'un APK est disponible)
+    # v4.6 : un seul bouton « Installer l'app » : installation directe sur l'écran d'accueil (Chrome Android),
+    # sinon téléchargement de l'APK, et sur iPhone les étapes « Sur l'écran d'accueil ».
+    has_apk = _apk_available()
+    apk_cls = " has-apk" if has_apk else ""
+    apk_href = url_for("telecharger_app") if has_apk else "#"
+    apk_dl = ' download="NATHO.apk"' if has_apk else ""
+    apk_btn = (f'<a class="apk-btn install-btn{apk_cls}" id="install-btn" href="{apk_href}"{apk_dl} '
+               f'title="Installer l\'application NATHO sur ton téléphone">📱 Installer l\'app</a>')
+    if not has_apk and user and user["is_admin"]:
+        apk_btn += f'<a class="apk-btn apk-missing" href="{url_for("admin")}#apk" title="Ajouter l\'APK">📱 Ajouter l\'APK</a>'
+
     return f"""
 <!doctype html><html lang="fr"><head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>NATHO — {h(str(title))}</title>
 <link rel="icon" type="image/svg+xml" href="{FAVICON_SVG}">
+<link rel="manifest" href="/manifest.webmanifest">
+<meta name="theme-color" content="#87CEEB">
+<link rel="apple-touch-icon" href="/icon-192.png">
+<script>if ('serviceWorker' in navigator) {{ window.addEventListener('load', function(){{ navigator.serviceWorker.register('/sw.js').catch(function(){{}}); }}); }}</script>
+{INSTALL_JS}
 {BASE_CSS}
 </head><body class="{body_class}">
 
@@ -6231,6 +6496,7 @@ def layout(title, body, user=None):
 
 <div class="nav">
   <div class="brand"><img src="{FAVICON_SVG}" width="28" height="28" style="border-radius:6px;"> NATHO · Deutsch A1</div>
+  {apk_btn}
   <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">{nav_links} {theme_btn} {mobile_btn}</div>
 </div>
 <div class="container">
@@ -6253,20 +6519,34 @@ def layout(title, body, user=None):
 </script>
 
 <div id="global-player">
-  <div class="info"><span id="gp-count">En cours de lecture...</span><small id="gp-text">En attente</small></div>
-  <div class="gp-ctrl">
-    <button type="button" class="gp-btn" id="gp-resume" style="display:none" onclick="NathoAudio.resume()">▶ Reprendre</button>
-    <button type="button" class="gp-btn" onclick="NathoAudio.prev()" title="Précédent">⏮</button>
-    <button type="button" class="gp-btn" id="gp-pause" onclick="NathoAudio.togglePause()" title="Pause / Lecture">⏸</button>
-    <button type="button" class="gp-btn" onclick="NathoAudio.next()" title="Suivant">⏭</button>
-    <button type="button" class="gp-btn gp-stop" onclick="NathoAudio.stopPlaylist()">⏹ Arrêter</button>
+  <div class="gp-top">
+    <div class="info"><span id="gp-count">En cours de lecture...</span><small id="gp-text">En attente</small></div>
+    <div class="gp-ctrl">
+      <button type="button" class="gp-btn" id="gp-resume" style="display:none" onclick="NathoAudio.resume()">▶ Reprendre</button>
+      <button type="button" class="gp-btn" onclick="NathoAudio.prev()" title="Précédent">⏮</button>
+      <button type="button" class="gp-btn" id="gp-pause" onclick="NathoAudio.togglePause()" title="Pause / Lecture">⏸</button>
+      <button type="button" class="gp-btn" onclick="NathoAudio.next()" title="Suivant">⏭</button>
+      <button type="button" class="gp-btn gp-stop" onclick="NathoAudio.stopPlaylist()" title="Arrêter">⏹<span class="gp-lbl"> Arrêter</span></button>
+    </div>
+  </div>
+  <div class="gp-seekrow" id="gp-seekrow">
+    <span id="gp-cur">0:00</span>
+    <input type="range" id="gp-seek" min="0" max="1" value="0" step="1" aria-label="Avancer ou revenir dans la playlist">
+    <span id="gp-dur">0:00</span>
   </div>
 </div>
 <div id="voice-toast"></div>
+<div class="install-help" id="install-help" onclick="if(event.target===this)this.classList.remove('show')">
+  <div class="box">
+    <h3 style="margin:0">📱 Installer NATHO</h3>
+    <div id="install-help-text"></div>
+    <button type="button" class="btn" onclick="document.getElementById('install-help').classList.remove('show')">OK</button>
+  </div>
+</div>
 <audio id="natho-audio" preload="auto" playsinline></audio>
 
 <footer>
-    © NATHO — Plateforme d'apprentissage de l'allemand A1 · v4.4<br>
+    © NATHO — Plateforme d'apprentissage de l'allemand A1 · v4.6<br>
     <a href="/politique">Politique de confidentialité</a> |
     <a href="/cgu">Conditions d'utilisation</a> |
     <a href="/mentions">Mentions légales</a>
@@ -8921,6 +9201,3417 @@ def guide():
     return page(layout("Guide", body, {"is_admin": session.get("is_admin")}))
 
 
+
+# =========================================================
+# === v4.5 : 500 verbes du quotidien (français → allemand) ===
+# =========================================================
+# Les 450 verbes du Guide + 50 verbes en plus. Chaque entrée : (allemand, français, phrase allemande, phrase française)
+VERBES_500_EXTRA = [('ansehen', 'regarder (attentivement)', 'Wir sehen uns zusammen die Fotos vom Urlaub an.', 'Nous regardons ensemble les photos des vacances.'),
+ ('ausprobieren', 'essayer, tester', 'Ich probiere heute ein neues Rezept aus.', "Aujourd'hui, j'essaie une nouvelle recette."),
+ ('aufladen', 'recharger', 'Ich muss mein Handy dringend aufladen.', 'Je dois recharger mon téléphone de toute urgence.'),
+ ('ausleihen', 'emprunter', 'Ich leihe mir drei Bücher in der Bibliothek aus.', "J'emprunte trois livres à la bibliothèque."),
+ ('beenden', 'terminer', 'Wir beenden die Sitzung um siebzehn Uhr.', 'Nous terminons la réunion à dix-sept heures.'),
+ ('bemerken', 'remarquer', 'Hast du bemerkt, dass Paul eine neue Brille hat?', 'As-tu remarqué que Paul a de nouvelles lunettes ?'),
+ ('beschreiben', 'décrire', 'Können Sie den Mann bitte beschreiben?', "Pouvez-vous décrire l'homme, s'il vous plaît ?"),
+ ('besitzen', 'posséder', 'Mein Onkel besitzt zwei Taxis in Douala.', 'Mon oncle possède deux taxis à Douala.'),
+ ('beten', 'prier', 'Meine Großmutter betet jeden Morgen.', 'Ma grand-mère prie chaque matin.'),
+ ('bewegen', 'bouger', 'Du musst dich mehr bewegen, das ist gesund.', "Tu dois bouger plus, c'est bon pour la santé."),
+ ('berichten', 'raconter, rendre compte', 'Die Zeitung berichtet über das Fußballspiel.', 'Le journal rend compte du match de football.'),
+ ('entdecken', 'découvrir', 'Im Urlaub entdecken wir gern neue Städte.', 'En vacances, nous aimons découvrir de nouvelles villes.'),
+ ('sich entspannen', 'se détendre', 'Am Sonntag entspanne ich mich im Garten.', 'Le dimanche, je me détends dans le jardin.'),
+ ('erkennen', 'reconnaître', 'Ich habe dich mit der neuen Frisur nicht erkannt.', "Je ne t'ai pas reconnu avec ta nouvelle coiffure."),
+ ('erleben', 'vivre (une expérience)', 'Auf der Reise haben wir viel erlebt.', 'Pendant le voyage, nous avons vécu beaucoup de choses.'),
+ ('ersetzen', 'remplacer', 'Der Techniker ersetzt die kaputte Lampe.', 'Le technicien remplace la lampe cassée.'),
+ ('erwarten', "attendre (s'attendre à)", 'Wir erwarten heute Abend zehn Gäste.', 'Nous attendons dix invités ce soir.'),
+ ('faulenzen', 'paresser, ne rien faire', 'Im Urlaub faulenze ich am Strand.', 'En vacances, je paresse sur la plage.'),
+ ('gähnen', 'bâiller', 'Er gähnt, weil er sehr müde ist.', "Il bâille parce qu'il est très fatigué."),
+ ('sich gewöhnen', "s'habituer", 'Ich gewöhne mich langsam an das kalte Wetter.', "Je m'habitue lentement au temps froid."),
+ ('hupen', 'klaxonner', 'Der Taxifahrer hupt vor dem Haus.', 'Le chauffeur de taxi klaxonne devant la maison.'),
+ ('sich interessieren', "s'intéresser", 'Mein Sohn interessiert sich für Computer.', "Mon fils s'intéresse aux ordinateurs."),
+ ('kämpfen', 'se battre, lutter', 'Die Mannschaft kämpft bis zur letzten Minute.', "L'équipe se bat jusqu'à la dernière minute."),
+ ('klicken', 'cliquer', 'Klicken Sie bitte auf den blauen Knopf.', "Cliquez sur le bouton bleu, s'il vous plaît."),
+ ('leeren', 'vider', 'Ich leere jeden Abend den Mülleimer.', 'Je vide la poubelle tous les soirs.'),
+ ('loben', "féliciter, faire l'éloge", 'Die Lehrerin lobt die Schüler für ihre Arbeit.', 'La professeure félicite les élèves pour leur travail.'),
+ ('nennen', 'nommer, appeler', 'Wir nennen unseren Hund Max.', 'Nous appelons notre chien Max.'),
+ ('pfeifen', 'siffler', 'Der Schiedsrichter pfeift das Spiel ab.', "L'arbitre siffle la fin du match."),
+ ('reinigen', 'nettoyer', 'Die Firma reinigt die Büros am Abend.', "L'entreprise nettoie les bureaux le soir."),
+ ('sammeln', 'collectionner, ramasser', 'Mein Bruder sammelt alte Münzen.', 'Mon frère collectionne les vieilles pièces de monnaie.'),
+ ('schimpfen', 'gronder, râler', 'Der Vater schimpft, weil das Zimmer unordentlich ist.', 'Le père gronde parce que la chambre est en désordre.'),
+ ('sich sorgen', "s'inquiéter", 'Meine Mutter sorgt sich immer um mich.', "Ma mère s'inquiète toujours pour moi."),
+ ('stattfinden', 'avoir lieu', 'Die Hochzeit findet im Juni statt.', 'Le mariage a lieu en juin.'),
+ ('stimmen', 'être exact', 'Das stimmt, du hast recht.', "C'est exact, tu as raison."),
+ ('streicheln', 'caresser', 'Das Kind streichelt die kleine Katze.', "L'enfant caresse le petit chat."),
+ ('tauschen', 'échanger', 'Wir tauschen unsere Telefonnummern.', 'Nous échangeons nos numéros de téléphone.'),
+ ('überraschen', 'surprendre', 'Wir überraschen Mama mit einem Kuchen.', 'Nous faisons une surprise à maman avec un gâteau.'),
+ ('überzeugen', 'convaincre', 'Dein Argument überzeugt mich nicht.', 'Ton argument ne me convainc pas.'),
+ ('unterstützen', 'soutenir', 'Meine Familie unterstützt mich beim Studium.', 'Ma famille me soutient dans mes études.'),
+ ('sich verabreden', 'se donner rendez-vous', 'Ich verabrede mich mit Anna für Freitag.', 'Je me donne rendez-vous avec Anna pour vendredi.'),
+ ('verbinden', 'relier, connecter', 'Ich verbinde das Handy mit dem Fernseher.', 'Je connecte le téléphone à la télévision.'),
+ ('verbringen', 'passer (du temps)', 'Wir verbringen die Ferien bei den Großeltern.', 'Nous passons les vacances chez les grands-parents.'),
+ ('vermeiden', 'éviter', 'Ich vermeide Zucker am Abend.', "J'évite le sucre le soir."),
+ ('verreisen', 'partir en voyage', 'Im Dezember verreisen wir nach Kribi.', 'En décembre, nous partons en voyage à Kribi.'),
+ ('verwechseln', 'confondre', 'Ich verwechsle immer die Zwillinge.', 'Je confonds toujours les jumeaux.'),
+ ('vorhaben', 'avoir prévu', 'Was hast du am Wochenende vor?', "Qu'as-tu prévu ce week-end ?"),
+ ('vorlesen', 'lire à voix haute', 'Der Vater liest den Kindern jeden Abend vor.', 'Le père fait la lecture aux enfants chaque soir.'),
+ ('wetten', 'parier', 'Ich wette, dass Kamerun heute gewinnt.', "Je parie que le Cameroun gagne aujourd'hui."),
+ ('zelten', 'faire du camping', 'Im Sommer zelten wir am See.', 'En été, nous faisons du camping au bord du lac.'),
+ ('zubereiten', 'préparer (un plat)', 'Sie bereitet das Abendessen für die Familie zu.', 'Elle prépare le dîner pour la famille.')]
+VERBES_500 = GUIDE_VERBS + [("Encore 50 verbes utiles", VERBES_500_EXTRA)]
+
+def _verbes500_playlists():
+    """« fr » = texte FRANÇAIS (voix française), « de » = texte ALLEMAND (voix allemande)."""
+    return {"500 verbes : " + title: [{"fr": f"{vfr}. {sfr}", "de": f"{v}. {sde}"} for v, vfr, sde, sfr in rows]
+            for title, rows in VERBES_500}
+
+@app.route("/verbes-500")
+@login_required
+def verbes_500():
+    small = "padding:4px 10px;font-size:12px;"
+    total = sum(len(rows) for _t, rows in VERBES_500)
+    chips = ""
+    groups = ""
+    num = 0
+    for gi, (title, rows) in enumerate(VERBES_500):
+        chips += f'<a class="nk-chip" href="#v5-{gi + 1}">{h(title)}</a>'
+        body_rows = ""
+        for v, vfr, sde, sfr in rows:
+            num += 1
+            key = f"{vfr} {v}".lower()
+            body_rows += f"""
+            <div class="gd-row" data-k="{h(key, quote=True)}">
+              <div class="gd-main"><b>{num}. {h(vfr)}</b> → <b class="gd-pp">{h(v)}</b>
+                <span class="gd-ex nk-fr">🇫🇷 {h(sfr)}</span>
+                <span class="gd-ex">🇩🇪 {h(sde)}</span>
+              </div>
+              <div class="gd-btns">
+                {say_btn("🇩🇪", "de", "", f"{v}. {sde}", css="btn ghost", style=small)}
+                {say_btn("▶", "pair", f"{vfr}. {sfr}", f"{v}. {sde}", css="btn ghost", style=small)}
+              </div>
+            </div>"""
+        groups += f"""
+        <div class="nomakk-section gd-vgroup" id="v5-{gi + 1}">
+          <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;">
+            <h3 style="margin:0">{h(title)} <span style="color:var(--muted);font-size:13px;">({len(rows)})</span></h3>
+            {playlist_btn("▶ Écouter", "verbes500", "500 verbes : " + title, css="btn ok")}
+          </div>
+          <div class="content nk-content">{body_rows}</div>
+        </div>"""
+    script = """
+    <script>
+    (function(){
+      var inp = document.getElementById('v5-search');
+      var cnt = document.getElementById('v5-count');
+      if (!inp) return;
+      inp.addEventListener('input', function(){
+        var q = inp.value.trim().toLowerCase();
+        var shown = 0;
+        var groups = document.querySelectorAll('.gd-vgroup');
+        for (var g = 0; g < groups.length; g++) {
+          var rows = groups[g].querySelectorAll('.gd-row');
+          var any = false;
+          for (var i = 0; i < rows.length; i++) {
+            var ok = !q || (rows[i].getAttribute('data-k') || '').indexOf(q) !== -1;
+            rows[i].style.display = ok ? '' : 'none';
+            if (ok) { any = true; shown++; }
+          }
+          groups[g].style.display = any ? '' : 'none';
+        }
+        cnt.textContent = q ? (shown + ' verbe(s) trouvé(s)') : '';
+      });
+    })();
+    </script>
+    """
+    body = f"""
+    <h1>{total} verbes du quotidien 🇫🇷 → 🇩🇪</h1>
+    <p style="margin-bottom:16px;color:#5B7A90;">
+      Les {total} verbes les plus utilisés dans la vie de tous les jours, du français vers l'allemand,
+      avec une phrase de la vie réelle pour chacun. 🇩🇪 = écouter l'allemand · ▶ = le français (voix française) puis l'allemand (voix allemande).
+    </p>
+    <div class="card" style="border-left:5px solid var(--warn);">
+      <input type="text" id="v5-search" placeholder="🔎 Chercher un verbe (français ou allemand)…" autocomplete="off" style="margin:0;">
+      <p id="v5-count" style="color:var(--muted);font-size:12px;margin:6px 0 0 0;"></p>
+    </div>
+    <div class="nk-chips">{chips}</div>
+    {groups}
+    {playlist_data_script({"verbes500": _verbes500_playlists()})}
+    {script}
+    """
+    return page(layout("500 verbes", body, {"is_admin": session.get("is_admin")}))
+
+
+# =========================================================
+# === v4.5 : application Android (APK à télécharger) + installation de l'appli (PWA) ===
+# =========================================================
+# Deux façons de proposer l'APK :
+#   1) l'admin le dépose dans « Admin → Application Android » : il est rangé dans DATA_DIR (volume Railway) ;
+#   2) ou la variable d'environnement NATHO_APK_URL contient un lien https direct vers l'APK (prioritaire).
+APK_PATH = os.path.join(DATA_DIR, "natho.apk")
+APK_MAX_BYTES = 150 * 1024 * 1024
+APK_UPLOAD_PATH = "/admin/apk"
+
+def _apk_env_url():
+    u = (os.environ.get("NATHO_APK_URL") or "").strip()
+    return u if u.startswith("https://") else ""
+
+def _apk_available():
+    return bool(_apk_env_url()) or os.path.isfile(APK_PATH)
+
+def _apk_info():
+    if not os.path.isfile(APK_PATH):
+        return None
+    st_ = os.stat(APK_PATH)
+    return {"mb": st_.st_size / (1024.0 * 1024.0), "date": datetime.fromtimestamp(st_.st_mtime).strftime("%d/%m/%Y %H:%M")}
+
+class _NathoRequest(app.request_class):
+    """Limite de taille : 1 Mo partout, sauf pour le dépôt de l'APK par l'admin."""
+    @property
+    def max_content_length(self):
+        if self.method == "POST" and self.path == APK_UPLOAD_PATH:
+            return APK_MAX_BYTES
+        return app.config.get("MAX_CONTENT_LENGTH")
+
+    @max_content_length.setter
+    def max_content_length(self, value):
+        pass
+
+app.request_class = _NathoRequest
+
+@app.route("/telecharger-app")
+def telecharger_app():
+    env_url = _apk_env_url()
+    if env_url:
+        return redirect(env_url)
+    if not os.path.isfile(APK_PATH):
+        flash("L'application Android n'est pas encore disponible. Reviens bientôt !", "warning")
+        return redirect(url_for("index"))
+    resp = send_file(APK_PATH, mimetype="application/vnd.android.package-archive",
+                     as_attachment=True, download_name="NATHO.apk", max_age=0)
+    resp.headers["Cache-Control"] = "no-cache"
+    return resp
+
+@app.route(APK_UPLOAD_PATH, methods=["POST"])
+@admin_required
+def admin_apk():
+    f = request.files.get("apk")
+    if not f or not f.filename:
+        flash("Choisis un fichier .apk.", "danger")
+        return redirect(url_for("admin") + "#apk")
+    if not f.filename.lower().endswith(".apk"):
+        flash("Le fichier doit se terminer par .apk.", "danger")
+        return redirect(url_for("admin") + "#apk")
+    head = f.stream.read(4)
+    f.stream.seek(0)
+    if head != b"PK\x03\x04":
+        flash("Ce fichier n'est pas un APK valide.", "danger")
+        return redirect(url_for("admin") + "#apk")
+    os.makedirs(DATA_DIR, exist_ok=True)
+    tmp = APK_PATH + ".tmp"
+    f.save(tmp)
+    os.replace(tmp, APK_PATH)
+    try:
+        os.chmod(APK_PATH, 0o644)
+    except OSError:
+        pass
+    flash("Application Android mise en ligne : le bouton « Télécharger l'app » est visible en haut du site.", "success")
+    return redirect(url_for("admin") + "#apk")
+
+@app.route("/admin/apk/supprimer", methods=["POST"])
+@admin_required
+def admin_apk_delete():
+    try:
+        os.remove(APK_PATH)
+        flash("APK supprimé.", "success")
+    except FileNotFoundError:
+        flash("Aucun APK à supprimer.", "warning")
+    return redirect(url_for("admin") + "#apk")
+
+def _apk_admin_card():
+    info = _apk_info()
+    env_url = _apk_env_url()
+    if env_url:
+        state = f'<p>✅ Le bouton télécharge depuis le lien NATHO_APK_URL : <code>{h(env_url)}</code></p>'
+    elif info:
+        state = f'<p>✅ APK en ligne : {info["mb"]:.1f} Mo, déposé le {h(info["date"])}. <a href="{url_for("telecharger_app")}">Tester le téléchargement</a></p>'
+    else:
+        state = '<p>⚠️ Aucun APK pour le moment : le bouton « Télécharger l\'app » est caché pour les élèves.</p>'
+    delete = ""
+    if info:
+        delete = f"""<form method="post" action="{url_for('admin_apk_delete')}" onsubmit="return confirm('Supprimer l\\'APK ?')" style="margin-top:8px;">
+          <button class="btn danger" type="submit">Supprimer l'APK</button></form>"""
+    return f"""
+    <div class="card" id="apk">
+      <h2>📱 Application Android (APK)</h2>
+      {state}
+      <form method="post" action="{APK_UPLOAD_PATH}" enctype="multipart/form-data">
+        <label>Fichier .apk (150 Mo maximum) :</label>
+        <input type="file" name="apk" accept=".apk,application/vnd.android.package-archive" required>
+        <button class="btn ok" type="submit">Mettre en ligne</button>
+      </form>
+      {delete}
+      <p style="color:var(--muted);font-size:13px;margin-top:10px;">Pour fabriquer l'APK : va sur pwabuilder.com, colle l'adresse de ton site NATHO,
+      choisis « Android » puis télécharge le paquet. Dépose ici le fichier .apk qu'il contient.</p>
+    </div>"""
+
+# --- Installation de l'appli (PWA) : nécessaire pour fabriquer l'APK avec PWABuilder ---
+_ICON_192_B64 = "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"
+_ICON_512_B64 = "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"
+
+@app.route("/icon-<int:size>.png")
+def app_icon(size):
+    data = {192: _ICON_192_B64, 512: _ICON_512_B64}.get(size)
+    if not data:
+        return ("", 404)
+    resp = make_response(base64.b64decode(data))
+    resp.headers["Content-Type"] = "image/png"
+    resp.headers["Cache-Control"] = "public, max-age=604800"
+    return resp
+
+@app.route("/manifest.webmanifest")
+def app_manifest():
+    man = {
+        "name": "NATHO · Deutsch A1",
+        "short_name": "NATHO",
+        "description": "Apprendre l'allemand A1 : cours, vocabulaire, dialogues, Neferti et examen Goethe.",
+        "lang": "fr",
+        "start_url": "/",
+        "scope": "/",
+        "display": "standalone",
+        "background_color": "#87CEEB",
+        "theme_color": "#87CEEB",
+        "icons": [
+            {"src": "/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any"},
+            {"src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any"},
+            {"src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable"},
+        ],
+    }
+    resp = make_response(json.dumps(man, ensure_ascii=False))
+    resp.headers["Content-Type"] = "application/manifest+json; charset=utf-8"
+    return resp
+
+@app.route("/sw.js")
+def app_service_worker():
+    # Service worker minimal : il ne met rien en cache (les pages restent toujours à jour).
+    js = ("self.addEventListener('install', function(e){ self.skipWaiting(); });\n"
+          "self.addEventListener('activate', function(e){ e.waitUntil(self.clients.claim()); });\n"
+          "self.addEventListener('fetch', function(e){ });\n")
+    resp = make_response(js)
+    resp.headers["Content-Type"] = "application/javascript; charset=utf-8"
+    resp.headers["Cache-Control"] = "no-cache"
+    return resp
+
+@app.route("/.well-known/assetlinks.json")
+def app_assetlinks():
+    # Collez dans la variable NATHO_ASSETLINKS le contenu du fichier assetlinks.json donné par PWABuilder :
+    # l'appli s'ouvre alors en plein écran, sans la barre d'adresse.
+    raw = (os.environ.get("NATHO_ASSETLINKS") or "").strip() or "[]"
+    try:
+        json.loads(raw)
+    except Exception:
+        raw = "[]"
+    resp = make_response(raw)
+    resp.headers["Content-Type"] = "application/json"
+    return resp
+
+
+
+# =========================================================
+# === v4.6 : dictionnaire français → allemand (3000+ mots courants, de A à Z) ===
+# =========================================================
+DICO_FR_DE = [('à bientôt', 'bis bald'),
+ ('à cause de', 'wegen'),
+ ('à côté de', 'neben'),
+ ('à droite', 'rechts'),
+ ('à gauche', 'links'),
+ ("à l'étranger", 'im Ausland'),
+ ("à l'heure", 'pünktlich'),
+ ('à la maison', 'zu Hause'),
+ ('à pied', 'zu Fuß'),
+ ('abandonner', 'aufgeben'),
+ ("l'abeille", 'die Biene'),
+ ('abîmer', 'beschädigen'),
+ ("d'abord", 'zuerst'),
+ ("l'abricot", 'die Aprikose'),
+ ('absent', 'abwesend'),
+ ('absolument', 'unbedingt'),
+ ('accepter', 'akzeptieren'),
+ ("l'accident", 'der Unfall'),
+ ('accompagner', 'begleiten'),
+ ("d'accord", 'einverstanden'),
+ ("l'accueil", 'der Empfang'),
+ ('accueillir', 'empfangen'),
+ ("l'achat", 'der Einkauf'),
+ ('acheter', 'kaufen'),
+ ("l'acteur", 'der Schauspieler'),
+ ('actif', 'aktiv'),
+ ("l'activité", 'die Aktivität'),
+ ("l'actrice", 'die Schauspielerin'),
+ ('actuel', 'aktuell'),
+ ('actuellement', 'zurzeit'),
+ ("l'addition", 'die Rechnung'),
+ ("l'adieu", 'der Abschied'),
+ ('admirer', 'bewundern'),
+ ("l'adolescent", 'der Jugendliche'),
+ ('adorer', 'sehr lieben'),
+ ("l'adresse", 'die Adresse'),
+ ("l'adulte", 'der Erwachsene'),
+ ("l'aéroport", 'der Flughafen'),
+ ("l'affaire", 'die Angelegenheit'),
+ ('les affaires', 'die Sachen'),
+ ("l'affiche", 'das Plakat'),
+ ('afin de', 'um ... zu'),
+ ('africain', 'afrikanisch'),
+ ("l'Afrique", 'Afrika'),
+ ("l'âge", 'das Alter'),
+ ('âgé', 'alt'),
+ ("l'agence", 'die Agentur'),
+ ("l'agence de voyages", 'das Reisebüro'),
+ ("l'agenda", 'der Terminkalender'),
+ ("l'agent de police", 'der Polizist'),
+ ('agir', 'handeln'),
+ ('agréable', 'angenehm'),
+ ("l'agriculteur", 'der Bauer'),
+ ("l'aide", 'die Hilfe'),
+ ('aider', 'helfen'),
+ ("l'aiguille", 'die Nadel'),
+ ("l'ail", 'der Knoblauch'),
+ ('ailleurs', 'woanders'),
+ ('aimable', 'freundlich'),
+ ('aimer', 'lieben'),
+ ('aîné', 'älter'),
+ ('ainsi', 'so'),
+ ("l'air", 'die Luft'),
+ ("l'album", 'das Album'),
+ ("l'alcool", 'der Alkohol'),
+ ("l'Allemagne", 'Deutschland'),
+ ('allemand', 'deutsch'),
+ ("l'allemand", 'Deutsch'),
+ ('aller', 'gehen'),
+ ('aller chercher', 'abholen'),
+ ("l'aller-retour", 'die Hin- und Rückfahrt'),
+ ("l'allergie", 'die Allergie'),
+ ('allô', 'hallo'),
+ ('allumer', 'anmachen'),
+ ("l'allumette", 'das Streichholz'),
+ ('alors', 'also'),
+ ("l'alphabet", 'das Alphabet'),
+ ("l'ambiance", 'die Stimmung'),
+ ("l'ambulance", 'der Krankenwagen'),
+ ('améliorer', 'verbessern'),
+ ("l'amende", 'die Geldstrafe'),
+ ('amener', 'mitbringen'),
+ ('américain', 'amerikanisch'),
+ ("l'ami", 'der Freund'),
+ ("l'amie", 'die Freundin'),
+ ("l'amitié", 'die Freundschaft'),
+ ("l'amour", 'die Liebe'),
+ ('amoureux', 'verliebt'),
+ ("l'ampoule", 'die Glühbirne'),
+ ('amusant', 'lustig'),
+ ("s'amuser", 'Spaß haben'),
+ ("l'an", 'das Jahr'),
+ ("l'ananas", 'die Ananas'),
+ ('ancien', 'alt'),
+ ("l'âne", 'der Esel'),
+ ("l'ange", 'der Engel'),
+ ('anglais', 'englisch'),
+ ("l'Angleterre", 'England'),
+ ("l'animal", 'das Tier'),
+ ("l'anniversaire", 'der Geburtstag'),
+ ("l'annonce", 'die Anzeige'),
+ ('annoncer', 'ankündigen'),
+ ('annuler', 'absagen'),
+ ("l'anorak", 'der Anorak'),
+ ("l'antenne", 'die Antenne'),
+ ('août', 'August'),
+ ('apercevoir', 'bemerken'),
+ ("l'appareil photo", 'der Fotoapparat'),
+ ("l'appartement", 'die Wohnung'),
+ ('appeler', 'anrufen'),
+ ("s'appeler", 'heißen'),
+ ("l'appétit", 'der Appetit'),
+ ('applaudir', 'klatschen'),
+ ('apporter', 'bringen'),
+ ('apprendre', 'lernen'),
+ ("l'apprenti", 'der Auszubildende'),
+ ("l'apprentissage", 'die Ausbildung'),
+ ('après', 'nach'),
+ ('après-demain', 'übermorgen'),
+ ("l'après-midi", 'der Nachmittag'),
+ ("l'arbre", 'der Baum'),
+ ("l'architecte", 'der Architekt'),
+ ("l'argent", 'das Geld'),
+ ("l'armoire", 'der Schrank'),
+ ("l'arrêt de bus", 'die Bushaltestelle'),
+ ('arrêter', 'aufhören'),
+ ("l'arrivée", 'die Ankunft'),
+ ('arriver', 'ankommen'),
+ ("l'art", 'die Kunst'),
+ ("l'article", 'der Artikel'),
+ ("l'artiste", 'der Künstler'),
+ ("l'ascenseur", 'der Aufzug'),
+ ("l'aspirateur", 'der Staubsauger'),
+ ("l'aspirine", 'das Aspirin'),
+ ("s'asseoir", 'sich setzen'),
+ ('assez', 'genug'),
+ ("l'assiette", 'der Teller'),
+ ("l'assurance", 'die Versicherung'),
+ ('attendre', 'warten'),
+ ('attention', 'Achtung'),
+ ('attraper', 'fangen'),
+ ('au bord de la mer', 'am Meer'),
+ ('au milieu', 'in der Mitte'),
+ ('au revoir', 'auf Wiedersehen'),
+ ('au secours', 'Hilfe'),
+ ('au-dessus', 'oben'),
+ ("l'auberge de jeunesse", 'die Jugendherberge'),
+ ('aucun', 'kein'),
+ ("aujourd'hui", 'heute'),
+ ('aussi', 'auch'),
+ ("l'auteur", 'der Autor'),
+ ("l'autobus", 'der Bus'),
+ ("l'automne", 'der Herbst'),
+ ("l'autoroute", 'die Autobahn'),
+ ('autour de', 'um ... herum'),
+ ('autre', 'andere'),
+ ("l'Autriche", 'Österreich'),
+ ('avant', 'vor'),
+ ('avant-hier', 'vorgestern'),
+ ('avec', 'mit'),
+ ("l'avenir", 'die Zukunft'),
+ ("l'aventure", 'das Abenteuer'),
+ ("l'avenue", 'die Allee'),
+ ("l'averse", 'der Regenschauer'),
+ ("l'avion", 'das Flugzeug'),
+ ("l'avis", 'die Meinung'),
+ ("l'avocat", 'der Rechtsanwalt'),
+ ("l'avocat (fruit)", 'die Avocado'),
+ ('avoir', 'haben'),
+ ('avoir besoin de', 'brauchen'),
+ ('avoir faim', 'Hunger haben'),
+ ('avoir froid', 'frieren'),
+ ('avoir honte', 'sich schämen'),
+ ('avoir lieu', 'stattfinden'),
+ ('avoir mal', 'Schmerzen haben'),
+ ('avoir peur', 'Angst haben'),
+ ('avoir raison', 'recht haben'),
+ ('avoir soif', 'Durst haben'),
+ ('avril', 'April'),
+ ('le bac', 'das Abitur'),
+ ('le badge', 'der Ausweis'),
+ ('le badminton', 'das Badminton'),
+ ('les bagages', 'das Gepäck'),
+ ('la bagarre', 'die Schlägerei'),
+ ('la bague', 'der Ring'),
+ ('la baguette', 'das Baguette'),
+ ('la baie', 'die Bucht'),
+ ('se baigner', 'baden'),
+ ('la baignoire', 'die Badewanne'),
+ ('le bâillement', 'das Gähnen'),
+ ('bâiller', 'gähnen'),
+ ('le bain', 'das Bad'),
+ ('le baiser', 'der Kuss'),
+ ('baisser', 'senken'),
+ ('le bal', 'der Ball'),
+ ('la balade', 'der Spaziergang'),
+ ('se balader', 'spazieren gehen'),
+ ('le balai', 'der Besen'),
+ ('la balance', 'die Waage'),
+ ('balayer', 'fegen'),
+ ('le balcon', 'der Balkon'),
+ ('la baleine', 'der Wal'),
+ ('la balle', 'der Ball'),
+ ('le ballon', 'der Ball'),
+ ('la banane', 'die Banane'),
+ ('le banc', 'die Bank'),
+ ('la bande', 'die Gruppe'),
+ ('la bande dessinée', 'der Comic'),
+ ('le bandeau', 'das Stirnband'),
+ ('la banlieue', 'der Vorort'),
+ ('la banque', 'die Bank'),
+ ('le banquier', 'der Bankangestellte'),
+ ('le bar', 'die Bar'),
+ ('la barbe', 'der Bart'),
+ ('le barbecue', 'der Grill'),
+ ('la barque', 'das Ruderboot'),
+ ('la barrière', 'die Schranke'),
+ ('bas', 'niedrig'),
+ ('en bas', 'unten'),
+ ('la basket', 'der Turnschuh'),
+ ('le basket', 'der Basketball'),
+ ('le bassin', 'das Becken'),
+ ('la bataille', 'die Schlacht'),
+ ('le bateau', 'das Schiff'),
+ ('le bateau à voile', 'das Segelboot'),
+ ('le bâtiment', 'das Gebäude'),
+ ('le bâton', 'der Stock'),
+ ('la batterie', 'die Batterie'),
+ ('battre', 'schlagen'),
+ ('bavarder', 'plaudern'),
+ ('le bavoir', 'das Lätzchen'),
+ ('le bazar', 'das Durcheinander'),
+ ('beau', 'schön'),
+ ('le beau-frère', 'der Schwager'),
+ ('le beau-père', 'der Schwiegervater'),
+ ('beaucoup', 'viel'),
+ ('la beauté', 'die Schönheit'),
+ ('le bébé', 'das Baby'),
+ ('le bec', 'der Schnabel'),
+ ('belge', 'belgisch'),
+ ('la Belgique', 'Belgien'),
+ ('la belle-mère', 'die Schwiegermutter'),
+ ('la belle-sœur', 'die Schwägerin'),
+ ('la berceuse', 'das Wiegenlied'),
+ ('le berger', 'der Hirte'),
+ ('le besoin', 'der Bedarf'),
+ ('bête', 'dumm'),
+ ('la bête', 'das Tier'),
+ ('la bêtise', 'die Dummheit'),
+ ('le béton', 'der Beton'),
+ ('la betterave', 'die Rote Bete'),
+ ('le beurre', 'die Butter'),
+ ('le biberon', 'die Babyflasche'),
+ ('la bibliothèque', 'die Bibliothek'),
+ ('la bicyclette', 'das Fahrrad'),
+ ('bien', 'gut'),
+ ('bien sûr', 'natürlich'),
+ ('le bien-être', 'das Wohlbefinden'),
+ ('bientôt', 'bald'),
+ ('bienvenue', 'willkommen'),
+ ('la bière', 'das Bier'),
+ ('le bijou', 'das Schmuckstück'),
+ ('le bijoutier', 'der Juwelier'),
+ ('le bilan', 'die Bilanz'),
+ ('bilingue', 'zweisprachig'),
+ ('le billet', 'die Fahrkarte'),
+ ('le billet de banque', 'der Geldschein'),
+ ('la biologie', 'die Biologie'),
+ ('le biscuit', 'der Keks'),
+ ('la bise', 'der Kuss auf die Wange'),
+ ('bizarre', 'seltsam'),
+ ('la blague', 'der Witz'),
+ ('blanc', 'weiß'),
+ ('le blé', 'der Weizen'),
+ ('blessé', 'verletzt'),
+ ('blesser', 'verletzen'),
+ ('la blessure', 'die Wunde'),
+ ('bleu', 'blau'),
+ ('le bloc-notes', 'der Notizblock'),
+ ('blond', 'blond'),
+ ('la blouse', 'der Kittel'),
+ ('le blouson', 'die Jacke'),
+ ('le bocal', 'das Einmachglas'),
+ ('boire', 'trinken'),
+ ('le bois', 'das Holz'),
+ ('la boisson', 'das Getränk'),
+ ('la boîte', 'die Dose'),
+ ('la boîte aux lettres', 'der Briefkasten'),
+ ('le bol', 'die Schüssel'),
+ ('bon', 'gut'),
+ ('bon anniversaire', 'alles Gute zum Geburtstag'),
+ ('bon appétit', 'guten Appetit'),
+ ('bon marché', 'billig'),
+ ('le bonbon', 'das Bonbon'),
+ ('le bonheur', 'das Glück'),
+ ('le bonhomme de neige', 'der Schneemann'),
+ ('bonjour', 'guten Tag'),
+ ('la bonne affaire', 'das Schnäppchen'),
+ ('bonne nuit', 'gute Nacht'),
+ ('le bonnet', 'die Mütze'),
+ ('bonsoir', 'guten Abend'),
+ ('le bord', 'der Rand'),
+ ('le bord de mer', 'die Küste'),
+ ('la bosse', 'die Beule'),
+ ('la botte', 'der Stiefel'),
+ ('la botte de foin', 'der Heuballen'),
+ ('la bouche', 'der Mund'),
+ ('le boucher', 'der Metzger'),
+ ('la boucherie', 'die Metzgerei'),
+ ('le bouchon', 'der Korken'),
+ ("la boucle d'oreille", 'der Ohrring'),
+ ('la bougeotte', 'die Unruhe'),
+ ('bouger', 'sich bewegen'),
+ ('la bougie', 'die Kerze'),
+ ('bouillir', 'kochen'),
+ ('le bouillon', 'die Brühe'),
+ ('le boulanger', 'der Bäcker'),
+ ('la boulangerie', 'die Bäckerei'),
+ ('la boule', 'die Kugel'),
+ ('le boulevard', 'der Boulevard'),
+ ('bouleversé', 'erschüttert'),
+ ('le boulot', 'die Arbeit'),
+ ('le bouquet', 'der Blumenstrauß'),
+ ('le bouquin', 'das Buch'),
+ ('la bourse', 'das Stipendium'),
+ ('la boussole', 'der Kompass'),
+ ('le bout', 'das Ende'),
+ ('la bouteille', 'die Flasche'),
+ ('la boutique', 'der Laden'),
+ ('le bouton', 'der Knopf'),
+ ('le bracelet', 'das Armband'),
+ ('la branche', 'der Ast'),
+ ('le bras', 'der Arm'),
+ ('bravo', 'bravo'),
+ ('le bricolage', 'das Heimwerken'),
+ ('bricoler', 'basteln'),
+ ('briller', 'scheinen'),
+ ('la brioche', 'die Brioche'),
+ ('la brique', 'der Ziegel'),
+ ('le briquet', 'das Feuerzeug'),
+ ('la brochure', 'die Broschüre'),
+ ('la brosse', 'die Bürste'),
+ ('la brosse à dents', 'die Zahnbürste'),
+ ('se brosser les dents', 'sich die Zähne putzen'),
+ ('le brouillard', 'der Nebel'),
+ ('le brouillon', 'der Entwurf'),
+ ('la bru', 'die Schwiegertochter'),
+ ('le bruit', 'der Lärm'),
+ ('brûler', 'brennen'),
+ ('brun', 'braun'),
+ ('brusquement', 'plötzlich'),
+ ('bruyant', 'laut'),
+ ('le budget', 'das Budget'),
+ ('le buffet', 'das Büfett'),
+ ('le buisson', 'der Busch'),
+ ('le bulletin', 'das Zeugnis'),
+ ('le bureau', 'das Büro'),
+ ('le bus', 'der Bus'),
+ ('le but', 'das Ziel'),
+ ('le bœuf', 'das Rindfleisch'),
+ ('ça', 'das'),
+ ('la cabine', 'die Kabine'),
+ ('le cabinet médical', 'die Arztpraxis'),
+ ('cacher', 'verstecken'),
+ ('le cadeau', 'das Geschenk'),
+ ('le cadre', 'der Rahmen'),
+ ('le café', 'der Kaffee'),
+ ('la cafétéria', 'die Cafeteria'),
+ ('le cahier', 'das Heft'),
+ ('la caisse', 'die Kasse'),
+ ('le caissier', 'der Kassierer'),
+ ('le calcul', 'die Rechnung'),
+ ('la calculatrice', 'der Taschenrechner'),
+ ('le calendrier', 'der Kalender'),
+ ('calme', 'ruhig'),
+ ('le cambriolage', 'der Einbruch'),
+ ('la caméra', 'die Kamera'),
+ ('le camion', 'der Lastwagen'),
+ ('la campagne', 'das Land'),
+ ('camper', 'zelten'),
+ ('le camping', 'der Campingplatz'),
+ ('le Canada', 'Kanada'),
+ ('le canapé', 'das Sofa'),
+ ('le canard', 'die Ente'),
+ ('le cancer', 'der Krebs'),
+ ('le candidat', 'der Bewerber'),
+ ('la cantine', 'die Kantine'),
+ ('la capitale', 'die Hauptstadt'),
+ ('le car', 'der Reisebus'),
+ ('le caractère', 'der Charakter'),
+ ('le carnet', 'das Notizbuch'),
+ ('la carotte', 'die Karotte'),
+ ('le carrefour', 'die Kreuzung'),
+ ('la carte', 'die Karte'),
+ ('la carte bancaire', 'die Bankkarte'),
+ ("la carte d'identité", 'der Personalausweis'),
+ ('la carte postale', 'die Postkarte'),
+ ('le carton', 'der Karton'),
+ ('le cas', 'der Fall'),
+ ('en cas de', 'im Falle von'),
+ ('la casquette', 'die Kappe'),
+ ('cassé', 'kaputt'),
+ ('casser', 'kaputt machen'),
+ ('la casserole', 'der Kochtopf'),
+ ('la cathédrale', 'der Dom'),
+ ('la cause', 'der Grund'),
+ ('la cave', 'der Keller'),
+ ('le CD', 'die CD'),
+ ('ce soir', 'heute Abend'),
+ ('la ceinture', 'der Gürtel'),
+ ('célèbre', 'berühmt'),
+ ('célibataire', 'ledig'),
+ ('la cendre', 'die Asche'),
+ ('le centime', 'der Cent'),
+ ('le centre', 'das Zentrum'),
+ ('le centre-ville', 'die Innenstadt'),
+ ('cependant', 'jedoch'),
+ ('le cercle', 'der Kreis'),
+ ('les céréales', 'das Müsli'),
+ ('la cerise', 'die Kirsche'),
+ ('certain', 'sicher'),
+ ('certainement', 'bestimmt'),
+ ('le cerveau', 'das Gehirn'),
+ ('chacun', 'jeder'),
+ ('la chaîne', 'der Fernsehsender'),
+ ('la chaise', 'der Stuhl'),
+ ('la chaleur', 'die Hitze'),
+ ('la chambre', 'das Zimmer'),
+ ('le champ', 'das Feld'),
+ ('le champignon', 'der Pilz'),
+ ('le champion', 'der Meister'),
+ ('la chance', 'das Glück'),
+ ('changer', 'ändern'),
+ ('la chanson', 'das Lied'),
+ ('chanter', 'singen'),
+ ('le chanteur', 'der Sänger'),
+ ('le chapeau', 'der Hut'),
+ ('chaque', 'jeder'),
+ ('le charbon', 'die Kohle'),
+ ('la charcuterie', 'die Wurstwaren'),
+ ('charger', 'laden'),
+ ('le chargeur', 'das Ladegerät'),
+ ('le chat', 'die Katze'),
+ ('le château', 'das Schloss'),
+ ('chaud', 'warm'),
+ ('le chauffage', 'die Heizung'),
+ ('le chauffeur', 'der Fahrer'),
+ ('la chaussette', 'die Socke'),
+ ('la chaussure', 'der Schuh'),
+ ('chauve', 'kahl'),
+ ('le chemin', 'der Weg'),
+ ('la cheminée', 'der Kamin'),
+ ('la chemise', 'das Hemd'),
+ ('le chemisier', 'die Bluse'),
+ ('le chèque', 'der Scheck'),
+ ('cher', 'teuer'),
+ ('chercher', 'suchen'),
+ ('le cheval', 'das Pferd'),
+ ('les cheveux', 'die Haare'),
+ ('la cheville', 'der Knöchel'),
+ ('la chèvre', 'die Ziege'),
+ ('chez', 'bei'),
+ ('chez moi', 'zu Hause'),
+ ('le chien', 'der Hund'),
+ ('le chiffre', 'die Zahl'),
+ ('la chimie', 'die Chemie'),
+ ('la Chine', 'China'),
+ ('le chocolat', 'die Schokolade'),
+ ('choisir', 'wählen'),
+ ('le choix', 'die Wahl'),
+ ('le chômage', 'die Arbeitslosigkeit'),
+ ('le chômeur', 'der Arbeitslose'),
+ ('la chose', 'die Sache'),
+ ('le chou', 'der Kohl'),
+ ('la chute', 'der Sturz'),
+ ('le ciel', 'der Himmel'),
+ ('la cigarette', 'die Zigarette'),
+ ('le cinéma', 'das Kino'),
+ ('le cirque', 'der Zirkus'),
+ ('les ciseaux', 'die Schere'),
+ ('le citron', 'die Zitrone'),
+ ('clair', 'hell'),
+ ('la classe', 'die Klasse'),
+ ('le clavier', 'die Tastatur'),
+ ('la clé', 'der Schlüssel'),
+ ('le client', 'der Kunde'),
+ ('le climat', 'das Klima'),
+ ('la climatisation', 'die Klimaanlage'),
+ ('la clinique', 'die Klinik'),
+ ('le cochon', 'das Schwein'),
+ ('le code postal', 'die Postleitzahl'),
+ ('le coffre', 'der Kofferraum'),
+ ('le coiffeur', 'der Friseur'),
+ ('le coin', 'die Ecke'),
+ ('la colère', 'der Ärger'),
+ ('le colis', 'das Paket'),
+ ('le collègue', 'der Kollege'),
+ ('le collier', 'die Halskette'),
+ ('la colline', 'der Hügel'),
+ ('combien', 'wie viel'),
+ ('commander', 'bestellen'),
+ ('comme', 'wie'),
+ ('commencer', 'anfangen'),
+ ('comment', 'wie'),
+ ('le commerçant', 'der Händler'),
+ ('le commissariat', 'die Polizeiwache'),
+ ('la commune', 'die Gemeinde'),
+ ('compliqué', 'kompliziert'),
+ ('comprendre', 'verstehen'),
+ ('le comprimé', 'die Tablette'),
+ ('compris', 'inklusive'),
+ ('le compte', 'das Konto'),
+ ('compter', 'zählen'),
+ ('le concert', 'das Konzert'),
+ ('le concours', 'der Wettbewerb'),
+ ('conduire', 'fahren'),
+ ('la confiance', 'das Vertrauen'),
+ ('la confiture', 'die Marmelade'),
+ ('confortable', 'bequem'),
+ ('connaître', 'kennen'),
+ ('le conseil', 'der Rat'),
+ ('conseiller', 'raten'),
+ ('content', 'zufrieden'),
+ ('continuer', 'weitermachen'),
+ ('contre', 'gegen'),
+ ('le copain', 'der Kumpel'),
+ ('la copine', 'die Freundin'),
+ ('le corps', 'der Körper'),
+ ('correct', 'richtig'),
+ ('la côte', 'die Küste'),
+ ('le côté', 'die Seite'),
+ ('le coton', 'die Baumwolle'),
+ ('le cou', 'der Hals'),
+ ('se coucher', 'ins Bett gehen'),
+ ('la couleur', 'die Farbe'),
+ ('le couloir', 'der Flur'),
+ ('le coup de fil', 'der Anruf'),
+ ('couper', 'schneiden'),
+ ('la cour', 'der Hof'),
+ ('courageux', 'mutig'),
+ ('courir', 'laufen'),
+ ('le courriel', 'die E-Mail'),
+ ('le cours', 'der Kurs'),
+ ('les courses', 'die Einkäufe'),
+ ('court', 'kurz'),
+ ('le cousin', 'der Cousin'),
+ ('la cousine', 'die Cousine'),
+ ('le couteau', 'das Messer'),
+ ('coûter', 'kosten'),
+ ('la couverture', 'die Decke'),
+ ('le crayon', 'der Bleistift'),
+ ('créer', 'schaffen'),
+ ('la crème', 'die Sahne'),
+ ('la crêpe', 'der Pfannkuchen'),
+ ('croire', 'glauben'),
+ ('la croissance', 'das Wachstum'),
+ ('la cuillère', 'der Löffel'),
+ ('le cuir', 'das Leder'),
+ ('la cuisine', 'die Küche'),
+ ('cuisiner', 'kochen'),
+ ('le cuisinier', 'der Koch'),
+ ('cuit', 'gekocht'),
+ ('la culture', 'die Kultur'),
+ ('curieux', 'neugierig'),
+ ('le cœur', 'das Herz'),
+ ('le daim', 'das Wildleder'),
+ ('la dame', 'die Dame'),
+ ('le danger', 'die Gefahr'),
+ ('dangereux', 'gefährlich'),
+ ('dans', 'in'),
+ ('la danse', 'der Tanz'),
+ ('danser', 'tanzen'),
+ ('la date', 'das Datum'),
+ ('la date de naissance', 'das Geburtsdatum'),
+ ('le dauphin', 'der Delfin'),
+ ('davantage', 'mehr'),
+ ('de', 'von'),
+ ('le dé', 'der Würfel'),
+ ('de bonne humeur', 'gut gelaunt'),
+ ('de temps en temps', 'ab und zu'),
+ ('débarrasser', 'abräumen'),
+ ('le débat', 'die Debatte'),
+ ('déborder', 'überlaufen'),
+ ('déboucher', 'öffnen'),
+ ('debout', 'stehend'),
+ ('se débrouiller', 'zurechtkommen'),
+ ('le début', 'der Anfang'),
+ ('décaféiné', 'entkoffeiniert'),
+ ('décembre', 'Dezember'),
+ ('la déception', 'die Enttäuschung'),
+ ('décevoir', 'enttäuschen'),
+ ('le déchet', 'der Müll'),
+ ('les déchets', 'der Abfall'),
+ ('déchirer', 'zerreißen'),
+ ('décider', 'entscheiden'),
+ ('la décision', 'die Entscheidung'),
+ ('la déclaration', 'die Erklärung'),
+ ('déclarer', 'erklären'),
+ ('décoller', 'abfliegen'),
+ ('décorer', 'schmücken'),
+ ('découper', 'ausschneiden'),
+ ('découvrir', 'entdecken'),
+ ('décrire', 'beschreiben'),
+ ('décrocher', 'abheben'),
+ ('déçu', 'enttäuscht'),
+ ('dedans', 'drinnen'),
+ ('la dédicace', 'die Widmung'),
+ ('défaire', 'auspacken'),
+ ('la défaite', 'die Niederlage'),
+ ('le défaut', 'der Fehler'),
+ ('défendre', 'verteidigen'),
+ ('défendu', 'verboten'),
+ ('le défilé', 'der Umzug'),
+ ('dégoûtant', 'ekelhaft'),
+ ('le degré', 'der Grad'),
+ ('déguisé', 'verkleidet'),
+ ('la dégustation', 'die Verkostung'),
+ ('dehors', 'draußen'),
+ ('déjà', 'schon'),
+ ('déjeuner', 'zu Mittag essen'),
+ ('le déjeuner', 'das Mittagessen'),
+ ('le délai', 'die Frist'),
+ ('délicat', 'empfindlich'),
+ ('délicieux', 'lecker'),
+ ('demain', 'morgen'),
+ ('la demande', 'die Anfrage'),
+ ('demander', 'fragen'),
+ ('démarrer', 'starten'),
+ ('le déménagement', 'der Umzug'),
+ ('déménager', 'umziehen'),
+ ('demeurer', 'wohnen'),
+ ('demi', 'halb'),
+ ('le demi-frère', 'der Halbbruder'),
+ ('la demi-heure', 'die halbe Stunde'),
+ ('la demi-sœur', 'die Halbschwester'),
+ ('la démocratie', 'die Demokratie'),
+ ('la dent', 'der Zahn'),
+ ('le dentifrice', 'die Zahnpasta'),
+ ('le dentiste', 'der Zahnarzt'),
+ ('dépanner', 'helfen'),
+ ('le départ', 'die Abfahrt'),
+ ('le département', 'das Departement'),
+ ('dépasser', 'überholen'),
+ ('se dépêcher', 'sich beeilen'),
+ ('dépendre', 'abhängen'),
+ ('la dépense', 'die Ausgabe'),
+ ('dépenser', 'ausgeben'),
+ ('le dépliant', 'das Faltblatt'),
+ ('déposer', 'abstellen'),
+ ('déprimé', 'deprimiert'),
+ ('depuis', 'seit'),
+ ('déranger', 'stören'),
+ ('dernier', 'letzte'),
+ ('derrière', 'hinter'),
+ ('désagréable', 'unangenehm'),
+ ('descendre', 'aussteigen'),
+ ('la description', 'die Beschreibung'),
+ ('le désert', 'die Wüste'),
+ ('désirer', 'wünschen'),
+ ('désolé', 'es tut mir leid'),
+ ('le désordre', 'die Unordnung'),
+ ('le dessert', 'der Nachtisch'),
+ ('le dessin', 'die Zeichnung'),
+ ('le dessin animé', 'der Zeichentrickfilm'),
+ ('dessiner', 'zeichnen'),
+ ('dessous', 'darunter'),
+ ('dessus', 'darauf'),
+ ('la destination', 'das Reiseziel'),
+ ('le détail', 'die Einzelheit'),
+ ('détendu', 'entspannt'),
+ ('détester', 'hassen'),
+ ('la dette', 'die Schuld'),
+ ('devant', 'vor'),
+ ('développer', 'entwickeln'),
+ ('devenir', 'werden'),
+ ('deviner', 'raten'),
+ ('devoir', 'müssen'),
+ ('le devoir', 'die Pflicht'),
+ ('les devoirs', 'die Hausaufgaben'),
+ ('le diabète', 'der Diabetes'),
+ ('le dialogue', 'der Dialog'),
+ ('le dictionnaire', 'das Wörterbuch'),
+ ('la différence', 'der Unterschied'),
+ ('différent', 'verschieden'),
+ ('difficile', 'schwierig'),
+ ('la difficulté', 'die Schwierigkeit'),
+ ('le dimanche', 'der Sonntag'),
+ ('dîner', 'zu Abend essen'),
+ ('le dîner', 'das Abendessen'),
+ ('le diplôme', 'das Diplom'),
+ ('dire', 'sagen'),
+ ('direct', 'direkt'),
+ ('le directeur', 'der Direktor'),
+ ('la direction', 'die Richtung'),
+ ('diriger', 'leiten'),
+ ('la discothèque', 'die Diskothek'),
+ ('la discussion', 'die Diskussion'),
+ ('discuter', 'diskutieren'),
+ ('disparaître', 'verschwinden'),
+ ('disponible', 'verfügbar'),
+ ('la dispute', 'der Streit'),
+ ('se disputer', 'sich streiten'),
+ ('le disque', 'die Schallplatte'),
+ ('la distance', 'die Entfernung'),
+ ('distribuer', 'verteilen'),
+ ('le distributeur', 'der Geldautomat'),
+ ('divorcé', 'geschieden'),
+ ('le docteur', 'der Arzt'),
+ ('le document', 'das Dokument'),
+ ('le doigt', 'der Finger'),
+ ('le domicile', 'der Wohnort'),
+ ('dommage', 'schade'),
+ ('donc', 'also'),
+ ('donner', 'geben'),
+ ('dormir', 'schlafen'),
+ ('le dos', 'der Rücken'),
+ ('la douane', 'der Zoll'),
+ ('doucement', 'leise'),
+ ('la douche', 'die Dusche'),
+ ('se doucher', 'duschen'),
+ ('la douleur', 'der Schmerz'),
+ ('le doute', 'der Zweifel'),
+ ('doux', 'weich'),
+ ('la douzaine', 'das Dutzend'),
+ ('le drap', 'das Betttuch'),
+ ('le drapeau', 'die Fahne'),
+ ('droit', 'gerade'),
+ ('le droit', 'das Recht'),
+ ('drôle', 'lustig'),
+ ('dur', 'hart'),
+ ('durer', 'dauern'),
+ ('le DVD', 'die DVD'),
+ ('dynamique', 'dynamisch'),
+ ("l'e-mail", 'die E-Mail'),
+ ("l'eau", 'das Wasser'),
+ ("l'eau minérale", 'das Mineralwasser'),
+ ("l'éboueur", 'der Müllmann'),
+ ("l'écart", 'der Abstand'),
+ ("l'échange", 'der Austausch'),
+ ('échanger', 'tauschen'),
+ ("l'écharpe", 'der Schal'),
+ ("l'échec", 'der Misserfolg'),
+ ('les échecs', 'das Schach'),
+ ("l'échelle", 'die Leiter'),
+ ("l'éclair", 'der Blitz'),
+ ("l'éclairage", 'die Beleuchtung'),
+ ("l'école", 'die Schule'),
+ ("l'écolier", 'der Schüler'),
+ ("l'économie", 'die Wirtschaft'),
+ ('économiser', 'sparen'),
+ ('écouter', 'zuhören'),
+ ("l'écouteur", 'der Kopfhörer'),
+ ("l'écran", 'der Bildschirm'),
+ ('écrire', 'schreiben'),
+ ("l'écriture", 'die Schrift'),
+ ("l'écrivain", 'der Schriftsteller'),
+ ("l'écureuil", 'das Eichhörnchen'),
+ ("l'éducation", 'die Erziehung'),
+ ('effacer', 'löschen'),
+ ('en effet', 'tatsächlich'),
+ ("l'effet", 'die Wirkung'),
+ ('efficace', 'wirksam'),
+ ("l'effort", 'die Anstrengung'),
+ ('égal', 'gleich'),
+ ('également', 'ebenfalls'),
+ ("l'égalité", 'die Gleichheit'),
+ ("l'église", 'die Kirche'),
+ ("l'élection", 'die Wahl'),
+ ("l'électricien", 'der Elektriker'),
+ ("l'électricité", 'der Strom'),
+ ('électrique', 'elektrisch'),
+ ('élégant', 'elegant'),
+ ("l'éléphant", 'der Elefant'),
+ ("l'élève", 'der Schüler'),
+ ('élever', 'erziehen'),
+ ('elle', 'sie'),
+ ('emballer', 'einpacken'),
+ ("l'embarras", 'die Verlegenheit'),
+ ("l'embouteillage", 'der Stau'),
+ ('embrasser', 'küssen'),
+ ("l'émission", 'die Sendung'),
+ ('emmener', 'mitnehmen'),
+ ("l'émotion", 'das Gefühl'),
+ ("l'emploi", 'die Stelle'),
+ ("l'emploi du temps", 'der Stundenplan'),
+ ("l'employé", 'der Angestellte'),
+ ('employer', 'beschäftigen'),
+ ('emporter', 'mitnehmen'),
+ ('emprunter', 'ausleihen'),
+ ('enceinte', 'schwanger'),
+ ('encore', 'noch'),
+ ('encore une fois', 'noch einmal'),
+ ("s'endormir", 'einschlafen'),
+ ("l'endroit", 'der Ort'),
+ ("l'énergie", 'die Energie'),
+ ('énerver', 'nerven'),
+ ("l'enfance", 'die Kindheit'),
+ ("l'enfant", 'das Kind'),
+ ('enfin', 'endlich'),
+ ('enlever', 'ausziehen'),
+ ("l'ennemi", 'der Feind'),
+ ("l'ennui", 'die Langeweile'),
+ ("s'ennuyer", 'sich langweilen'),
+ ('ennuyeux', 'langweilig'),
+ ('énorme', 'riesig'),
+ ("l'enquête", 'die Umfrage'),
+ ('enregistrer', 'aufnehmen'),
+ ('enrhumé', 'erkältet'),
+ ("l'enseignant", 'der Lehrer'),
+ ('ensemble', 'zusammen'),
+ ('ensoleillé', 'sonnig'),
+ ('ensuite', 'dann'),
+ ('entendre', 'hören'),
+ ("s'entendre", 'sich verstehen'),
+ ("l'enterrement", 'die Beerdigung'),
+ ('entier', 'ganz'),
+ ("l'entraînement", 'das Training'),
+ ("s'entraîner", 'trainieren'),
+ ('entre', 'zwischen'),
+ ("l'entrée", 'der Eingang'),
+ ("l'entreprise", 'die Firma'),
+ ('entrer', 'eintreten'),
+ ("l'enveloppe", 'der Umschlag'),
+ ("l'envie", 'die Lust'),
+ ('environ', 'ungefähr'),
+ ("l'environnement", 'die Umwelt'),
+ ('envoyer', 'schicken'),
+ ("l'épaule", 'die Schulter'),
+ ("l'épicerie", 'das Lebensmittelgeschäft'),
+ ('les épices', 'die Gewürze'),
+ ("l'épinard", 'der Spinat'),
+ ("l'éponge", 'der Schwamm'),
+ ("l'époque", 'die Zeit'),
+ ('épouser', 'heiraten'),
+ ('épuisé', 'erschöpft'),
+ ("l'équipe", 'die Mannschaft'),
+ ("l'erreur", 'der Fehler'),
+ ("l'escalier", 'die Treppe'),
+ ("l'escargot", 'die Schnecke'),
+ ("l'esclave", 'der Sklave'),
+ ("l'espace", 'der Raum'),
+ ("l'Espagne", 'Spanien'),
+ ('espagnol', 'spanisch'),
+ ('espérer', 'hoffen'),
+ ("l'esprit", 'der Geist'),
+ ('essayer', 'versuchen'),
+ ("l'essence", 'das Benzin'),
+ ('essentiel', 'wesentlich'),
+ ('essuyer', 'abtrocknen'),
+ ("l'est", 'der Osten'),
+ ("l'estomac", 'der Magen'),
+ ('et', 'und'),
+ ("l'étage", 'der Stock'),
+ ("l'étagère", 'das Regal'),
+ ("l'été", 'der Sommer'),
+ ('éteindre', 'ausmachen'),
+ ("l'étoile", 'der Stern'),
+ ('étonné', 'erstaunt'),
+ ('étrange', 'seltsam'),
+ ("l'étranger", 'der Ausländer'),
+ ('être', 'sein'),
+ ('étroit', 'eng'),
+ ('les études', 'das Studium'),
+ ("l'étudiant", 'der Student'),
+ ('étudier', 'studieren'),
+ ("l'euro", 'der Euro'),
+ ("l'Europe", 'Europa'),
+ ('européen', 'europäisch'),
+ ('eux', 'sie'),
+ ("l'événement", 'das Ereignis'),
+ ('évidemment', 'selbstverständlich'),
+ ("l'évier", 'die Spüle'),
+ ('éviter', 'vermeiden'),
+ ('exact', 'genau'),
+ ('exactement', 'genau'),
+ ("l'examen", 'die Prüfung'),
+ ('excellent', 'ausgezeichnet'),
+ ("l'exception", 'die Ausnahme'),
+ ("l'excursion", 'der Ausflug'),
+ ('excuser', 'entschuldigen'),
+ ("l'exemple", 'das Beispiel'),
+ ("l'exercice", 'die Übung'),
+ ("l'expérience", 'die Erfahrung'),
+ ("l'explication", 'die Erklärung'),
+ ('expliquer', 'erklären'),
+ ("l'exposition", 'die Ausstellung'),
+ ('exprès', 'absichtlich'),
+ ("l'extérieur", 'das Äußere'),
+ ('extra', 'super'),
+ ('extraordinaire', 'außergewöhnlich'),
+ ('la fabrique', 'die Fabrik'),
+ ('fabriquer', 'herstellen'),
+ ('fabuleux', 'fabelhaft'),
+ ('la façade', 'die Fassade'),
+ ('en face', 'gegenüber'),
+ ('en face de', 'gegenüber'),
+ ('fâché', 'böse'),
+ ('se fâcher', 'sich ärgern'),
+ ('facile', 'leicht'),
+ ('facilement', 'leicht'),
+ ('la façon', 'die Art'),
+ ('le facteur', 'der Briefträger'),
+ ('la facture', 'die Rechnung'),
+ ('la faculté', 'die Fakultät'),
+ ('faible', 'schwach'),
+ ('la faiblesse', 'die Schwäche'),
+ ('la faim', 'der Hunger'),
+ ('faire', 'machen'),
+ ('faire attention', 'aufpassen'),
+ ('faire du sport', 'Sport treiben'),
+ ('faire du vélo', 'Fahrrad fahren'),
+ ('faire la cuisine', 'kochen'),
+ ('faire la fête', 'feiern'),
+ ('faire la queue', 'Schlange stehen'),
+ ('faire la vaisselle', 'abwaschen'),
+ ('faire le ménage', 'putzen'),
+ ('faire les courses', 'einkaufen'),
+ ('le faire-part', 'die Anzeige'),
+ ('le fait', 'die Tatsache'),
+ ('la falaise', 'die Klippe'),
+ ('falloir', 'müssen'),
+ ('fameux', 'berühmt'),
+ ('familial', 'familiär'),
+ ('la famille', 'die Familie'),
+ ('la farine', 'das Mehl'),
+ ('fatigant', 'anstrengend'),
+ ('fatigué', 'müde'),
+ ('la fatigue', 'die Müdigkeit'),
+ ('la faute', 'der Fehler'),
+ ('le fauteuil', 'der Sessel'),
+ ('faux', 'falsch'),
+ ('la faveur', 'der Gefallen'),
+ ('favori', 'Lieblings-'),
+ ('le fax', 'das Fax'),
+ ('la fée', 'die Fee'),
+ ('félicitations', 'herzlichen Glückwunsch'),
+ ('féliciter', 'gratulieren'),
+ ('féminin', 'weiblich'),
+ ('la femme', 'die Frau'),
+ ('la fenêtre', 'das Fenster'),
+ ('le fenouil', 'der Fenchel'),
+ ('le fer', 'das Eisen'),
+ ('le fer à repasser', 'das Bügeleisen'),
+ ('férié', 'feiertags'),
+ ('fermé', 'geschlossen'),
+ ('la ferme', 'der Bauernhof'),
+ ('fermer', 'schließen'),
+ ('le fermier', 'der Bauer'),
+ ('le festival', 'das Festival'),
+ ('la fête', 'das Fest'),
+ ('fêter', 'feiern'),
+ ('le feu', 'das Feuer'),
+ ("le feu d'artifice", 'das Feuerwerk'),
+ ('le feu rouge', 'die Ampel'),
+ ('la feuille', 'das Blatt'),
+ ('le feuilleton', 'die Serie'),
+ ('la fève', 'die Saubohne'),
+ ('février', 'Februar'),
+ ('les fiançailles', 'die Verlobung'),
+ ('le fiancé', 'der Verlobte'),
+ ('la fiancée', 'die Verlobte'),
+ ('la fiche', 'das Formular'),
+ ('le fichier', 'die Datei'),
+ ('fidèle', 'treu'),
+ ('fier', 'stolz'),
+ ('la fièvre', 'das Fieber'),
+ ('la figure', 'das Gesicht'),
+ ('le fil', 'der Faden'),
+ ("la file d'attente", 'die Warteschlange'),
+ ('le filet', 'das Netz'),
+ ('la fille', 'die Tochter'),
+ ('le filleul', 'das Patenkind'),
+ ('le film', 'der Film'),
+ ('le fils', 'der Sohn'),
+ ('le filtre', 'der Filter'),
+ ('fin', 'dünn'),
+ ('la fin', 'das Ende'),
+ ('finalement', 'schließlich'),
+ ('financier', 'finanziell'),
+ ('finir', 'beenden'),
+ ('fixer', 'befestigen'),
+ ('le flacon', 'das Fläschchen'),
+ ('la flamme', 'die Flamme'),
+ ('le flash', 'der Blitz'),
+ ('la flèche', 'der Pfeil'),
+ ('la fleur', 'die Blume'),
+ ('le fleuve', 'der Fluss'),
+ ('flotter', 'schwimmen'),
+ ('la flûte', 'die Flöte'),
+ ('le foie', 'die Leber'),
+ ('la foire', 'die Messe'),
+ ('la fois', 'das Mal'),
+ ('une fois', 'einmal'),
+ ('foncé', 'dunkel'),
+ ('le fond', 'der Boden'),
+ ('la fontaine', 'der Brunnen'),
+ ('le football', 'der Fußball'),
+ ('le footing', 'das Joggen'),
+ ('la force', 'die Kraft'),
+ ('la forêt', 'der Wald'),
+ ('le forfait', 'die Pauschale'),
+ ('la formation', 'die Ausbildung'),
+ ('en forme', 'fit'),
+ ('la forme', 'die Form'),
+ ('le formulaire', 'das Formular'),
+ ('fort', 'stark'),
+ ('fort en', 'gut in'),
+ ('fou', 'verrückt'),
+ ('le foulard', 'das Halstuch'),
+ ('la foule', 'die Menschenmenge'),
+ ('le four', 'der Backofen'),
+ ('la fourchette', 'die Gabel'),
+ ('fournir', 'liefern'),
+ ('frais', 'frisch'),
+ ('les frais', 'die Kosten'),
+ ('frais de port', 'die Versandkosten'),
+ ('la fraise', 'die Erdbeere'),
+ ('la framboise', 'die Himbeere'),
+ ('français', 'französisch'),
+ ('le français', 'Französisch'),
+ ('la France', 'Frankreich'),
+ ('franchement', 'ehrlich gesagt'),
+ ('frapper', 'schlagen'),
+ ('frapper à la porte', 'an die Tür klopfen'),
+ ('le frein', 'die Bremse'),
+ ('fréquent', 'häufig'),
+ ('le frère', 'der Bruder'),
+ ('le frigo', 'der Kühlschrank'),
+ ('la friperie', 'der Secondhandladen'),
+ ('frisé', 'lockig'),
+ ('les frites', 'die Pommes frites'),
+ ('la friteuse', 'die Fritteuse'),
+ ('froid', 'kalt'),
+ ('froisser', 'zerknittern'),
+ ('le fromage', 'der Käse'),
+ ('le fromager', 'der Käsehändler'),
+ ('le front', 'die Stirn'),
+ ('la frontière', 'die Grenze'),
+ ('la frousse', 'die Angst'),
+ ('le fruit', 'das Obst'),
+ ('le fruitier', 'der Obsthändler'),
+ ('les fruits de mer', 'die Meeresfrüchte'),
+ ('fuir', 'fliehen'),
+ ('la fuite', 'die Flucht'),
+ ('la fumée', 'der Rauch'),
+ ('fumer', 'rauchen'),
+ ('le fumeur', 'der Raucher'),
+ ('furieux', 'wütend'),
+ ('la fusée', 'die Rakete'),
+ ('le futur', 'die Zukunft'),
+ ('gâcher', 'verderben'),
+ ('gagner', 'gewinnen'),
+ ('gai', 'fröhlich'),
+ ('la gaieté', 'die Fröhlichkeit'),
+ ('le gain', 'der Gewinn'),
+ ('la galerie', 'die Galerie'),
+ ('la galette', 'der Fladen'),
+ ('le gamin', 'das Kind'),
+ ('la gamme', 'die Auswahl'),
+ ('le gang', 'die Bande'),
+ ('le gant', 'der Handschuh'),
+ ('le garage', 'die Werkstatt'),
+ ('le garçon', 'der Junge'),
+ ('le garde', 'der Wächter'),
+ ('la garde-robe', 'der Kleiderschrank'),
+ ('garder', 'behalten'),
+ ('la garderie', 'die Kita'),
+ ('le gardien', 'der Hausmeister'),
+ ('le gardien de but', 'der Torwart'),
+ ('la gare', 'der Bahnhof'),
+ ('la gare centrale', 'der Hauptbahnhof'),
+ ('la gare routière', 'der Busbahnhof'),
+ ('garer', 'parken'),
+ ('le gaspillage', 'die Verschwendung'),
+ ('gaspiller', 'verschwenden'),
+ ('le gâteau', 'der Kuchen'),
+ ("le gâteau d'anniversaire", 'der Geburtstagskuchen'),
+ ('gâter', 'verwöhnen'),
+ ('gauche', 'linke'),
+ ('gauche (maladroit)', 'ungeschickt'),
+ ('la gaufre', 'die Waffel'),
+ ('le gaufrier', 'das Waffeleisen'),
+ ('le gaz', 'das Gas'),
+ ('le géant', 'der Riese'),
+ ('le gel', 'der Frost'),
+ ('le gel douche', 'das Duschgel'),
+ ('la gelée', 'das Gelee'),
+ ('geler', 'frieren'),
+ ('gênant', 'peinlich'),
+ ('le gendarme', 'der Polizist'),
+ ('le gendre', 'der Schwiegersohn'),
+ ('gêner', 'stören'),
+ ('en général', 'im Allgemeinen'),
+ ('général', 'allgemein'),
+ ('la génération', 'die Generation'),
+ ('généreux', 'großzügig'),
+ ('génial', 'genial'),
+ ('le genou', 'das Knie'),
+ ('le genre', 'die Art'),
+ ('les gens', 'die Leute'),
+ ('gentil', 'nett'),
+ ('la gentillesse', 'die Freundlichkeit'),
+ ('la géographie', 'die Erdkunde'),
+ ('gérer', 'verwalten'),
+ ('le germe', 'der Keim'),
+ ('le geste', 'die Geste'),
+ ('le gibier', 'das Wild'),
+ ('le gilet', 'die Weste'),
+ ('la girafe', 'die Giraffe'),
+ ('le gîte', 'die Ferienwohnung'),
+ ('la glace', 'das Eis'),
+ ('le glacier', 'der Gletscher'),
+ ('le glaçon', 'der Eiswürfel'),
+ ('la glissade', 'das Rutschen'),
+ ('glisser', 'rutschen'),
+ ('le globe', 'der Globus'),
+ ('la gloire', 'der Ruhm'),
+ ('le golf', 'das Golf'),
+ ('la gomme', 'der Radiergummi'),
+ ('la gorge', 'der Hals'),
+ ('le gorille', 'der Gorilla'),
+ ('la gourde', 'die Trinkflasche'),
+ ('gourmand', 'naschhaft'),
+ ('le gourmet', 'der Feinschmecker'),
+ ("la gousse d'ail", 'die Knoblauchzehe'),
+ ('le goût', 'der Geschmack'),
+ ('goûter', 'probieren'),
+ ('le goûter', 'der Nachmittagsimbiss'),
+ ('la goutte', 'der Tropfen'),
+ ('le gouvernement', 'die Regierung'),
+ ('gouverner', 'regieren'),
+ ('le gouverneur', 'der Gouverneur'),
+ ('la grâce', 'die Gnade'),
+ ('grâce à', 'dank'),
+ ('gracieux', 'anmutig'),
+ ('la graine', 'der Samen'),
+ ('la graisse', 'das Fett'),
+ ('la grammaire', 'die Grammatik'),
+ ('le gramme', 'das Gramm'),
+ ('grand', 'groß'),
+ ('grand-chose', 'viel'),
+ ('la grand-mère', 'die Großmutter'),
+ ('le grand-père', 'der Großvater'),
+ ('la grande surface', 'der Großmarkt'),
+ ('la grandeur', 'die Größe'),
+ ('grandir', 'wachsen'),
+ ('les grands-parents', 'die Großeltern'),
+ ('gras', 'fettig'),
+ ('la gratitude', 'die Dankbarkeit'),
+ ('le gratte-ciel', 'der Wolkenkratzer'),
+ ('gratter', 'kratzen'),
+ ('gratuit', 'kostenlos'),
+ ('grave', 'schlimm'),
+ ('graver', 'gravieren'),
+ ('grec', 'griechisch'),
+ ('la Grèce', 'Griechenland'),
+ ('le grenier', 'der Dachboden'),
+ ('la grenouille', 'der Frosch'),
+ ('la grève', 'der Streik'),
+ ('la grille', 'das Gitter'),
+ ('griller', 'grillen'),
+ ('la grimace', 'die Grimasse'),
+ ('grimper', 'klettern'),
+ ('la grippe', 'die Grippe'),
+ ('la grippe saisonnière', 'die saisonale Grippe'),
+ ('gris', 'grau'),
+ ('gris clair', 'hellgrau'),
+ ('le grondement', 'das Grollen'),
+ ('gronder', 'schimpfen'),
+ ('gros', 'dick'),
+ ('la grossesse', 'die Schwangerschaft'),
+ ('grossir', 'zunehmen'),
+ ('la grotte', 'die Höhle'),
+ ('le groupe', 'die Gruppe'),
+ ('la grue', 'der Kran'),
+ ('le gruyère', 'der Greyerzer'),
+ ('la guêpe', 'die Wespe'),
+ ('guérir', 'heilen'),
+ ('la guérison', 'die Heilung'),
+ ('la guerre', 'der Krieg'),
+ ('le guerrier', 'der Krieger'),
+ ('guetter', 'lauern'),
+ ('la gueule', 'das Maul'),
+ ('le guichet', 'der Schalter'),
+ ('le guide', 'der Reiseführer'),
+ ('le guide touristique', 'der Fremdenführer'),
+ ('guider', 'führen'),
+ ('le guidon', 'der Lenker'),
+ ('la guirlande', 'die Girlande'),
+ ('la guitare', 'die Gitarre'),
+ ('le gymnase', 'die Turnhalle'),
+ ('la gymnastique', 'die Gymnastik'),
+ ('habile', 'geschickt'),
+ ('habillé', 'angezogen'),
+ ("s'habiller", 'sich anziehen'),
+ ("l'habitant", 'der Einwohner'),
+ ('habiter', 'wohnen'),
+ ("d'habitude", 'normalerweise'),
+ ("l'habitude", 'die Gewohnheit'),
+ ('la hache', 'die Axt'),
+ ('la haine', 'der Hass'),
+ ('haïr', 'hassen'),
+ ("l'haleine", 'der Atem'),
+ ('haletant', 'atemlos'),
+ ('le hall', 'die Halle'),
+ ('la halte', 'die Rast'),
+ ('le hamburger', 'der Hamburger'),
+ ("l'hameçon", 'der Angelhaken'),
+ ('le hamster', 'der Hamster'),
+ ('la hanche', 'die Hüfte'),
+ ('le handicap', 'die Behinderung'),
+ ('handicapé', 'behindert'),
+ ('le hangar', 'die Halle'),
+ ('le harcèlement', 'die Belästigung'),
+ ('le hareng', 'der Hering'),
+ ('le haricot', 'die Bohne'),
+ ('la harpe', 'die Harfe'),
+ ('le hasard', 'der Zufall'),
+ ('la hausse', 'der Anstieg'),
+ ('hausser', 'erhöhen'),
+ ('en haut', 'oben'),
+ ('haut', 'hoch'),
+ ('le haut-parleur', 'der Lautsprecher'),
+ ('la hauteur', 'die Höhe'),
+ ("l'hebdomadaire", 'die Wochenzeitung'),
+ ("l'hébergement", 'die Unterkunft'),
+ ('héberger', 'beherbergen'),
+ ("l'hectare", 'der Hektar'),
+ ('hein', 'nicht wahr'),
+ ('hélas', 'leider'),
+ ("l'hélicoptère", 'der Hubschrauber'),
+ ("l'herbe", 'das Gras'),
+ ('le hérisson', 'der Igel'),
+ ("l'héritage", 'das Erbe'),
+ ('hériter', 'erben'),
+ ("l'héroïne", 'die Heldin'),
+ ('le héros', 'der Held'),
+ ('hésiter', 'zögern'),
+ ('le hêtre', 'die Buche'),
+ ("l'heure", 'die Stunde'),
+ ("l'heure de pointe", 'die Hauptverkehrszeit'),
+ ('heureusement', 'zum Glück'),
+ ('heureux', 'glücklich'),
+ ('heurter', 'stoßen'),
+ ('le hibou', 'die Eule'),
+ ('hideux', 'scheußlich'),
+ ('hier', 'gestern'),
+ ('hier soir', 'gestern Abend'),
+ ('la hiérarchie', 'die Hierarchie'),
+ ("l'hippopotame", 'das Nilpferd'),
+ ("l'hirondelle", 'die Schwalbe'),
+ ("l'histoire", 'die Geschichte'),
+ ('historique', 'historisch'),
+ ("l'hiver", 'der Winter'),
+ ('la HLM', 'die Sozialwohnung'),
+ ('le hobby', 'das Hobby'),
+ ('le hockey', 'das Eishockey'),
+ ('la Hollande', 'Holland'),
+ ('le homard', 'der Hummer'),
+ ("l'homme", 'der Mann'),
+ ("l'homme d'affaires", 'der Geschäftsmann'),
+ ('honnête', 'ehrlich'),
+ ("l'honneur", 'die Ehre'),
+ ('honorer', 'ehren'),
+ ('la honte', 'die Scham'),
+ ("l'hôpital", 'das Krankenhaus'),
+ ('le hoquet', 'der Schluckauf'),
+ ("l'horaire", 'der Fahrplan'),
+ ("l'horizon", 'der Horizont'),
+ ('horizontal', 'waagerecht'),
+ ("l'horloge", 'die Uhr'),
+ ("l'hormone", 'das Hormon'),
+ ("l'horreur", 'der Schrecken'),
+ ('horrible', 'schrecklich'),
+ ('hors de', 'außerhalb'),
+ ("le hors-d'œuvre", 'die Vorspeise'),
+ ('hospitalisé', 'im Krankenhaus'),
+ ("l'hospitalité", 'die Gastfreundschaft'),
+ ('hostile', 'feindlich'),
+ ("l'hôte", 'der Gastgeber'),
+ ("l'hôtel", 'das Hotel'),
+ ("l'hôtesse de l'air", 'die Flugbegleiterin'),
+ ('la hotte', 'die Dunstabzugshaube'),
+ ('la housse', 'die Hülle'),
+ ('le houx', 'die Stechpalme'),
+ ('le hublot', 'das Bullauge'),
+ ("l'huile", 'das Öl'),
+ ('huit', 'acht'),
+ ("l'huître", 'die Auster'),
+ ('humain', 'menschlich'),
+ ('humble', 'bescheiden'),
+ ("l'humeur", 'die Laune'),
+ ('humide', 'feucht'),
+ ('humilier', 'demütigen'),
+ ("l'humour", 'der Humor'),
+ ('hurler', 'schreien'),
+ ('la hutte', 'die Hütte'),
+ ("l'hygiène", 'die Hygiene'),
+ ("l'hymne", 'die Hymne'),
+ ('hypocrite', 'scheinheilig'),
+ ("l'hypothèse", 'die Annahme'),
+ ('ici', 'hier'),
+ ("l'icône", 'das Symbol'),
+ ('idéal', 'ideal'),
+ ("l'idée", 'die Idee'),
+ ('identique', 'gleich'),
+ ("l'identité", 'die Identität'),
+ ('idiot', 'dumm'),
+ ("l'idole", 'das Idol'),
+ ("l'igloo", 'das Iglu'),
+ ("l'ignorance", 'die Unwissenheit'),
+ ('ignorer', 'nicht wissen'),
+ ('il', 'er'),
+ ("s'il te plaît", 'bitte'),
+ ('il y a', 'es gibt'),
+ ("l'île", 'die Insel'),
+ ('illégal', 'illegal'),
+ ('illimité', 'unbegrenzt'),
+ ('illuminer', 'beleuchten'),
+ ("l'illusion", 'die Illusion'),
+ ("l'illustration", 'die Abbildung'),
+ ("l'image", 'das Bild'),
+ ("l'imagination", 'die Fantasie'),
+ ('imaginer', 'sich vorstellen'),
+ ("l'imbécile", 'der Dummkopf'),
+ ('imiter', 'nachahmen'),
+ ('immédiatement', 'sofort'),
+ ('immense', 'riesig'),
+ ("l'immeuble", 'das Gebäude'),
+ ("l'immigré", 'der Einwanderer'),
+ ('immobile', 'bewegungslos'),
+ ("l'immobilier", 'die Immobilien'),
+ ('immobiliser', 'ruhig stellen'),
+ ("l'impatience", 'die Ungeduld'),
+ ('impatient', 'ungeduldig'),
+ ("l'imperméable", 'der Regenmantel'),
+ ('impoli', 'unhöflich'),
+ ("l'importance", 'die Bedeutung'),
+ ('important', 'wichtig'),
+ ('importer', 'einführen'),
+ ('impossible', 'unmöglich'),
+ ("l'impôt", 'die Steuer'),
+ ("l'impression", 'der Eindruck'),
+ ('impressionnant', 'beeindruckend'),
+ ("l'imprévu", 'das Unvorhergesehene'),
+ ("l'imprimante", 'der Drucker'),
+ ('imprimer', 'drucken'),
+ ('imprudent', 'unvorsichtig'),
+ ('inacceptable', 'inakzeptabel'),
+ ('inattendu', 'unerwartet'),
+ ("l'incendie", 'der Brand'),
+ ('inclus', 'inbegriffen'),
+ ('inconnu', 'unbekannt'),
+ ("l'inconvénient", 'der Nachteil'),
+ ('incroyable', 'unglaublich'),
+ ("l'Inde", 'Indien'),
+ ("l'indépendance", 'die Unabhängigkeit'),
+ ('indépendant', 'unabhängig'),
+ ("l'indication", 'die Angabe'),
+ ("l'indice", 'der Hinweis'),
+ ('indifférent', 'gleichgültig'),
+ ('indiquer', 'zeigen'),
+ ('indispensable', 'unentbehrlich'),
+ ("l'individu", 'der Einzelne'),
+ ("l'industrie", 'die Industrie'),
+ ('industriel', 'industriell'),
+ ("l'infection", 'die Entzündung'),
+ ('inférieur', 'niedriger'),
+ ('infini', 'unendlich'),
+ ("l'infirmier", 'der Krankenpfleger'),
+ ("l'infirmière", 'die Krankenschwester'),
+ ("l'inflation", 'die Inflation'),
+ ("l'influence", 'der Einfluss'),
+ ("l'informaticien", 'der Informatiker'),
+ ("l'information", 'die Information'),
+ ('les informations', 'die Nachrichten'),
+ ("l'informatique", 'die Informatik'),
+ ('informer', 'informieren'),
+ ("l'ingénieur", 'der Ingenieur'),
+ ("l'ingrédient", 'die Zutat'),
+ ("l'injection", 'die Spritze'),
+ ('injuste', 'ungerecht'),
+ ("l'innocent", 'der Unschuldige'),
+ ("l'inondation", 'die Überschwemmung'),
+ ('inoubliable', 'unvergesslich'),
+ ('inquiet', 'besorgt'),
+ ("s'inquiéter", 'sich Sorgen machen'),
+ ("l'inquiétude", 'die Sorge'),
+ ("l'inscription", 'die Anmeldung'),
+ ("s'inscrire", 'sich anmelden'),
+ ('inscrit', 'angemeldet'),
+ ("l'insecte", 'das Insekt'),
+ ('insister', 'darauf bestehen'),
+ ("l'insomnie", 'die Schlaflosigkeit'),
+ ("l'inspecteur", 'der Inspektor'),
+ ('installer', 'einrichten'),
+ ("l'instant", 'der Augenblick'),
+ ("l'instituteur", 'der Grundschullehrer'),
+ ("l'instruction", 'die Anweisung'),
+ ("l'instrument", 'das Instrument'),
+ ('insupportable', 'unerträglich'),
+ ('intelligent', 'klug'),
+ ("l'intention", 'die Absicht'),
+ ('interdit', 'verboten'),
+ ('intéressant', 'interessant'),
+ ("s'intéresser", 'sich interessieren'),
+ ("l'intérêt", 'das Interesse'),
+ ("l'intérieur", 'das Innere'),
+ ('interminable', 'endlos'),
+ ('international', 'international'),
+ ('Internet', 'das Internet'),
+ ("l'interprète", 'der Dolmetscher'),
+ ('interroger', 'befragen'),
+ ('interrompre', 'unterbrechen'),
+ ("l'interrupteur", 'der Lichtschalter'),
+ ("l'interview", 'das Interview'),
+ ('intime', 'vertraut'),
+ ('inutile', 'nutzlos'),
+ ('inventer', 'erfinden'),
+ ("l'invitation", 'die Einladung'),
+ ("l'invité", 'der Gast'),
+ ('inviter', 'einladen'),
+ ('irriter', 'ärgern'),
+ ("l'Italie", 'Italien'),
+ ('italien', 'italienisch'),
+ ("l'itinéraire", 'die Route'),
+ ("l'ivoire", 'das Elfenbein'),
+ ('ivre', 'betrunken'),
+ ('la jalousie', 'die Eifersucht'),
+ ('jaloux', 'eifersüchtig'),
+ ('jamais', 'nie'),
+ ('la jambe', 'das Bein'),
+ ('le jambon', 'der Schinken'),
+ ('le jambon cru', 'der Rohschinken'),
+ ('janvier', 'Januar'),
+ ('le Japon', 'Japan'),
+ ('japonais', 'japanisch'),
+ ('le jardin', 'der Garten'),
+ ("le jardin d'enfants", 'der Kindergarten'),
+ ('le jardin public', 'der Stadtpark'),
+ ('le jardinage', 'die Gartenarbeit'),
+ ('la jardinerie', 'das Gartencenter'),
+ ('le jardinier', 'der Gärtner'),
+ ('jaune', 'gelb'),
+ ('jaunir', 'gelb werden'),
+ ('le javelot', 'der Speer'),
+ ('le jean', 'die Jeans'),
+ ('le jet', 'der Strahl'),
+ ("le jet d'eau", 'der Springbrunnen'),
+ ('la jetée', 'die Mole'),
+ ('jeter', 'werfen'),
+ ('le jeton', 'die Spielmarke'),
+ ('le jeu', 'das Spiel'),
+ ('le jeu de cartes', 'das Kartenspiel'),
+ ('le jeu de société', 'das Gesellschaftsspiel'),
+ ('le jeu vidéo', 'das Videospiel'),
+ ('le jeudi', 'der Donnerstag'),
+ ('jeune', 'jung'),
+ ('la jeune fille', 'das Mädchen'),
+ ('jeûner', 'fasten'),
+ ('les jeunes', 'die Jugendlichen'),
+ ('la jeunesse', 'die Jugend'),
+ ('la joaillerie', 'das Juweliergeschäft'),
+ ('le jockey', 'der Jockey'),
+ ('le jogging', 'das Joggen'),
+ ('la joie', 'die Freude'),
+ ('joindre', 'erreichen'),
+ ('le joint', 'die Dichtung'),
+ ('le joker', 'der Joker'),
+ ('joli', 'hübsch'),
+ ('le jongleur', 'der Jongleur'),
+ ('la jonquille', 'die Osterglocke'),
+ ('la joue', 'die Wange'),
+ ('jouer', 'spielen'),
+ ('le jouet', 'das Spielzeug'),
+ ('le joueur', 'der Spieler'),
+ ('le jour', 'der Tag'),
+ ("le jour de l'an", 'der Neujahrstag'),
+ ('le jour férié', 'der Feiertag'),
+ ('le journal', 'die Zeitung'),
+ ('journalier', 'täglich'),
+ ('le journaliste', 'der Journalist'),
+ ('la journée', 'der Tag'),
+ ('la journée de travail', 'der Arbeitstag'),
+ ('joyeux', 'fröhlich'),
+ ('joyeux Noël', 'frohe Weihnachten'),
+ ('le judo', 'das Judo'),
+ ('le juge', 'der Richter'),
+ ('le jugement', 'das Urteil'),
+ ('juger', 'urteilen'),
+ ('juillet', 'Juli'),
+ ('juin', 'Juni'),
+ ('les jumeaux', 'die Zwillinge'),
+ ('la jumelle', 'der Zwilling'),
+ ('les jumelles', 'das Fernglas'),
+ ('la jument', 'die Stute'),
+ ('la jungle', 'der Dschungel'),
+ ('la jupe', 'der Rock'),
+ ('le jupon', 'der Unterrock'),
+ ('jurer', 'schwören'),
+ ('juridique', 'rechtlich'),
+ ('le jury', 'die Jury'),
+ ('le jus', 'der Saft'),
+ ("le jus d'orange", 'der Orangensaft'),
+ ('le jus de fruit', 'der Fruchtsaft'),
+ ('le jus de pomme', 'der Apfelsaft'),
+ ("jusqu'à", 'bis'),
+ ('juste', 'gerecht'),
+ ('justement', 'gerade'),
+ ('la justice', 'die Gerechtigkeit'),
+ ('justifier', 'begründen'),
+ ('juteux', 'saftig'),
+ ('kaki', 'khakifarben'),
+ ('le kangourou', 'das Känguru'),
+ ('le karaoké', 'das Karaoke'),
+ ('le karaté', 'das Karate'),
+ ('le kart', 'das Gokart'),
+ ('le kayak', 'das Kajak'),
+ ('le kebab', 'der Döner'),
+ ('le képi', 'die Schirmmütze'),
+ ('la kermesse', 'das Volksfest'),
+ ('le kérosène', 'das Kerosin'),
+ ('le ketchup', 'der Ketchup'),
+ ('kidnapper', 'entführen'),
+ ('le kidnapping', 'die Entführung'),
+ ('le kilo', 'das Kilo'),
+ ('le kilogramme', 'das Kilogramm'),
+ ('le kilométrage', 'der Kilometerstand'),
+ ('le kilomètre', 'der Kilometer'),
+ ('le kilowatt', 'das Kilowatt'),
+ ('le kimono', 'der Kimono'),
+ ('le kiné', 'der Physiotherapeut'),
+ ('le kinésithérapeute', 'der Krankengymnast'),
+ ('le kiosque', 'der Kiosk'),
+ ('le kit', 'der Bausatz'),
+ ('le kitesurf', 'das Kitesurfen'),
+ ('le kiwi', 'die Kiwi'),
+ ('le klaxon', 'die Hupe'),
+ ('klaxonner', 'hupen'),
+ ('le koala', 'der Koala'),
+ ('le krach', 'der Börsenkrach'),
+ ('le kyste', 'die Zyste'),
+ ('là', 'da'),
+ ('là-bas', 'dort'),
+ ('le laboratoire', 'das Labor'),
+ ('le lac', 'der See'),
+ ('lacer', 'schnüren'),
+ ('le lacet', 'der Schnürsenkel'),
+ ('lâcher', 'loslassen'),
+ ('la lâcheté', 'die Feigheit'),
+ ('la lagune', 'die Lagune'),
+ ('laid', 'hässlich'),
+ ('la laine', 'die Wolle'),
+ ('laisser', 'lassen'),
+ ('le lait', 'die Milch'),
+ ('la laitue', 'der Kopfsalat'),
+ ('la lame', 'die Klinge'),
+ ('la lame de rasoir', 'die Rasierklinge'),
+ ('lamentable', 'kläglich'),
+ ('le lampadaire', 'die Stehlampe'),
+ ('la lampe', 'die Lampe'),
+ ('la lampe de poche', 'die Taschenlampe'),
+ ('le lancement', 'der Start'),
+ ('lancer', 'werfen'),
+ ('le langage', 'die Sprache'),
+ ('la langouste', 'die Languste'),
+ ('la langue', 'die Sprache'),
+ ('la lanterne', 'die Laterne'),
+ ('le lapin', 'das Kaninchen'),
+ ('large', 'breit'),
+ ('la larme', 'die Träne'),
+ ('le laurier', 'der Lorbeer'),
+ ('le lavabo', 'das Waschbecken'),
+ ('le lavage', 'die Wäsche'),
+ ('la lavande', 'der Lavendel'),
+ ('le lave-glace', 'die Scheibenwaschanlage'),
+ ('le lave-linge', 'die Waschmaschine'),
+ ('le lave-vaisselle', 'die Spülmaschine'),
+ ('laver', 'waschen'),
+ ('se laver', 'sich waschen'),
+ ('la laverie', 'der Waschsalon'),
+ ('la layette', 'die Babywäsche'),
+ ('le leader', 'der Anführer'),
+ ('la leçon', 'die Lektion'),
+ ('le lecteur', 'der Leser'),
+ ('le lecteur DVD', 'der DVD-Player'),
+ ('la lecture', 'das Lesen'),
+ ('la légende', 'die Legende'),
+ ('léger', 'leicht'),
+ ('la légèreté', 'die Leichtigkeit'),
+ ('le légume', 'das Gemüse'),
+ ('le lendemain', 'der nächste Tag'),
+ ('lent', 'langsam'),
+ ('lentement', 'langsam'),
+ ('la lenteur', 'die Langsamkeit'),
+ ('la lentille', 'die Linse'),
+ ('la lessive', 'das Waschmittel'),
+ ('la lettre', 'der Brief'),
+ ('la lettre recommandée', 'das Einschreiben'),
+ ('leur', 'ihr'),
+ ('se lever', 'aufstehen'),
+ ('le levier', 'der Hebel'),
+ ('la lèvre', 'die Lippe'),
+ ('la levure', 'die Hefe'),
+ ('le lexique', 'der Wortschatz'),
+ ('le lézard', 'die Eidechse'),
+ ('la liaison', 'die Verbindung'),
+ ('libérer', 'befreien'),
+ ('la liberté', 'die Freiheit'),
+ ('le libraire', 'der Buchhändler'),
+ ('la librairie', 'die Buchhandlung'),
+ ('la librairie-papeterie', 'das Schreibwarengeschäft'),
+ ('libre', 'frei'),
+ ('la licence', 'der Bachelor'),
+ ('licencier', 'entlassen'),
+ ('le lien', 'die Verbindung'),
+ ('le lierre', 'der Efeu'),
+ ('le lieu', 'der Ort'),
+ ('le lieu de naissance', 'der Geburtsort'),
+ ('le lieu de travail', 'der Arbeitsplatz'),
+ ('la ligne', 'die Linie'),
+ ('la limace', 'die Nacktschnecke'),
+ ('la limite', 'die Grenze'),
+ ('la limonade', 'die Limonade'),
+ ('le lin', 'das Leinen'),
+ ('le linge', 'die Wäsche'),
+ ('le linge sale', 'die schmutzige Wäsche'),
+ ('le linguiste', 'der Sprachwissenschaftler'),
+ ('le lion', 'der Löwe'),
+ ('la lionne', 'die Löwin'),
+ ('en liquide', 'bar'),
+ ('liquide', 'flüssig'),
+ ('le liquide vaisselle', 'das Spülmittel'),
+ ('lire', 'lesen'),
+ ('lisse', 'glatt'),
+ ('la liste', 'die Liste'),
+ ('le lit', 'das Bett'),
+ ("le lit d'enfant", 'das Kinderbett'),
+ ('le litre', 'der Liter'),
+ ('le litre de lait', 'der Liter Milch'),
+ ('la littérature', 'die Literatur'),
+ ('la livraison', 'die Lieferung'),
+ ('le livre', 'das Buch'),
+ ('livrer', 'liefern'),
+ ('le livret', 'das Heft'),
+ ('le livreur', 'der Lieferant'),
+ ('local', 'örtlich'),
+ ('le locataire', 'der Mieter'),
+ ('la location', 'die Vermietung'),
+ ('la location de voiture', 'die Autovermietung'),
+ ('la loge', 'die Loge'),
+ ('le logement', 'die Wohnung'),
+ ('loger', 'wohnen'),
+ ('le logiciel', 'die Software'),
+ ('logique', 'logisch'),
+ ('la loi', 'das Gesetz'),
+ ('loin', 'weit'),
+ ("loin d'ici", 'weit von hier'),
+ ('les loisirs', 'die Freizeit'),
+ ('long', 'lang'),
+ ('le long de', 'entlang'),
+ ('longtemps', 'lange'),
+ ('la longueur', 'die Länge'),
+ ('lorsque', 'als'),
+ ('le lot', 'das Los'),
+ ('la loterie', 'die Lotterie'),
+ ('la louche', 'die Kelle'),
+ ('louer', 'mieten'),
+ ('le loup', 'der Wolf'),
+ ('la loupe', 'die Lupe'),
+ ('lourd', 'schwer'),
+ ('loyal', 'treu'),
+ ('le loyer', 'die Miete'),
+ ('la lucarne', 'das Dachfenster'),
+ ('la luge', 'der Schlitten'),
+ ('la lumière', 'das Licht'),
+ ('lumineux', 'hell'),
+ ('le lundi', 'der Montag'),
+ ('lundi prochain', 'nächsten Montag'),
+ ('la lune', 'der Mond'),
+ ('les lunettes', 'die Brille'),
+ ('les lunettes de soleil', 'die Sonnenbrille'),
+ ('la lutte', 'der Kampf'),
+ ('lutter', 'kämpfen'),
+ ('le luxe', 'der Luxus'),
+ ('luxueux', 'luxuriös'),
+ ('le lycée', 'das Gymnasium'),
+ ('le lycéen', 'der Gymnasiast'),
+ ('la machine', 'die Maschine'),
+ ('la machine à laver', 'die Waschmaschine'),
+ ('madame', 'Frau'),
+ ('mademoiselle', 'Fräulein'),
+ ('le magasin', 'das Geschäft'),
+ ('le magasin de chaussures', 'das Schuhgeschäft'),
+ ('le magazine', 'die Zeitschrift'),
+ ('magnifique', 'wunderschön'),
+ ('mai', 'Mai'),
+ ('maigre', 'dünn'),
+ ('maigrir', 'abnehmen'),
+ ('la maille', 'die Masche'),
+ ('le maillot', 'das Trikot'),
+ ('le maillot de bain', 'der Badeanzug'),
+ ('la main', 'die Hand'),
+ ('maintenant', 'jetzt'),
+ ('le maire', 'der Bürgermeister'),
+ ('la mairie', 'das Rathaus'),
+ ('le maïs', 'der Mais'),
+ ('mais', 'aber'),
+ ('la maison', 'das Haus'),
+ ('le maître', 'der Lehrer'),
+ ('la maîtresse', 'die Lehrerin'),
+ ('la majorité', 'die Mehrheit'),
+ ('mal', 'schlecht'),
+ ('le mal de dos', 'die Rückenschmerzen'),
+ ('le mal de tête', 'die Kopfschmerzen'),
+ ('le mal de ventre', 'die Bauchschmerzen'),
+ ('malade', 'krank'),
+ ('la maladie', 'die Krankheit'),
+ ('malgré', 'trotz'),
+ ('le malheur', 'das Unglück'),
+ ('malheureusement', 'leider'),
+ ('malheureux', 'unglücklich'),
+ ('malin', 'schlau'),
+ ('la malle', 'der Koffer'),
+ ('la mallette', 'der Aktenkoffer'),
+ ('la maman', 'die Mama'),
+ ('la mamie', 'die Oma'),
+ ('le manager', 'der Manager'),
+ ('la manche', 'der Ärmel'),
+ ('la mandarine', 'die Mandarine'),
+ ('le manège', 'das Karussell'),
+ ('manger', 'essen'),
+ ('la mangue', 'die Mango'),
+ ('la manière', 'die Art'),
+ ('le mannequin', 'das Model'),
+ ('manquer', 'fehlen'),
+ ('le manteau', 'der Mantel'),
+ ('manuel', 'manuell'),
+ ('le maquereau', 'die Makrele'),
+ ('le maquillage', 'die Schminke'),
+ ('le marchand', 'der Händler'),
+ ('la marchandise', 'die Ware'),
+ ('la marche', 'die Stufe'),
+ ('le marché', 'der Markt'),
+ ('marcher', 'gehen'),
+ ('le mardi', 'der Dienstag'),
+ ('la marée', 'die Gezeiten'),
+ ('la marge', 'der Rand'),
+ ('le mari', 'der Ehemann'),
+ ('le mariage', 'die Hochzeit'),
+ ('le mariage civil', 'die standesamtliche Trauung'),
+ ('marié', 'verheiratet'),
+ ('se marier', 'heiraten'),
+ ('le marin', 'der Seemann'),
+ ('la marque', 'die Marke'),
+ ('marron', 'braun'),
+ ('le marronnier', 'die Kastanie'),
+ ('mars', 'März'),
+ ('le marteau', 'der Hammer'),
+ ('le masque', 'die Maske'),
+ ('masser', 'massieren'),
+ ('le match', 'das Spiel'),
+ ('le matelas', 'die Matratze'),
+ ('le matériel', 'das Material'),
+ ('maternel', 'mütterlich'),
+ ('la maternelle', 'die Vorschule'),
+ ('les mathématiques', 'die Mathematik'),
+ ('la matière', 'das Schulfach'),
+ ('le matin', 'der Morgen'),
+ ('la matinée', 'der Vormittag'),
+ ('mauvais', 'schlecht'),
+ ('le mécanicien', 'der Mechaniker'),
+ ('méchant', 'böse'),
+ ('le mécontentement', 'die Unzufriedenheit'),
+ ('la médaille', 'die Medaille'),
+ ('le médecin', 'der Arzt'),
+ ('le médicament', 'das Medikament'),
+ ('la Méditerranée', 'das Mittelmeer'),
+ ('la méfiance', 'das Misstrauen'),
+ ('meilleur', 'besser'),
+ ('le meilleur ami', 'der beste Freund'),
+ ('le mélange', 'die Mischung'),
+ ('mélanger', 'mischen'),
+ ('le melon', 'die Melone'),
+ ('le membre', 'das Mitglied'),
+ ('même', 'selbst'),
+ ('la mémoire', 'das Gedächtnis'),
+ ('le ménage', 'der Haushalt'),
+ ('la ménagère', 'die Hausfrau'),
+ ('mener', 'führen'),
+ ('mensuel', 'monatlich'),
+ ('le menteur', 'der Lügner'),
+ ('la mention', 'die Note'),
+ ('mentir', 'lügen'),
+ ('le menton', 'das Kinn'),
+ ('le menu', 'das Menü'),
+ ('le mépris', 'die Verachtung'),
+ ('la mer', 'das Meer'),
+ ('la mercerie', 'das Kurzwarengeschäft'),
+ ('merci', 'danke'),
+ ('le mercredi', 'der Mittwoch'),
+ ('la mère', 'die Mutter'),
+ ('merveilleux', 'wunderbar'),
+ ('le message', 'die Nachricht'),
+ ('la mesure', 'das Maß'),
+ ('le métier', 'der Beruf'),
+ ('le mètre', 'der Meter'),
+ ('le métro', 'die U-Bahn'),
+ ('mettre', 'legen'),
+ ('mettre la table', 'den Tisch decken'),
+ ('le meuble', 'das Möbelstück'),
+ ('le micro-ondes', 'die Mikrowelle'),
+ ('midi', 'Mittag'),
+ ('le miel', 'der Honig'),
+ ('mieux', 'besser'),
+ ('mignon', 'süß'),
+ ('le milieu', 'die Mitte'),
+ ('mince', 'schlank'),
+ ('minuit', 'Mitternacht'),
+ ('la minute', 'die Minute'),
+ ('le miroir', 'der Spiegel'),
+ ('la mode', 'die Mode'),
+ ('moderne', 'modern'),
+ ('moi', 'ich'),
+ ('moins', 'weniger'),
+ ('le mois', 'der Monat'),
+ ('la moitié', 'die Hälfte'),
+ ('le moment', 'der Moment'),
+ ('le monde', 'die Welt'),
+ ('la monnaie', 'das Kleingeld'),
+ ('monsieur', 'Herr'),
+ ('la montagne', 'der Berg'),
+ ('monter', 'hinaufgehen'),
+ ('la montre', 'die Armbanduhr'),
+ ('montrer', 'zeigen'),
+ ('le monument', 'das Denkmal'),
+ ('se moquer', 'sich lustig machen'),
+ ('le morceau', 'das Stück'),
+ ('la mort', 'der Tod'),
+ ('mort', 'tot'),
+ ('la mosquée', 'die Moschee'),
+ ('le mot', 'das Wort'),
+ ('le mot de passe', 'das Passwort'),
+ ('le moteur', 'der Motor'),
+ ('la moto', 'das Motorrad'),
+ ('mou', 'weich'),
+ ('la mouche', 'die Fliege'),
+ ('le mouchoir', 'das Taschentuch'),
+ ('le mouchoir en papier', 'das Papiertaschentuch'),
+ ('mouillé', 'nass'),
+ ('la moule', 'die Muschel'),
+ ('mourir', 'sterben'),
+ ('la moustache', 'der Schnurrbart'),
+ ('le moustique', 'die Mücke'),
+ ('la moutarde', 'der Senf'),
+ ('le mouton', 'das Schaf'),
+ ('le mouvement', 'die Bewegung'),
+ ('moyen', 'mittel'),
+ ('le moyen de transport', 'das Verkehrsmittel'),
+ ('le mur', 'die Wand'),
+ ('mûr', 'reif'),
+ ('le muscle', 'der Muskel'),
+ ('le musée', 'das Museum'),
+ ('le musicien', 'der Musiker'),
+ ('la musique', 'die Musik'),
+ ('musulman', 'muslimisch'),
+ ('la myrtille', 'die Heidelbeere'),
+ ('le mystère', 'das Geheimnis'),
+ ('la nage', 'das Schwimmen'),
+ ('nager', 'schwimmen'),
+ ('le nageur', 'der Schwimmer'),
+ ('naïf', 'naiv'),
+ ('la naissance', 'die Geburt'),
+ ('naître', 'geboren werden'),
+ ('la nappe', 'die Tischdecke'),
+ ('la natalité', 'die Geburtenrate'),
+ ('la natation', 'das Schwimmen'),
+ ('la nation', 'die Nation'),
+ ('national', 'national'),
+ ('la nationalité', 'die Staatsangehörigkeit'),
+ ('la nature', 'die Natur'),
+ ('naturel', 'natürlich'),
+ ('naturellement', 'natürlich'),
+ ('la nausée', 'die Übelkeit'),
+ ('la navette', 'der Pendelbus'),
+ ('le navigateur', 'der Browser'),
+ ('naviguer', 'surfen'),
+ ('le navire', 'das Schiff'),
+ ('né', 'geboren'),
+ ('nécessaire', 'notwendig'),
+ ('nécessiter', 'erfordern'),
+ ('négatif', 'negativ'),
+ ('négliger', 'vernachlässigen'),
+ ('négocier', 'verhandeln'),
+ ('la neige', 'der Schnee'),
+ ('la neige fondue', 'der Schneeregen'),
+ ('neiger', 'schneien'),
+ ('le néon', 'das Neonlicht'),
+ ('nerveusement', 'nervös'),
+ ('nerveux', 'nervös'),
+ ('net', 'sauber'),
+ ('nettement', 'deutlich'),
+ ('la netteté', 'die Schärfe'),
+ ('le nettoyage', 'die Reinigung'),
+ ('nettoyer', 'sauber machen'),
+ ('neuf', 'neu'),
+ ('neutre', 'neutral'),
+ ('le neveu', 'der Neffe'),
+ ('le nez', 'die Nase'),
+ ('le nez qui coule', 'die laufende Nase'),
+ ('ni ... ni', 'weder ... noch'),
+ ('la niche', 'die Hundehütte'),
+ ('le nickel', 'das Nickel'),
+ ('le nid', 'das Nest'),
+ ('la nièce', 'die Nichte'),
+ ('nier', 'leugnen'),
+ ('le niveau', 'das Niveau'),
+ ('le niveau de vie', 'der Lebensstandard'),
+ ('noble', 'edel'),
+ ('la noblesse', 'der Adel'),
+ ('la noce', 'die Hochzeitsfeier'),
+ ('nocturne', 'nächtlich'),
+ ('Noël', 'Weihnachten'),
+ ('noir', 'schwarz'),
+ ('noircir', 'schwärzen'),
+ ('la noisette', 'die Haselnuss'),
+ ('la noix', 'die Nuss'),
+ ('le nom', 'der Name'),
+ ('le nom de famille', 'der Familienname'),
+ ('le nom de jeune fille', 'der Mädchenname'),
+ ('le nombre', 'die Zahl'),
+ ('le nombre pair', 'die gerade Zahl'),
+ ('nombreux', 'zahlreich'),
+ ('le nombril', 'der Bauchnabel'),
+ ('nommé', 'genannt'),
+ ('nommer', 'ernennen'),
+ ('non', 'nein'),
+ ('le non-fumeur', 'der Nichtraucher'),
+ ('la nonne', 'die Nonne'),
+ ('le nord', 'der Norden'),
+ ('nord', 'nördlich'),
+ ('le nord-est', 'der Nordosten'),
+ ('le nord-ouest', 'der Nordwesten'),
+ ('normal', 'normal'),
+ ('normalement', 'normalerweise'),
+ ('la norme', 'die Norm'),
+ ('la Norvège', 'Norwegen'),
+ ('la nostalgie', 'das Heimweh'),
+ ('le notaire', 'der Notar'),
+ ('la note', 'die Note'),
+ ('la note de frais', 'die Spesenabrechnung'),
+ ('la note de musique', 'die Note'),
+ ('noter', 'notieren'),
+ ('la notice', 'die Gebrauchsanweisung'),
+ ('la notion', 'der Begriff'),
+ ('notre', 'unser'),
+ ('nouer', 'knoten'),
+ ('le nougat', 'der Nugat'),
+ ('les nouilles', 'die Nudeln'),
+ ('la nounou', 'die Babysitterin'),
+ ('la nourrice', 'die Tagesmutter'),
+ ('nourrir', 'ernähren'),
+ ('le nourrisson', 'der Säugling'),
+ ('la nourriture', 'das Essen'),
+ ('nous', 'wir'),
+ ('nouveau', 'neu'),
+ ('le nouveau-né', 'das Neugeborene'),
+ ('la nouveauté', 'die Neuheit'),
+ ('le nouvel an', 'das Neujahr'),
+ ('la nouvelle', 'die Neuigkeit'),
+ ('nouvellement', 'neu'),
+ ('les nouvelles', 'die Nachrichten'),
+ ('novembre', 'November'),
+ ('la noyade', 'das Ertrinken'),
+ ('se noyer', 'ertrinken'),
+ ('nu', 'nackt'),
+ ('le nuage', 'die Wolke'),
+ ('nuageux', 'bewölkt'),
+ ('la nuance', 'die Nuance'),
+ ('nuire', 'schaden'),
+ ('nuisible', 'schädlich'),
+ ('la nuit', 'die Nacht'),
+ ('nul', 'schlecht'),
+ ('le numéro', 'die Nummer'),
+ ('le numéro de téléphone', 'die Telefonnummer'),
+ ('la nuque', 'der Nacken'),
+ ('le nylon', 'das Nylon'),
+ ('le nœud', 'der Knoten'),
+ ("l'oasis", 'die Oase'),
+ ('obéir', 'gehorchen'),
+ ('obéissant', 'gehorsam'),
+ ('obèse', 'übergewichtig'),
+ ("l'obésité", 'das Übergewicht'),
+ ("l'objectif", 'das Ziel'),
+ ("l'objet", 'der Gegenstand'),
+ ("l'obligation", 'die Verpflichtung'),
+ ('obligatoire', 'obligatorisch'),
+ ('obligé', 'verpflichtet'),
+ ('obligeant', 'zuvorkommend'),
+ ('obscur', 'dunkel'),
+ ("l'obscurité", 'die Dunkelheit'),
+ ("l'observation", 'die Beobachtung'),
+ ('observer', 'beobachten'),
+ ("l'obstacle", 'das Hindernis'),
+ ('obtenir', 'bekommen'),
+ ("d'occasion", 'gebraucht'),
+ ("l'occasion", 'die Gelegenheit'),
+ ("l'occident", 'der Westen'),
+ ("l'occupation", 'die Beschäftigung'),
+ ('occupé', 'beschäftigt'),
+ ('occuper', 'besetzen'),
+ ("s'occuper de", 'sich kümmern um'),
+ ("l'océan", 'der Ozean'),
+ ('octobre', 'Oktober'),
+ ("l'odeur", 'der Geruch'),
+ ("l'odeur de brûlé", 'der Brandgeruch'),
+ ("l'odorat", 'der Geruchssinn'),
+ ('offenser', 'beleidigen'),
+ ('offert', 'geschenkt'),
+ ("l'office", 'der Gottesdienst'),
+ ("l'office du tourisme", 'das Fremdenverkehrsamt'),
+ ('officiel', 'offiziell'),
+ ("l'officier", 'der Offizier'),
+ ("l'offre", 'das Angebot'),
+ ('offrir', 'schenken'),
+ ("l'oie", 'die Gans'),
+ ("l'oignon", 'die Zwiebel'),
+ ("l'oignon rouge", 'die rote Zwiebel'),
+ ("l'oiseau", 'der Vogel'),
+ ("l'oiseau de nuit", 'der Nachtvogel'),
+ ("l'oiseau migrateur", 'der Zugvogel'),
+ ("l'olive", 'die Olive'),
+ ("l'olivier", 'der Olivenbaum'),
+ ("l'ombre", 'der Schatten'),
+ ("l'ombrelle", 'der Sonnenschirm'),
+ ("l'omelette", 'das Omelett'),
+ ("l'omnibus", 'der Nahverkehrszug'),
+ ("l'oncle", 'der Onkel'),
+ ("l'onde", 'die Welle'),
+ ("l'ongle", 'der Fingernagel'),
+ ("l'ongle de pied", 'der Zehennagel'),
+ ('onze', 'elf'),
+ ("l'opéra", 'die Oper'),
+ ("l'opérateur", 'der Betreiber'),
+ ("l'opération", 'die Operation'),
+ ("l'opinion", 'die Meinung'),
+ ('opposé', 'entgegengesetzt'),
+ ("l'opposition", 'die Opposition'),
+ ("l'opticien", 'der Optiker'),
+ ('optimiste', 'optimistisch'),
+ ("l'option", 'die Wahlmöglichkeit'),
+ ("l'or", 'das Gold'),
+ ("l'orage", 'das Gewitter'),
+ ('orageux', 'gewittrig'),
+ ('oral', 'mündlich'),
+ ("l'orange", 'die Orange'),
+ ('orange', 'orange'),
+ ("l'orange pressée", 'der frisch gepresste Orangensaft'),
+ ("l'orchestre", 'das Orchester'),
+ ('ordinaire', 'gewöhnlich'),
+ ("l'ordinateur", 'der Computer'),
+ ("l'ordinateur portable", 'der Laptop'),
+ ("l'ordonnance", 'das Rezept'),
+ ("l'ordre", 'die Ordnung'),
+ ('les ordures', 'der Müll'),
+ ("l'oreille", 'das Ohr'),
+ ("l'oreiller", 'das Kopfkissen'),
+ ('les oreillons', 'der Mumps'),
+ ("l'organisation", 'die Organisation'),
+ ('organiser', 'organisieren'),
+ ("l'orgue", 'die Orgel'),
+ ("l'orgueil", 'der Stolz'),
+ ("l'orient", 'der Osten'),
+ ('originaire', 'stammend'),
+ ('original', 'originell'),
+ ("l'origine", 'die Herkunft'),
+ ("l'orphelin", 'das Waisenkind'),
+ ("l'orteil", 'der Zeh'),
+ ("l'orthographe", 'die Rechtschreibung'),
+ ("l'os", 'der Knochen'),
+ ('oser', 'wagen'),
+ ("l'otage", 'die Geisel'),
+ ('ôter', 'abnehmen'),
+ ("l'otite", 'die Mittelohrentzündung'),
+ ('ou', 'oder'),
+ ('où', 'wo'),
+ ("l'ouate", 'die Watte'),
+ ('oublier', 'vergessen'),
+ ("l'ouest", 'der Westen'),
+ ('oui', 'ja'),
+ ("l'ouragan", 'der Orkan'),
+ ("l'ourlet", 'der Saum'),
+ ("l'ours", 'der Bär'),
+ ("l'outil", 'das Werkzeug'),
+ ('outre', 'außer'),
+ ('ouvert', 'offen'),
+ ("l'ouverture", 'die Öffnung'),
+ ("l'ouvre-boîte", 'der Dosenöffner'),
+ ("l'ouvre-bouteille", 'der Flaschenöffner'),
+ ("l'ouvrier", 'der Arbeiter'),
+ ('ouvrir', 'öffnen'),
+ ("l'ovale", 'das Oval'),
+ ("l'ovni", 'das Ufo'),
+ ("l'oxygène", 'der Sauerstoff'),
+ ("l'ozone", 'das Ozon'),
+ ('la page', 'die Seite'),
+ ('le pain', 'das Brot'),
+ ('la paix', 'der Frieden'),
+ ('le palais', 'der Palast'),
+ ('pâle', 'blass'),
+ ('le pamplemousse', 'die Grapefruit'),
+ ('le panier', 'der Korb'),
+ ('en panne', 'kaputt'),
+ ('la panne', 'die Panne'),
+ ('le panneau', 'das Schild'),
+ ('le pansement', 'das Pflaster'),
+ ('le pantalon', 'die Hose'),
+ ('la pantoufle', 'der Hausschuh'),
+ ('le papa', 'der Papa'),
+ ('le papier', 'das Papier'),
+ ('les papiers', 'die Ausweispapiere'),
+ ('le papillon', 'der Schmetterling'),
+ ('Pâques', 'Ostern'),
+ ('le paquet', 'das Paket'),
+ ('par', 'durch'),
+ ('par exemple', 'zum Beispiel'),
+ ('par hasard', 'zufällig'),
+ ('le paragraphe', 'der Absatz'),
+ ('le parapluie', 'der Regenschirm'),
+ ('le parc', 'der Park'),
+ ('parce que', 'weil'),
+ ('pardon', 'Entschuldigung'),
+ ('pareil', 'gleich'),
+ ('les parents', 'die Eltern'),
+ ('paresseux', 'faul'),
+ ('parfois', 'manchmal'),
+ ('le parfum', 'das Parfüm'),
+ ('le parking', 'der Parkplatz'),
+ ('parler', 'sprechen'),
+ ('parmi', 'unter'),
+ ('la parole', 'das Wort'),
+ ('partager', 'teilen'),
+ ('le partenaire', 'der Partner'),
+ ('participer', 'teilnehmen'),
+ ('particulier', 'besonders'),
+ ('la partie', 'der Teil'),
+ ('partir', 'weggehen'),
+ ('partout', 'überall'),
+ ('le passager', 'der Fahrgast'),
+ ('le passé', 'die Vergangenheit'),
+ ('le passeport', 'der Reisepass'),
+ ('passer', 'vorbeigehen'),
+ ('passer un examen', 'eine Prüfung machen'),
+ ('la passion', 'die Leidenschaft'),
+ ('les pâtes', 'die Nudeln'),
+ ('le patient', 'der Patient'),
+ ('la pâtisserie', 'die Konditorei'),
+ ('le patron', 'der Chef'),
+ ('la patte', 'die Pfote'),
+ ('pauvre', 'arm'),
+ ('payer', 'bezahlen'),
+ ('le pays', 'das Land'),
+ ('le paysage', 'die Landschaft'),
+ ('la peau', 'die Haut'),
+ ('la pêche', 'der Pfirsich'),
+ ('la pêche (sport)', 'das Angeln'),
+ ('le peigne', 'der Kamm'),
+ ('peindre', 'malen'),
+ ('la peine', 'die Mühe'),
+ ('le peintre', 'der Maler'),
+ ('la peinture', 'das Gemälde'),
+ ('pendant', 'während'),
+ ('penser', 'denken'),
+ ('la pension', 'die Pension'),
+ ('perdre', 'verlieren'),
+ ('le père', 'der Vater'),
+ ('permettre', 'erlauben'),
+ ('le permis de conduire', 'der Führerschein'),
+ ('la personne', 'die Person'),
+ ('personne', 'niemand'),
+ ('personnel', 'persönlich'),
+ ('peser', 'wiegen'),
+ ('petit', 'klein'),
+ ('le petit déjeuner', 'das Frühstück'),
+ ('le petit-fils', 'der Enkel'),
+ ('la petite-fille', 'die Enkelin'),
+ ('les petits-enfants', 'die Enkelkinder'),
+ ('peu', 'wenig'),
+ ('la peur', 'die Angst'),
+ ('peut-être', 'vielleicht'),
+ ('la pharmacie', 'die Apotheke'),
+ ('le pharmacien', 'der Apotheker'),
+ ('la photo', 'das Foto'),
+ ('la phrase', 'der Satz'),
+ ('le piano', 'das Klavier'),
+ ('la pièce', 'das Zimmer'),
+ ('la pièce de monnaie', 'die Münze'),
+ ('le pied', 'der Fuß'),
+ ('la pierre', 'der Stein'),
+ ('le piéton', 'der Fußgänger'),
+ ('le pilote', 'der Pilot'),
+ ('la pilule', 'die Pille'),
+ ('le piment', 'der Chili'),
+ ('le pique-nique', 'das Picknick'),
+ ('la piqûre', 'die Spritze'),
+ ('pire', 'schlimmer'),
+ ('la piscine', 'das Schwimmbad'),
+ ('la place', 'der Platz'),
+ ('le plafond', 'die Decke'),
+ ('la plage', 'der Strand'),
+ ('plaire', 'gefallen'),
+ ('le plaisir', 'das Vergnügen'),
+ ('le plan', 'der Stadtplan'),
+ ('la planche', 'das Brett'),
+ ('la plante', 'die Pflanze'),
+ ('le plastique', 'das Plastik'),
+ ('le plat', 'das Gericht'),
+ ('plein', 'voll'),
+ ('pleurer', 'weinen'),
+ ('pleuvoir', 'regnen'),
+ ('la pluie', 'der Regen'),
+ ('la plume', 'die Feder'),
+ ('plus', 'mehr'),
+ ('plusieurs', 'mehrere'),
+ ('plutôt', 'eher'),
+ ('le pneu', 'der Reifen'),
+ ('la poche', 'die Tasche'),
+ ('le poids', 'das Gewicht'),
+ ('la poire', 'die Birne'),
+ ('le poisson', 'der Fisch'),
+ ('la poissonnerie', 'das Fischgeschäft'),
+ ('le poivre', 'der Pfeffer'),
+ ('le poivron', 'die Paprika'),
+ ('poli', 'höflich'),
+ ('la police', 'die Polizei'),
+ ('le policier', 'der Polizist'),
+ ('la politique', 'die Politik'),
+ ('la pomme', 'der Apfel'),
+ ('la pomme de terre', 'die Kartoffel'),
+ ('le pompier', 'der Feuerwehrmann'),
+ ('le pont', 'die Brücke'),
+ ('le porc', 'das Schweinefleisch'),
+ ('le port', 'der Hafen'),
+ ('le portable', 'das Handy'),
+ ('la porte', 'die Tür'),
+ ('le portefeuille', 'die Brieftasche'),
+ ('porter', 'tragen'),
+ ('poser', 'stellen'),
+ ('poser une question', 'eine Frage stellen'),
+ ('possible', 'möglich'),
+ ('la poste', 'die Post'),
+ ('le poster', 'das Poster'),
+ ('le pot', 'der Topf'),
+ ('la poubelle', 'der Mülleimer'),
+ ('le poulet', 'das Hähnchen'),
+ ('pour', 'für'),
+ ('le pourboire', 'das Trinkgeld'),
+ ('pourquoi', 'warum'),
+ ('pousser', 'schieben'),
+ ('pouvoir', 'können'),
+ ('pratique', 'praktisch'),
+ ('préféré', 'Lieblings-'),
+ ('préférer', 'lieber mögen'),
+ ('premier', 'erste'),
+ ('prendre', 'nehmen'),
+ ('le prénom', 'der Vorname'),
+ ('préparer', 'vorbereiten'),
+ ('près de', 'in der Nähe von'),
+ ('présenter', 'vorstellen'),
+ ('presque', 'fast'),
+ ('pressé', 'eilig'),
+ ('prêt', 'fertig'),
+ ('prêter', 'leihen'),
+ ('le printemps', 'der Frühling'),
+ ('le prix', 'der Preis'),
+ ('le problème', 'das Problem'),
+ ('prochain', 'nächste'),
+ ('proche', 'nah'),
+ ('le produit', 'das Produkt'),
+ ('le professeur', 'der Lehrer'),
+ ('la profession', 'der Beruf'),
+ ('profiter', 'genießen'),
+ ('le programme', 'das Programm'),
+ ('le projet', 'das Projekt'),
+ ('la promenade', 'der Spaziergang'),
+ ('se promener', 'spazieren gehen'),
+ ('la promesse', 'das Versprechen'),
+ ('promettre', 'versprechen'),
+ ('proposer', 'vorschlagen'),
+ ('propre', 'sauber'),
+ ('le propriétaire', 'der Besitzer'),
+ ('protéger', 'schützen'),
+ ('la prune', 'die Pflaume'),
+ ('le public', 'das Publikum'),
+ ('puis', 'dann'),
+ ('le pull', 'der Pullover'),
+ ('le quai', 'der Bahnsteig'),
+ ('qualifié', 'qualifiziert'),
+ ('la qualité', 'die Qualität'),
+ ('quand', 'wann'),
+ ('quand même', 'trotzdem'),
+ ('la quantité', 'die Menge'),
+ ('la quarantaine', 'die Quarantäne'),
+ ('quarante', 'vierzig'),
+ ('quarante-cinq', 'fünfundvierzig'),
+ ('le quart', 'das Viertel'),
+ ("le quart d'heure", 'die Viertelstunde'),
+ ('le quartier', 'das Viertel'),
+ ('quasiment', 'fast'),
+ ('quatorze', 'vierzehn'),
+ ('quatre', 'vier'),
+ ('quatre-vingts', 'achtzig'),
+ ('quatrième', 'vierte'),
+ ('que', 'dass'),
+ ('quel', 'welcher'),
+ ('quelconque', 'irgendein'),
+ ('quelle heure est-il', 'wie spät ist es'),
+ ("quelqu'un", 'jemand'),
+ ('quelque chose', 'etwas'),
+ ('quelquefois', 'manchmal'),
+ ('quelques', 'einige'),
+ ('la querelle', 'der Streit'),
+ ('la question', 'die Frage'),
+ ('la question piège', 'die Fangfrage'),
+ ('le questionnaire', 'der Fragebogen'),
+ ('la quête', 'die Suche'),
+ ('la queue', 'die Schlange'),
+ ('qui', 'wer'),
+ ('la quiche', 'die Quiche'),
+ ('la quille', 'der Kegel'),
+ ('la quincaillerie', 'das Eisenwarengeschäft'),
+ ('le quincaillier', 'der Eisenwarenhändler'),
+ ('la quinte de toux', 'der Hustenanfall'),
+ ('la quinzaine', 'etwa zwei Wochen'),
+ ('quinze', 'fünfzehn'),
+ ('la quittance', 'die Quittung'),
+ ('quitte', 'quitt'),
+ ('quitter', 'verlassen'),
+ ('le quiz', 'das Quiz'),
+ ('quoi', 'was'),
+ ('le quota', 'die Quote'),
+ ('le quotidien', 'die Tageszeitung'),
+ ('quotidien', 'täglich'),
+ ('quotidiennement', 'täglich'),
+ ('le rabais', 'der Rabatt'),
+ ('raccrocher', 'auflegen'),
+ ('la race', 'die Rasse'),
+ ('la racine', 'die Wurzel'),
+ ('raconter', 'erzählen'),
+ ('le radiateur', 'der Heizkörper'),
+ ('radin', 'geizig'),
+ ('la radio', 'das Radio'),
+ ('la radiographie', 'das Röntgenbild'),
+ ('rafraîchir', 'erfrischen'),
+ ('la rage', 'die Wut'),
+ ('le ragoût', 'der Eintopf'),
+ ('raide', 'steif'),
+ ('la raie', 'der Scheitel'),
+ ('le rail', 'die Schiene'),
+ ('le raisin', 'die Traube'),
+ ('la raison', 'der Grund'),
+ ('raisonnable', 'vernünftig'),
+ ('ralentir', 'langsamer fahren'),
+ ('ramasser', 'aufheben'),
+ ('ramener', 'zurückbringen'),
+ ('la randonnée', 'die Wanderung'),
+ ('le rang', 'die Reihe'),
+ ('rangé', 'ordentlich'),
+ ('ranger', 'aufräumen'),
+ ('rapide', 'schnell'),
+ ('rapidement', 'schnell'),
+ ('rappeler', 'zurückrufen'),
+ ('se rappeler', 'sich erinnern'),
+ ('le rapport', 'der Bericht'),
+ ('rare', 'selten'),
+ ('rarement', 'selten'),
+ ('se raser', 'sich rasieren'),
+ ('le rasoir', 'der Rasierer'),
+ ('rassurer', 'beruhigen'),
+ ('le rat', 'die Ratte'),
+ ('rater', 'verpassen'),
+ ('rater le train', 'den Zug verpassen'),
+ ('le rayon', 'die Abteilung'),
+ ('le rayon de soleil', 'der Sonnenstrahl'),
+ ('la réaction', 'die Reaktion'),
+ ('réagir', 'reagieren'),
+ ('réaliser', 'verwirklichen'),
+ ('la réalité', 'die Wirklichkeit'),
+ ('récent', 'neu'),
+ ('la réception', 'die Rezeption'),
+ ('la recette', 'das Rezept'),
+ ('recevoir', 'bekommen'),
+ ('la recherche', 'die Suche'),
+ ('le récit', 'die Erzählung'),
+ ('la récolte', 'die Ernte'),
+ ('recommander', 'empfehlen'),
+ ('recommencer', 'neu anfangen'),
+ ('reconnaître', 'erkennen'),
+ ('la récréation', 'die Pause'),
+ ('le reçu', 'die Quittung'),
+ ('la réduction', 'die Ermäßigung'),
+ ('réduire', 'reduzieren'),
+ ('réel', 'wirklich'),
+ ('réfléchir', 'nachdenken'),
+ ('la réflexion', 'die Überlegung'),
+ ('le réfrigérateur', 'der Kühlschrank'),
+ ('le refuge', 'die Hütte'),
+ ('refuser', 'ablehnen'),
+ ('regarder', 'anschauen'),
+ ('la région', 'die Region'),
+ ('la règle', 'die Regel'),
+ ('régler', 'bezahlen'),
+ ('regretter', 'bedauern'),
+ ('régulier', 'regelmäßig'),
+ ('la reine', 'die Königin'),
+ ('la relation', 'die Beziehung'),
+ ('religieux', 'religiös'),
+ ('la religion', 'die Religion'),
+ ('remarquer', 'bemerken'),
+ ('rembourser', 'zurückzahlen'),
+ ('le remède', 'das Heilmittel'),
+ ('le remerciement', 'der Dank'),
+ ('remercier', 'danken'),
+ ('remettre', 'zurücklegen'),
+ ('remplacer', 'ersetzen'),
+ ('remplir', 'ausfüllen'),
+ ('la rencontre', 'das Treffen'),
+ ('rencontrer', 'treffen'),
+ ('le rendez-vous', 'der Termin'),
+ ('rendre', 'zurückgeben'),
+ ('rendre service', 'einen Gefallen tun'),
+ ('rendre visite', 'besuchen'),
+ ('renoncer', 'verzichten'),
+ ('le renseignement', 'die Auskunft'),
+ ('la rentrée', 'der Schulanfang'),
+ ('la rentrée scolaire', 'der Schulbeginn'),
+ ('rentrer', 'nach Hause gehen'),
+ ('renverser', 'umwerfen'),
+ ('réparer', 'reparieren'),
+ ('le repas', 'die Mahlzeit'),
+ ('le repassage', 'das Bügeln'),
+ ('repasser', 'bügeln'),
+ ('répéter', 'wiederholen'),
+ ('répondre', 'antworten'),
+ ('la réponse', 'die Antwort'),
+ ('le reporter', 'der Reporter'),
+ ('le repos', 'die Ruhe'),
+ ('se reposer', 'sich ausruhen'),
+ ('le requin', 'der Hai'),
+ ('le réseau', 'das Netz'),
+ ('la réservation', 'die Reservierung'),
+ ('réserver', 'reservieren'),
+ ('respirer', 'atmen'),
+ ('ressembler', 'ähnlich sein'),
+ ('le restaurant', 'das Restaurant'),
+ ('le reste', 'der Rest'),
+ ('rester', 'bleiben'),
+ ('le résultat', 'das Ergebnis'),
+ ('en retard', 'zu spät'),
+ ('le retard', 'die Verspätung'),
+ ('retourner', 'zurückkehren'),
+ ('la retraite', 'die Rente'),
+ ('retrouver', 'wiederfinden'),
+ ('réussir', 'schaffen'),
+ ('le rêve', 'der Traum'),
+ ('le réveil', 'der Wecker'),
+ ('se réveiller', 'aufwachen'),
+ ('revenir', 'zurückkommen'),
+ ('rêver', 'träumen'),
+ ('réviser', 'wiederholen'),
+ ('revoir', 'wiedersehen'),
+ ('le rez-de-chaussée', 'das Erdgeschoss'),
+ ('le rhume', 'der Schnupfen'),
+ ('riche', 'reich'),
+ ('le rideau', 'der Vorhang'),
+ ('rien', 'nichts'),
+ ('rire', 'lachen'),
+ ('la rivière', 'der Fluss'),
+ ('le riz', 'der Reis'),
+ ('la robe', 'das Kleid'),
+ ('le robinet', 'der Wasserhahn'),
+ ('le roi', 'der König'),
+ ('le roman', 'der Roman'),
+ ('rond', 'rund'),
+ ('le rond-point', 'der Kreisverkehr'),
+ ('la rose', 'die Rose'),
+ ('rose', 'rosa'),
+ ('rouge', 'rot'),
+ ('rouler', 'fahren'),
+ ('la route', 'die Straße'),
+ ('roux', 'rothaarig'),
+ ('la rue', 'die Straße'),
+ ('le rugby', 'das Rugby'),
+ ('le ruisseau', 'der Bach'),
+ ('la rupture', 'die Trennung'),
+ ('russe', 'russisch'),
+ ('la Russie', 'Russland'),
+ ('le rythme', 'der Rhythmus'),
+ ('le sable', 'der Sand'),
+ ('le sabot', 'der Holzschuh'),
+ ('le sac', 'die Tasche'),
+ ('le sac à dos', 'der Rucksack'),
+ ('sage', 'brav'),
+ ('saigner', 'bluten'),
+ ('sain', 'gesund'),
+ ('la saison', 'die Jahreszeit'),
+ ('la salade', 'der Salat'),
+ ('le saladier', 'die Salatschüssel'),
+ ('le salaire', 'das Gehalt'),
+ ('sale', 'schmutzig'),
+ ('salé', 'salzig'),
+ ('saler', 'salzen'),
+ ('la salive', 'der Speichel'),
+ ('la salle', 'der Saal'),
+ ('la salle à manger', 'das Esszimmer'),
+ ('la salle de bains', 'das Badezimmer'),
+ ('la salle de classe', 'das Klassenzimmer'),
+ ('le salon', 'das Wohnzimmer'),
+ ('la salopette', 'die Latzhose'),
+ ('saluer', 'grüßen'),
+ ('le salut', 'der Gruß'),
+ ('salut', 'hallo'),
+ ('le samedi', 'der Samstag'),
+ ('la sandale', 'die Sandale'),
+ ('le sandwich', 'das Sandwich'),
+ ('le sang', 'das Blut'),
+ ('la sangle', 'der Gurt'),
+ ('le sanglier', 'das Wildschwein'),
+ ('sans', 'ohne'),
+ ('la santé', 'die Gesundheit'),
+ ('le sapin', 'die Tanne'),
+ ('satisfait', 'zufrieden'),
+ ('la sauce', 'die Soße'),
+ ('la saucisse', 'die Wurst'),
+ ('sauf', 'außer'),
+ ('le saumon', 'der Lachs'),
+ ('sauter', 'springen'),
+ ('sauver', 'retten'),
+ ('la saveur', 'der Geschmack'),
+ ('savoir', 'wissen'),
+ ('le savon', 'die Seife'),
+ ('savoureux', 'lecker'),
+ ('le scanner', 'der Scanner'),
+ ('la scène', 'die Bühne'),
+ ('la scie', 'die Säge'),
+ ('la science', 'die Wissenschaft'),
+ ('le score', 'der Spielstand'),
+ ('le sculpteur', 'der Bildhauer'),
+ ('le seau', 'der Eimer'),
+ ("le seau d'eau", 'der Wassereimer'),
+ ('sec', 'trocken'),
+ ('le sèche-cheveux', 'der Föhn'),
+ ('le sèche-linge', 'der Wäschetrockner'),
+ ('sécher', 'trocknen'),
+ ('la sécheresse', 'die Dürre'),
+ ('la seconde', 'die Sekunde'),
+ ('le secours', 'die Hilfe'),
+ ('le secret', 'das Geheimnis'),
+ ('la secrétaire', 'die Sekretärin'),
+ ('la sécurité', 'die Sicherheit'),
+ ('le séjour', 'der Aufenthalt'),
+ ('le sel', 'das Salz'),
+ ('le sel de mer', 'das Meersalz'),
+ ('la selle', 'der Sattel'),
+ ('la semaine', 'die Woche'),
+ ('sembler', 'scheinen'),
+ ('la semelle', 'die Sohle'),
+ ('le sens', 'der Sinn'),
+ ('le sentier', 'der Pfad'),
+ ('le sentiment', 'das Gefühl'),
+ ('se sentir', 'sich fühlen'),
+ ('sentir', 'riechen'),
+ ('séparé', 'getrennt'),
+ ('septembre', 'September'),
+ ('la série', 'die Serie'),
+ ('sérieux', 'ernst'),
+ ('le serpent', 'die Schlange'),
+ ('serrer la main', 'die Hand geben'),
+ ('la serrure', 'das Schloss'),
+ ('le serveur', 'der Kellner'),
+ ('la serveuse', 'die Kellnerin'),
+ ('le service', 'der Dienst'),
+ ('le service client', 'der Kundendienst'),
+ ('la serviette', 'das Handtuch'),
+ ('servir', 'servieren'),
+ ('le seuil', 'die Schwelle'),
+ ('seul', 'allein'),
+ ('seulement', 'nur'),
+ ('sévère', 'streng'),
+ ('le shampooing', 'das Shampoo'),
+ ('le shopping', 'das Einkaufen'),
+ ('le short', 'die Shorts'),
+ ('si', 'wenn'),
+ ('le siècle', 'das Jahrhundert'),
+ ('le siège', 'der Sitz'),
+ ('la sieste', 'der Mittagsschlaf'),
+ ('le sifflet', 'die Pfeife'),
+ ('le signal', 'das Signal'),
+ ('la signature', 'die Unterschrift'),
+ ('signer', 'unterschreiben'),
+ ('le silence', 'die Stille'),
+ ('simple', 'einfach'),
+ ('le singe', 'der Affe'),
+ ('la situation', 'die Lage'),
+ ('le ski', 'der Ski'),
+ ('la société', 'die Gesellschaft'),
+ ('la soif', 'der Durst'),
+ ('le soir', 'der Abend'),
+ ('la soirée', 'der Abend'),
+ ('le sol', 'der Boden'),
+ ('le soldat', 'der Soldat'),
+ ('les soldes', 'der Schlussverkauf'),
+ ('le soleil', 'die Sonne'),
+ ('sombre', 'dunkel'),
+ ('le sommeil', 'der Schlaf'),
+ ('le sommet', 'der Gipfel'),
+ ('sonner', 'klingeln'),
+ ('la sonnette', 'die Klingel'),
+ ('la sorte', 'die Sorte'),
+ ('la sortie', 'der Ausgang'),
+ ('sortir', 'hinausgehen'),
+ ('la soupe', 'die Suppe'),
+ ('sourd', 'taub'),
+ ('sourire', 'lächeln'),
+ ('la souris', 'die Maus'),
+ ('sous', 'unter'),
+ ('le sous-sol', 'das Untergeschoss'),
+ ('souvent', 'oft'),
+ ('le spectacle', 'die Vorstellung'),
+ ('le sport', 'der Sport'),
+ ('sportif', 'sportlich'),
+ ('le stade', 'das Stadion'),
+ ('le stage', 'das Praktikum'),
+ ('la station', 'die Station'),
+ ('la station-service', 'die Tankstelle'),
+ ('la statue', 'die Statue'),
+ ('le steak', 'das Steak'),
+ ('le stylo', 'der Kugelschreiber'),
+ ('le succès', 'der Erfolg'),
+ ('le sucre', 'der Zucker'),
+ ('sucré', 'süß'),
+ ('le sud', 'der Süden'),
+ ('la Suisse', 'die Schweiz'),
+ ('suisse', 'schweizerisch'),
+ ('suivant', 'folgend'),
+ ('suivre', 'folgen'),
+ ('le sujet', 'das Thema'),
+ ('super', 'super'),
+ ('le supermarché', 'der Supermarkt'),
+ ('sur', 'auf'),
+ ('sûr', 'sicher'),
+ ('surprendre', 'überraschen'),
+ ('la surprise', 'die Überraschung'),
+ ('surtout', 'vor allem'),
+ ('surveiller', 'beaufsichtigen'),
+ ('sympathique', 'sympathisch'),
+ ('la sœur', 'die Schwester'),
+ ('le tabac', 'der Tabak'),
+ ('la table', 'der Tisch'),
+ ('le tableau', 'die Tafel'),
+ ('la tablette', 'das Tablet'),
+ ('le tabouret', 'der Hocker'),
+ ('la tache', 'der Fleck'),
+ ('la tâche', 'die Aufgabe'),
+ ('la taille', 'die Größe'),
+ ('tailler', 'schneiden'),
+ ('le tailleur', 'der Schneider'),
+ ('se taire', 'schweigen'),
+ ('le talon', 'die Ferse'),
+ ('le tambour', 'die Trommel'),
+ ('le tank', 'der Panzer'),
+ ('tant pis', 'schade'),
+ ('la tante', 'die Tante'),
+ ('taper', 'tippen'),
+ ('le tapis', 'der Teppich'),
+ ('taquiner', 'necken'),
+ ('tard', 'spät'),
+ ('le tarif', 'der Tarif'),
+ ('la tarte', 'der Kuchen'),
+ ('la tartelette', 'das Törtchen'),
+ ('la tartine', 'das Butterbrot'),
+ ('le tas', 'der Haufen'),
+ ('la tasse', 'die Tasse'),
+ ('le taureau', 'der Stier'),
+ ('le taux', 'der Satz'),
+ ('le taxi', 'das Taxi'),
+ ('le technicien', 'der Techniker'),
+ ('la technique', 'die Technik'),
+ ('le tee-shirt', 'das T-Shirt'),
+ ('teindre', 'färben'),
+ ('la teinturerie', 'die Reinigung'),
+ ('tel', 'solch'),
+ ('la télé', 'der Fernseher'),
+ ('la télécommande', 'die Fernbedienung'),
+ ('le télégramme', 'das Telegramm'),
+ ('le téléphone', 'das Telefon'),
+ ('téléphoner', 'telefonieren'),
+ ('la télévision', 'das Fernsehen'),
+ ('le témoin', 'der Zeuge'),
+ ('la température', 'die Temperatur'),
+ ('la tempête', 'der Sturm'),
+ ('le temps', 'die Zeit'),
+ ('le temps (météo)', 'das Wetter'),
+ ('tendre', 'zart'),
+ ('tenir', 'halten'),
+ ('le tennis', 'das Tennis'),
+ ('la tension', 'der Blutdruck'),
+ ('la tente', 'das Zelt'),
+ ('terminer', 'beenden'),
+ ('le terminus', 'die Endstation'),
+ ('le terrain', 'das Grundstück'),
+ ('la terrasse', 'die Terrasse'),
+ ('la terre', 'die Erde'),
+ ('terrible', 'schrecklich'),
+ ('le territoire', 'das Gebiet'),
+ ('le test', 'der Test'),
+ ('la tête', 'der Kopf'),
+ ('la tétine', 'der Schnuller'),
+ ('têtu', 'stur'),
+ ('le texte', 'der Text'),
+ ('le TGV', 'der Schnellzug'),
+ ('le thé', 'der Tee'),
+ ('le théâtre', 'das Theater'),
+ ('le thermomètre', 'das Thermometer'),
+ ('le thon', 'der Thunfisch'),
+ ('le ticket', 'die Fahrkarte'),
+ ('la tige', 'der Stängel'),
+ ('le tigre', 'der Tiger'),
+ ('le timbre', 'die Briefmarke'),
+ ('timide', 'schüchtern'),
+ ('le tir', 'das Schießen'),
+ ('le tire-bouchon', 'der Korkenzieher'),
+ ('tirer', 'ziehen'),
+ ('le tiroir', 'die Schublade'),
+ ('la tisane', 'der Kräutertee'),
+ ('le tissu', 'der Stoff'),
+ ("le tissu d'ameublement", 'der Möbelstoff'),
+ ('le titre', 'der Titel'),
+ ('toi', 'du'),
+ ('la toile', 'die Leinwand'),
+ ('la toilette', 'die Toilette'),
+ ('les toilettes', 'die Toilette'),
+ ('le toit', 'das Dach'),
+ ('la tomate', 'die Tomate'),
+ ('la tombe', 'das Grab'),
+ ('tomber', 'fallen'),
+ ('tomber malade', 'krank werden'),
+ ('le tonneau', 'das Fass'),
+ ('le tonnerre', 'der Donner'),
+ ('la tortue', 'die Schildkröte'),
+ ('tôt', 'früh'),
+ ('tôt le matin', 'früh am Morgen'),
+ ('toucher', 'berühren'),
+ ('toujours', 'immer'),
+ ('la tour', 'der Turm'),
+ ('le tour', 'die Runde'),
+ ('le touriste', 'der Tourist'),
+ ('tourner', 'abbiegen'),
+ ('le tournevis', 'der Schraubenzieher'),
+ ('le tournoi', 'das Turnier'),
+ ('tousser', 'husten'),
+ ('tout', 'alles'),
+ ('tout de suite', 'sofort'),
+ ('tout droit', 'geradeaus'),
+ ('tout le monde', 'alle'),
+ ('la toux', 'der Husten'),
+ ('le tracteur', 'der Traktor'),
+ ('la tradition', 'die Tradition'),
+ ('traduire', 'übersetzen'),
+ ('le trafic', 'der Verkehr'),
+ ('la tragédie', 'die Tragödie'),
+ ('trahir', 'verraten'),
+ ('le train', 'der Zug'),
+ ('en train de', 'gerade dabei'),
+ ('le traitement', 'die Behandlung'),
+ ('le trajet', 'die Fahrt'),
+ ('le tramway', 'die Straßenbahn'),
+ ('la tranche', 'die Scheibe'),
+ ('tranquille', 'ruhig'),
+ ('la tranquillité', 'die Ruhe'),
+ ('transpirer', 'schwitzen'),
+ ('le transport', 'der Transport'),
+ ('les transports en commun', 'die öffentlichen Verkehrsmittel'),
+ ('le travail', 'die Arbeit'),
+ ('travailler', 'arbeiten'),
+ ('traverser', 'überqueren'),
+ ('très', 'sehr'),
+ ('le trésor', 'der Schatz'),
+ ('le triangle', 'das Dreieck'),
+ ('la tribu', 'der Stamm'),
+ ('tricher', 'schummeln'),
+ ('le tricot', 'der Pullover'),
+ ('trier', 'sortieren'),
+ ('le trimestre', 'das Quartal'),
+ ('triste', 'traurig'),
+ ('se tromper', 'sich irren'),
+ ('tromper', 'täuschen'),
+ ('trop', 'zu viel'),
+ ('le trottoir', 'der Gehweg'),
+ ('le trou', 'das Loch'),
+ ('la trousse', 'das Federmäppchen'),
+ ('se trouver', 'sich befinden'),
+ ('trouver', 'finden'),
+ ('le truc', 'das Ding'),
+ ('tu', 'du'),
+ ('tuer', 'töten'),
+ ('la Turquie', 'die Türkei'),
+ ('le tuyau', 'das Rohr'),
+ ('typique', 'typisch'),
+ ("l'ulcère", 'das Geschwür'),
+ ('ultime', 'letzte'),
+ ('ultra-rapide', 'superschnell'),
+ ('un', 'ein'),
+ ("l'uniforme", 'die Uniform'),
+ ("l'union", 'die Union'),
+ ("l'Union européenne", 'die Europäische Union'),
+ ('unique', 'einzig'),
+ ('uniquement', 'nur'),
+ ("l'unité", 'die Einheit'),
+ ("l'univers", 'das Universum'),
+ ('universel', 'allgemein'),
+ ("l'université", 'die Universität'),
+ ('urbain', 'städtisch'),
+ ("l'urbanisme", 'die Stadtplanung'),
+ ("l'urgence", 'der Notfall'),
+ ('les urgences', 'die Notaufnahme'),
+ ('urgent', 'dringend'),
+ ("l'urine", 'der Urin'),
+ ("l'urne", 'die Wahlurne'),
+ ('les USA', 'die USA'),
+ ("l'usage", 'der Gebrauch'),
+ ("l'usager", 'der Nutzer'),
+ ('usé', 'abgenutzt'),
+ ("l'usine", 'die Fabrik'),
+ ("l'ustensile", 'das Gerät'),
+ ("l'usure", 'die Abnutzung'),
+ ('utile', 'nützlich'),
+ ("l'utilisateur", 'der Benutzer'),
+ ('utiliser', 'benutzen'),
+ ("l'utopie", 'die Utopie'),
+ ('les vacances', 'die Ferien'),
+ ('le vaccin', 'die Impfung'),
+ ('vacciner', 'impfen'),
+ ('la vache', 'die Kuh'),
+ ('le vagabond', 'der Landstreicher'),
+ ('la vague', 'die Welle'),
+ ('vaincre', 'besiegen'),
+ ('le vainqueur', 'der Sieger'),
+ ('la vaisselle', 'das Geschirr'),
+ ('valable', 'gültig'),
+ ('la valeur', 'der Wert'),
+ ('la valise', 'der Koffer'),
+ ('la vallée', 'das Tal'),
+ ('la vanille', 'die Vanille'),
+ ('la vapeur', 'der Dampf'),
+ ('varier', 'variieren'),
+ ('la vase', 'der Schlamm'),
+ ('le vase', 'die Vase'),
+ ('vaste', 'weit'),
+ ('le veau', 'das Kalb'),
+ ('la vedette', 'der Star'),
+ ('végétarien', 'vegetarisch'),
+ ('le véhicule', 'das Fahrzeug'),
+ ('la veille', 'der Vortag'),
+ ('la veine', 'die Ader'),
+ ('le vélo', 'das Fahrrad'),
+ ('le velours', 'der Samt'),
+ ('le vendeur', 'der Verkäufer'),
+ ('la vendeuse', 'die Verkäuferin'),
+ ('vendre', 'verkaufen'),
+ ('le vendredi', 'der Freitag'),
+ ('venger', 'rächen'),
+ ('venir', 'kommen'),
+ ('le vent', 'der Wind'),
+ ('la vente', 'der Verkauf'),
+ ('le ventre', 'der Bauch'),
+ ('le ver', 'der Wurm'),
+ ('le verbe', 'das Verb'),
+ ('vérifier', 'überprüfen'),
+ ('la vérité', 'die Wahrheit'),
+ ('le vernis à ongles', 'der Nagellack'),
+ ('le verre', 'das Glas'),
+ ('le verrou', 'der Riegel'),
+ ('vers', 'gegen'),
+ ('verser', 'gießen'),
+ ('la version', 'die Version'),
+ ('vert', 'grün'),
+ ('le vertige', 'der Schwindel'),
+ ('la veste', 'die Jacke'),
+ ('le vestiaire', 'die Garderobe'),
+ ('les vêtements', 'die Kleidung'),
+ ('le vétérinaire', 'der Tierarzt'),
+ ('le veuf', 'der Witwer'),
+ ('la veuve', 'die Witwe'),
+ ('vexé', 'gekränkt'),
+ ('la viande', 'das Fleisch'),
+ ('la vibration', 'die Vibration'),
+ ('le vice', 'das Laster'),
+ ('la victime', 'das Opfer'),
+ ('la victoire', 'der Sieg'),
+ ('vide', 'leer'),
+ ('le vide-grenier', 'der Flohmarkt'),
+ ('la vidéo', 'das Video'),
+ ('la vie', 'das Leben'),
+ ('le vieillard', 'der Greis'),
+ ('vieillir', 'altern'),
+ ('vieux', 'alt'),
+ ('vif', 'lebhaft'),
+ ('la vigne', 'der Weinberg'),
+ ('le vignoble', 'das Weingebiet'),
+ ('vilain', 'hässlich'),
+ ('le village', 'das Dorf'),
+ ('la ville', 'die Stadt'),
+ ('le vin', 'der Wein'),
+ ('le vinaigre', 'der Essig'),
+ ('la violence', 'die Gewalt'),
+ ('violet', 'lila'),
+ ('le violon', 'die Geige'),
+ ('le virage', 'die Kurve'),
+ ('la virgule', 'das Komma'),
+ ('le virus', 'das Virus'),
+ ('la vis', 'die Schraube'),
+ ('le visa', 'das Visum'),
+ ('le visage', 'das Gesicht'),
+ ('viser', 'zielen'),
+ ('la vision', 'die Sicht'),
+ ('la visite', 'der Besuch'),
+ ('visiter', 'besichtigen'),
+ ('le visiteur', 'der Besucher'),
+ ('la vitamine', 'das Vitamin'),
+ ('vite', 'schnell'),
+ ('la vitesse', 'die Geschwindigkeit'),
+ ('la vitre', 'die Fensterscheibe'),
+ ('vitré', 'verglast'),
+ ('la vitrine', 'das Schaufenster'),
+ ('vivant', 'lebendig'),
+ ('vivre', 'leben'),
+ ('la vocation', 'die Berufung'),
+ ('voici', 'hier ist'),
+ ('la voie', 'das Gleis'),
+ ('voilà', 'da ist'),
+ ('la voile', 'das Segel'),
+ ('le voilier', 'das Segelboot'),
+ ('voir', 'sehen'),
+ ('le voisin', 'der Nachbar'),
+ ('la voisine', 'die Nachbarin'),
+ ('la voiture', 'das Auto'),
+ ('la voix', 'die Stimme'),
+ ('le vol', 'der Flug'),
+ ('le vol (crime)', 'der Diebstahl'),
+ ('le volant', 'das Lenkrad'),
+ ('le volcan', 'der Vulkan'),
+ ('voler', 'fliegen'),
+ ('le volet', 'der Fensterladen'),
+ ('le voleur', 'der Dieb'),
+ ('le volley', 'der Volleyball'),
+ ('volontiers', 'gern'),
+ ('le volume', 'die Lautstärke'),
+ ('vomir', 'sich übergeben'),
+ ('le vote', 'die Abstimmung'),
+ ('voter', 'wählen'),
+ ('vouloir', 'wollen'),
+ ('vous', 'Sie'),
+ ('le voyage', 'die Reise'),
+ ('voyager', 'reisen'),
+ ('le voyageur', 'der Reisende'),
+ ('le voyou', 'der Schurke'),
+ ('vrai', 'wahr'),
+ ('vraiment', 'wirklich'),
+ ('la vue', 'die Aussicht'),
+ ('le vœu', 'der Wunsch'),
+ ('les W.-C.', 'das WC'),
+ ('le wagon', 'der Wagen'),
+ ('le wagon-lit', 'der Schlafwagen'),
+ ('le wagon-restaurant', 'der Speisewagen'),
+ ('le wapiti', 'der Wapiti'),
+ ('le water-polo', 'der Wasserball'),
+ ('le watt', 'das Watt'),
+ ('le web', 'das Internet'),
+ ('la webcam', 'die Webcam'),
+ ('le week-end', 'das Wochenende'),
+ ('le western', 'der Western'),
+ ('le whisky', 'der Whisky'),
+ ('le wifi', 'das WLAN'),
+ ('le windsurf', 'das Windsurfen'),
+ ('le wok', 'der Wok'),
+ ('xénophobe', 'fremdenfeindlich'),
+ ('la xénophobie', 'die Fremdenfeindlichkeit'),
+ ('le xérès', 'der Sherry'),
+ ('le xylophone', 'das Xylofon'),
+ ('le yacht', 'die Jacht'),
+ ('le yaourt', 'der Joghurt'),
+ ('le yen', 'der Yen'),
+ ('le yéti', 'der Yeti'),
+ ('les yeux', 'die Augen'),
+ ('le yoga', 'das Yoga'),
+ ('le yogourt', 'der Jogurt'),
+ ('le yoyo', 'das Jo-Jo'),
+ ('zapper', 'umschalten'),
+ ('le zèbre', 'das Zebra'),
+ ('zélé', 'eifrig'),
+ ('le zen', 'das Zen'),
+ ('zéro', 'null'),
+ ('le zeste', 'die Schale'),
+ ('le zigzag', 'der Zickzack'),
+ ('le zinc', 'das Zink'),
+ ('le zodiaque', 'der Tierkreis'),
+ ('la zone', 'die Zone'),
+ ('la zone piétonne', 'die Fußgängerzone'),
+ ('le zoo', 'der Zoo'),
+ ('la zoologie', 'die Zoologie'),
+ ('la zumba', 'das Zumba'),
+ ('zut', 'Mist'),
+ ("l'œil", 'das Auge'),
+ ("l'œil au beurre noir", 'das blaue Auge'),
+ ("l'œuf", 'das Ei'),
+ ("l'œuvre", 'das Werk')]
+
+def _dico_key(fr):
+    s = fr.lower().strip()
+    for p in ("le ", "la ", "les ", "l'", "d'", "se ", "s'", "en ", "un ", "une "):
+        if s.startswith(p) and len(s) > len(p) + 1:
+            s = s[len(p):]
+            break
+    s = unicodedata.normalize("NFD", s)
+    return "".join(c for c in s if not unicodedata.combining(c))
+
+def _dico_norm(s):
+    s = unicodedata.normalize("NFD", (s or "").lower())
+    return "".join(c for c in s if not unicodedata.combining(c)).replace("ß", "ss")
+
+DICO_BY_LETTER = {}
+for _fr, _de in DICO_FR_DE:
+    _k = _dico_key(_fr)
+    _l = _k[:1].upper() if _k[:1].isalpha() else "#"
+    DICO_BY_LETTER.setdefault(_l, []).append((_fr, _de))
+DICO_SEARCH = [(_dico_norm(fr) + " | " + _dico_norm(de), fr, de) for fr, de in DICO_FR_DE]
+DICO_LETTERS = [chr(c) for c in range(ord("A"), ord("Z") + 1)]
+
+@app.route("/dictionnaire")
+@login_required
+def dictionnaire():
+    small = "padding:4px 10px;font-size:12px;"
+    q = (request.args.get("q") or "").strip()[:60]
+    letter = (request.args.get("l") or "A").strip().upper()[:1]
+    if letter not in DICO_LETTERS:
+        letter = "A"
+    if q:
+        nq = _dico_norm(q)
+        entries = [(fr, de) for blob, fr, de in DICO_SEARCH if nq in blob][:150]
+        heading = f'{len(entries)} résultat(s) pour « {h(q)} »' + (" (150 premiers)" if len(entries) >= 150 else "")
+    else:
+        entries = DICO_BY_LETTER.get(letter, [])
+        heading = f"Lettre {letter} — {len(entries)} mots"
+    chips = "".join(
+        f'<a class="dico-l{" active" if (l == letter and not q) else ""}" href="{url_for("dictionnaire", l=l)}">{l}'
+        f'<small>{len(DICO_BY_LETTER.get(l, []))}</small></a>' for l in DICO_LETTERS)
+    rows = ""
+    for fr, de in entries:
+        rows += f"""
+        <div class="dico-row">
+          <div class="dico-w"><b>{h(fr)}</b> <span class="dico-arrow">→</span> <span class="dico-de">{h(de)}</span></div>
+          <div class="gd-btns">
+            {say_btn("🇩🇪", "de", "", de, css="btn ghost", style=small)}
+            {say_btn("▶", "pair", fr, de, css="btn ghost", style=small)}
+          </div>
+        </div>"""
+    if not rows:
+        rows = '<p style="color:var(--muted);padding:10px 0;">Aucun mot trouvé. Essaie un autre mot, en français ou en allemand.</p>'
+    pl_title = f"Dictionnaire : {'recherche ' + q if q else 'lettre ' + letter}"
+    pl_btn = playlist_btn("▶ Écouter cette liste", "dico", pl_title, css="btn ok") if entries else ""
+    payload = {"dico": {pl_title: [{"fr": fr, "de": de} for fr, de in entries]}}
+    body = f"""
+    <h1>Dictionnaire français → allemand 📕</h1>
+    <p style="margin-bottom:14px;color:#5B7A90;">
+      {len(DICO_FR_DE)} mots courants de A à Z pour enrichir ton vocabulaire (Wortschatz).
+      Les noms allemands sont donnés avec leur article (der, die, das).
+      🇩🇪 = écouter l'allemand · ▶ = le français (voix française) puis l'allemand (voix allemande).
+    </p>
+    <form method="get" action="{url_for('dictionnaire')}" class="card dico-search" style="border-left:5px solid var(--warn);">
+      <input type="search" name="q" value="{h(q)}" placeholder="🔎 Chercher un mot (français ou allemand)…" autocomplete="off" style="margin:0;">
+      <button class="btn" type="submit">Chercher</button>
+    </form>
+    <div class="dico-letters">{chips}</div>
+    <div class="nomakk-section">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:6px;">
+        <h3 style="margin:0">{heading}</h3>{pl_btn}
+      </div>
+      <div class="dico-list">{rows}</div>
+    </div>
+    {playlist_data_script(payload)}
+    """
+    return page(layout("Dictionnaire", body, {"is_admin": session.get("is_admin")}))
+
+
 @app.route("/playlists")
 @login_required
 def playlists():
@@ -10403,6 +14094,7 @@ def admin():
       <div class="stat"><div class="num">{neferti_bank_count}</div><div class="lbl">Questions Neferti</div></div>
       <div class="stat"><div class="num">{neferti_users_count}</div><div class="lbl">Users Neferti</div></div>
     </div>
+    {_apk_admin_card()}
     <div class="card">
       <h2>Ajouter une leçon</h2>
       <form method="post" action="{url_for('admin_add_lesson')}">
