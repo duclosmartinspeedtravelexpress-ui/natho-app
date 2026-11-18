@@ -4,6 +4,7 @@
 # + Apprendre à parler + Essentiels A1 + Mode nuit + Menu mobile
 # + NOM/AKK (Nominativ vs Akkusativ) + NEFERTI (bot Sprechen)
 # v4.1 : correctifs (sécurité, playlists, progression, Goethe, Neferti, contenu)
+# v5.0 : Simulation Sprechen A1 (Teil 1, 2, 3) à 3 voix — Herr Wagner, Sankara et Nefertiti — avec 50 ou 10 cartes chacun, traduction au choix, playlist
 # v4.9 : page Playlists — ajout des 500 verbes, du dictionnaire (A à Z) et du Guide, avec « Lire tout »
 # v4.8 : écran éteint — chaque élément de playlist est un MP3 assemblé par le serveur (préparé à l'avance), plus rien à calculer sur le téléphone
 # v4.7 : lecture en arrière-plan fiable (voix serveur intégrée sans gTTS, un fichier audio de 5,5 s+ par élément pour les commandes de l'écran de verrouillage), test de la voix dans l'admin
@@ -5447,6 +5448,51 @@ html.standalone .install-btn { display: none !important; }
 
 .pl-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 0 12px; }
 @media (max-width: 560px) { .pl-grid { grid-template-columns: 1fr 1fr; } .pl-grid .card { padding: 12px; flex-direction: column; align-items: stretch !important; } .pl-grid .card .btn { width: 100%; } }
+/* === v5.0 : simulation Sprechen === */
+.sim-hero { background: linear-gradient(135deg, #4AA5D0 0%, #2F8CBB 60%, #1E6F99 100%); color: #fff; border-radius: 18px; padding: 22px; margin-bottom: 16px;
+  display: flex; justify-content: space-between; gap: 18px; flex-wrap: wrap; align-items: center; box-shadow: 0 8px 24px rgba(47,140,187,.25); }
+.sim-hero h1 { color: #fff; }
+.sim-cast { display: flex; gap: 10px; flex-wrap: wrap; }
+.sim-person { display: flex; gap: 10px; align-items: center; background: rgba(255,255,255,.14); border: 1px solid rgba(255,255,255,.25);
+  border-left: 4px solid var(--c); border-radius: 14px; padding: 8px 12px; min-width: 190px; }
+.sim-person small { opacity: .9; }
+.sim-avatar { font-size: 28px; width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; background: rgba(255,255,255,.9); border-radius: 50%; }
+.sim-controls { display: flex; flex-direction: column; gap: 12px; }
+.sim-ctrl-row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; justify-content: space-between; }
+.sim-seg { display: inline-flex; background: var(--input-bg); border: 1px solid var(--border-light); border-radius: 999px; padding: 4px; gap: 4px; }
+.sim-seg button { border: 0; background: transparent; color: var(--ink); padding: 8px 14px; border-radius: 999px; font-weight: 700; cursor: pointer; font-size: 13px; }
+.sim-seg button.on { background: var(--sky-dark); color: #fff; }
+.sim-meta { display: flex; flex-wrap: wrap; gap: 8px 16px; font-size: 13px; color: var(--muted); }
+.sim-follow { font-size: 13px; color: var(--muted); display: flex; align-items: center; gap: 6px; }
+.sim-follow input { width: auto; margin: 0; }
+.sim-tip { font-size: 14px; line-height: 1.6; border-left: 5px solid var(--warn); }
+.sim-teil { margin-top: 20px; }
+.sim-teil-head { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; position: sticky; top: 64px; z-index: 5;
+  background: var(--card-bg); border-radius: 14px; padding: 12px 16px; box-shadow: 0 4px 14px rgba(0,0,0,.06); margin-bottom: 10px; }
+.sim-block { position: relative; background: var(--card-bg); border: 1px solid var(--border-light); border-radius: 14px; padding: 10px 12px 10px 48px; margin: 8px 0;
+  transition: box-shadow .2s, border-color .2s; }
+.sim-block.playing { border-color: var(--sky-dark); box-shadow: 0 0 0 3px rgba(74,165,208,.25); }
+.sim-play { position: absolute; left: 10px; top: 10px; width: 30px; height: 30px; border-radius: 50%; border: 0; background: var(--sky-light); color: var(--sky-dark);
+  font-size: 12px; cursor: pointer; }
+.sim-play:hover { background: var(--sky-dark); color: #fff; }
+.sim-line { border-left: 3px solid var(--c); padding: 4px 0 4px 10px; margin: 4px 0; max-width: 92%; }
+.sim-line.right { margin-left: auto; border-left: 0; border-right: 3px solid var(--c); padding: 4px 10px 4px 0; text-align: right; }
+.sim-line.center { max-width: 100%; background: var(--sky-light); border-radius: 0 10px 10px 0; padding: 6px 10px; }
+.sim-who { font-size: 12px; font-weight: 800; color: var(--c); }
+.sim-de { font-size: 15px; line-height: 1.5; font-weight: 600; }
+.sim-fr { font-size: 13px; color: var(--muted); line-height: 1.45; }
+.sim-mode-de .sim-fr { display: none; }
+.sim-goethe-card { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; border-left: 5px solid var(--ok); }
+@media (max-width: 800px) {
+  .sim-hero { padding: 18px 14px; }
+  .sim-person { min-width: 0; flex: 1 1 100%; }
+  .sim-teil-head { top: 58px; }
+  .sim-line { max-width: 100%; }
+  .sim-seg { width: 100%; }
+  .sim-seg button { flex: 1; padding: 8px 6px; }
+  #sim-all, .sim-controls form .btn, .sim-controls select { width: 100%; max-width: none !important; }
+}
+
 .neferti-example { flex-basis: 100%; background: var(--sky-light); border-radius: 10px; padding: 12px; font-size: 14px; line-height: 1.6; }
 </style>
 """
@@ -5554,6 +5600,8 @@ AUDIO_JS = r"""
     'kind:dico': 'Tout le dictionnaire français → allemand',
     'kind:guide': 'Tout le Guide (alphabet, verbes, séparables, Perfekt)'
   };
+  ALL_TITLES['sprechfull:DE+FR'] = 'Sprechen Teil 1+2+3 (DE+FR)';
+  ALL_TITLES['sprechfull:DE'] = 'Sprechen Teil 1+2+3 (DE)';
 
   function sleep(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
 
@@ -5679,7 +5727,7 @@ AUDIO_JS = r"""
       au.addEventListener('timeupdate', function () { updSeek(false); });
       au.addEventListener('loadedmetadata', function () {
         if (itemMode && isFinite(au.duration) && au.duration > 0) {
-          itemDur = au.duration / ITEM_RATE; fixDur(idx, itemDur); updSeek(true);
+          itemDur = au.duration / itemRate; fixDur(idx, itemDur); updSeek(true);
         }
       });
       // le téléphone a mis en pause (appel, casque débranché…) : on synchronise l'état
@@ -5807,12 +5855,14 @@ AUDIO_JS = r"""
   // Écran éteint, le téléphone n'exécute presque plus le JavaScript : le lecteur charge lui-même
   // /tts-item (français + pause + allemand + pause, 5,6 s mini) et le serveur prépare les suivants.
   var ITEM_RATE = 0.9;
+  var itemRate = 0.9;
   var itemMode = false;
   var itemDur = 0;
   var warnedNoServerVoice = false;
   function enc(s) { return encodeURIComponent(s || ''); }
   function itemUrl(i) {
     var it = list[i];
+    if (it.url) return it.url;
     var u = '/tts-item?fr=' + enc(it.fr) + '&de=' + enc(it.de);
     for (var k = 1; k <= 2; k++) {
       var nx = list[i + k];
@@ -5853,7 +5903,7 @@ AUDIO_JS = r"""
     var start = 0;
     for (var k = 0; k < phase; k++) start += p[k];
     var t = (curMode === 'mp3' && au && isFinite(au.currentTime)) ? au.currentTime : 0;
-    if (itemMode) return Math.min(cum[idx + 1] - 0.05, cum[idx] + Math.min(t / ITEM_RATE, itemDur));
+    if (itemMode) return Math.min(cum[idx + 1] - 0.05, cum[idx] + Math.min(t / itemRate, itemDur));
     return Math.min(cum[idx + 1] - 0.05, cum[idx] + start + Math.min(t, p[phase] + 3));
   }
   function fmt(s) {
@@ -6035,7 +6085,8 @@ AUDIO_JS = r"""
       if (useMp3()) {
         curMode = 'mp3';
         itemMode = true; itemDur = cum[idx + 1] - cum[idx];
-        var okItem = await playUrl(itemUrl(idx), ITEM_RATE, 45000);
+        itemRate = list[idx].rate || ITEM_RATE;
+        var okItem = await playUrl(itemUrl(idx), itemRate, 45000);
         itemMode = false;
         if (my !== token) return;
         if (okItem) { ttsFails = 0; idx++; continue; }
@@ -6064,7 +6115,7 @@ AUDIO_JS = r"""
     if (my === token) stopPlaylist();
   }
 
-  async function startPlaylist(items, title) {
+  async function startPlaylist(items, title, startIdx) {
     if (!useMp3() && !warnedNoServerVoice) {
       warnedNoServerVoice = true;
       toast("⚠️ Voix du serveur indisponible : la lecture utilisera la voix du téléphone et s'arrêtera si l'écran s'éteint.");
@@ -6076,7 +6127,7 @@ AUDIO_JS = r"""
     if (my !== token) return;
     clearItems();
     list = items;
-    idx = 0;
+    idx = Math.max(0, Math.min(parseInt(startIdx || 0, 10) || 0, items.length - 1));
     listTitle = title || '';
     buildCum();
     saveItems();
@@ -6100,6 +6151,11 @@ AUDIO_JS = r"""
       if (key === 'mix') return flat('lessons').concat(flat('vocab'));
       if (key === 'dialogues') return flat('dialogues');
       if (key && key.indexOf('kind:') === 0) return flat(key.slice(5));
+      if (key && key.indexOf('sprechfull:') === 0) {
+        var sp = d.sprechen || {}, m = key.slice(11), r = [];
+        [1, 2, 3].forEach(function (t) { r = r.concat(sp['Sprechen Teil ' + t + ' (' + m + ')'] || []); });
+        return r;
+      }
       return null;
     }
     return d[kind] && d[kind][key];
@@ -6298,7 +6354,8 @@ AUDIO_JS = r"""
     togglePause: togglePause,
     prev: function () { jump(-1); },
     next: function () { jump(1); },
-    unlock: unlockAudio
+    unlock: unlockAudio,
+    state: function () { return { title: listTitle, idx: idx, n: list.length, paused: paused }; }
   };
   window.speak = speak;
   window.speakPair = speakPair;
@@ -6457,6 +6514,7 @@ def layout(title, body, user=None):
             </div></details>
             <a href="{url_for('verbes_500')}">500 verbes 🇫🇷🇩🇪</a>
             <a href="{url_for('dictionnaire')}">Dictionnaire 📕</a>
+            <a href="{url_for('sprechen_sim')}">Simulation Sprechen 🎤</a>
             <a href="{url_for('neferti')}">Neferti 🤖</a>
             <a href="{url_for('goethe')}">Examen Goethe</a>
             <details class="nav-dd"><summary>Mon espace ▾</summary><div class="nav-dd-menu">
@@ -6477,6 +6535,7 @@ def layout(title, body, user=None):
             <a href="{url_for('guide')}">Guide 📘</a>
             <a href="{url_for('verbes_500')}">500 verbes 🇫🇷🇩🇪</a>
             <a href="{url_for('dictionnaire')}">Dictionnaire 📕</a>
+            <a href="{url_for('sprechen_sim')}">Simulation Sprechen 🎤</a>
             <a href="{url_for('neferti')}">Neferti 🤖</a>
             <a href="{url_for('goethe')}">Examen Goethe</a>
             <a href="{url_for('progress')}">Progrès</a>
@@ -6620,7 +6679,7 @@ def layout(title, body, user=None):
 <audio id="natho-audio" preload="auto" playsinline></audio>
 
 <footer>
-    © NATHO — Plateforme d'apprentissage de l'allemand A1 · v4.9<br>
+    © NATHO — Plateforme d'apprentissage de l'allemand A1 · v5.0<br>
     <a href="/politique">Politique de confidentialité</a> |
     <a href="/cgu">Conditions d'utilisation</a> |
     <a href="/mentions">Mentions légales</a>
@@ -6793,7 +6852,20 @@ def admin_tts_test():
             results.append(f'<div class="flash success">✔ {lang.upper()} : OK ({size // 1024} Ko, {time.time() - t0:.1f} s, moteur : {h(eng)})</div>')
         except Exception as e:
             results.append(f'<div class="flash danger">✘ {lang.upper()} : échec — {h(str(e))[:400]}</div>')
-    ok = all("success" in r for r in results)
+    if edge_tts is not None:
+        for key in ("prof", "sankara", "nefertiti"):
+            voice = SIM_SPEAKERS[key]["voice"]
+            t0 = time.time()
+            try:
+                data = _edge_bytes("Guten Tag, ich heiße %s." % SIM_SPEAKERS[key]["name"], voice, "-8%")
+                if len(data) < 500:
+                    raise RuntimeError("audio vide")
+                results.append(f'<div class="flash success">✔ Voix {h(SIM_SPEAKERS[key]["name"])} ({h(voice)}) : OK ({len(data) // 1024} Ko, {time.time() - t0:.1f} s)</div>')
+            except Exception as e:
+                results.append(f'<div class="flash danger">✘ Voix {h(SIM_SPEAKERS[key]["name"])} : échec — {h(str(e))[:300]}</div>')
+    else:
+        results.append('<div class="flash warning">ℹ️ edge-tts n\'est pas installé : la simulation Sprechen utilisera une seule voix. Ajoute <code>edge-tts</code> dans requirements.txt.</div>')
+    ok = all("success" in r or "warning" in r for r in results)
     advice = ("<p>La voix serveur fonctionne : les playlists continuent écran éteint (Chrome Android / app installée).</p>" if ok else
               "<p>La voix serveur ne répond pas depuis Railway. Sans elle, les playlists utilisent la voix du téléphone, "
               "qui s'arrête quand l'écran s'éteint. Ajoute <code>gTTS</code> dans <code>requirements.txt</code>, redéploie et refais le test.</p>")
@@ -12961,6 +13033,1099 @@ def dictionnaire():
     return page(layout("Dictionnaire", body, {"is_admin": session.get("is_admin")}))
 
 
+
+# =========================================================
+# === v5.0 : SIMULATION SPRECHEN A1 (Teil 1, 2, 3) À TROIS VOIX ===
+# Herr Wagner (le prüfer), Sankara et Nefertiti passent l'épreuve orale du Goethe-Zertifikat A1.
+# Chaque nouvelle simulation tire d'autres questions et d'autres cartes.
+# =========================================================
+try:
+    import edge_tts
+except Exception:
+    edge_tts = None
+import asyncio
+
+SIM_SPEAKERS = {
+    "prof": {"name": "Herr Wagner", "role": "Prüfer", "emoji": "👨🏻‍🏫", "voice": "de-DE-ConradNeural", "color": "#4AA5D0"},
+    "sankara": {"name": "Sankara", "role": "Kandidat · 20 Jahre · Informatiker", "emoji": "👨🏾‍💻", "voice": "de-DE-KillianNeural", "color": "#2ECC71"},
+    "nefertiti": {"name": "Nefertiti", "role": "Kandidatin · 21 Jahre · Ärztin", "emoji": "👩🏾‍⚕️", "voice": "de-DE-AmalaNeural", "color": "#E67E22"},
+}
+SIM_FR_VOICE = "fr-FR-DeniseNeural"
+_EDGE_COOLDOWN = {"until": 0.0, "err": ""}
+
+SIM_T2_CARDS = [('Essen und Trinken', 'Obst', 'Welches Obst isst du gern?', 'Quel fruit aimes-tu manger ?', 'Ich esse gern Mangos und Bananen.', "J'aime manger des mangues et des bananes."),
+ ('Essen und Trinken', 'Frühstück', 'Was isst du zum Frühstück?', 'Que manges-tu au petit-déjeuner ?', 'Zum Frühstück esse ich Brot mit Butter und trinke Tee.', 'Au petit-déjeuner, je mange du pain avec du beurre et je bois du thé.'),
+ ('Essen und Trinken', 'Mittagessen', 'Wo isst du zu Mittag?', 'Où déjeunes-tu ?', 'Ich esse meistens in der Kantine.', 'Je déjeune la plupart du temps à la cantine.'),
+ ('Essen und Trinken', 'Abendessen', 'Wann isst du zu Abend?', 'À quelle heure dînes-tu ?', 'Ich esse um acht Uhr zu Abend.', 'Je dîne à huit heures.'),
+ ('Essen und Trinken', 'Kaffee', 'Trinkst du gern Kaffee?', 'Aimes-tu boire du café ?', 'Ja, ich trinke jeden Morgen einen Kaffee.', 'Oui, je bois un café chaque matin.'),
+ ('Essen und Trinken', 'Tee', 'Trinkst du lieber Tee oder Kaffee?', 'Préfères-tu le thé ou le café ?', 'Ich trinke lieber Tee.', 'Je préfère le thé.'),
+ ('Essen und Trinken', 'Fleisch', 'Isst du gern Fleisch?', 'Aimes-tu manger de la viande ?', 'Ja, ich esse gern Hähnchen.', "Oui, j'aime manger du poulet."),
+ ('Essen und Trinken', 'Fisch', 'Wie oft isst du Fisch?', 'À quelle fréquence manges-tu du poisson ?', 'Ich esse zweimal pro Woche Fisch.', 'Je mange du poisson deux fois par semaine.'),
+ ('Essen und Trinken', 'Gemüse', 'Welches Gemüse magst du?', 'Quels légumes aimes-tu ?', 'Ich mag Tomaten und Karotten.', "J'aime les tomates et les carottes."),
+ ('Essen und Trinken', 'Lieblingsessen', 'Was ist dein Lieblingsessen?', 'Quel est ton plat préféré ?', 'Mein Lieblingsessen ist Reis mit Fisch.', "Mon plat préféré, c'est le riz au poisson."),
+ ('Essen und Trinken', 'Restaurant', 'Gehst du oft ins Restaurant?', 'Vas-tu souvent au restaurant ?', 'Nein, nur am Wochenende.', 'Non, seulement le week-end.'),
+ ('Essen und Trinken', 'Kochen', 'Kochst du gern?', 'Aimes-tu cuisiner ?', 'Ja, ich koche jeden Abend.', 'Oui, je cuisine tous les soirs.'),
+ ('Essen und Trinken', 'Wasser', 'Wie viel Wasser trinkst du am Tag?', "Combien d'eau bois-tu par jour ?", 'Ich trinke zwei Liter Wasser am Tag.', "Je bois deux litres d'eau par jour."),
+ ('Essen und Trinken', 'Saft', 'Welchen Saft trinkst du gern?', 'Quel jus aimes-tu boire ?', 'Ich trinke gern Orangensaft.', "J'aime boire du jus d'orange."),
+ ('Essen und Trinken', 'Kuchen', 'Backst du manchmal Kuchen?', 'Fais-tu parfois des gâteaux ?', 'Ja, zum Geburtstag backe ich einen Kuchen.', 'Oui, pour les anniversaires, je fais un gâteau.'),
+ ('Essen und Trinken', 'Brot', 'Wo kaufst du Brot?', 'Où achètes-tu du pain ?', 'Ich kaufe Brot in der Bäckerei.', "J'achète du pain à la boulangerie."),
+ ('Essen und Trinken', 'Süßigkeiten', 'Isst du gern Schokolade?', 'Aimes-tu manger du chocolat ?', 'Ja, aber nicht so oft.', 'Oui, mais pas très souvent.'),
+ ('Essen und Trinken', 'Getränk', 'Was ist dein Lieblingsgetränk?', 'Quelle est ta boisson préférée ?', 'Mein Lieblingsgetränk ist Mangosaft.', 'Ma boisson préférée est le jus de mangue.'),
+ ('Essen und Trinken', 'Reis', 'Isst du oft Reis?', 'Manges-tu souvent du riz ?', 'Ja, fast jeden Tag.', 'Oui, presque tous les jours.'),
+ ('Essen und Trinken', 'Milch', 'Trinkst du Milch?', 'Bois-tu du lait ?', 'Ja, ich trinke Milch mit Kaffee.', 'Oui, je bois du lait avec du café.'),
+ ('Essen und Trinken', 'Käse', 'Magst du Käse?', 'Aimes-tu le fromage ?', 'Nein, ich mag keinen Käse.', "Non, je n'aime pas le fromage."),
+ ('Essen und Trinken', 'Eier', 'Wie viele Eier isst du pro Woche?', "Combien d'œufs manges-tu par semaine ?", 'Ich esse ungefähr vier Eier pro Woche.', 'Je mange environ quatre œufs par semaine.'),
+ ('Einkaufen', 'Supermarkt', 'Wann gehst du in den Supermarkt?', 'Quand vas-tu au supermarché ?', 'Ich gehe am Samstag in den Supermarkt.', 'Je vais au supermarché le samedi.'),
+ ('Einkaufen', 'Markt', 'Kaufst du auf dem Markt ein?', 'Fais-tu tes courses au marché ?', 'Ja, ich kaufe dort Obst und Gemüse.', "Oui, j'y achète des fruits et des légumes."),
+ ('Einkaufen', 'Preis', 'Was kostet ein Kilo Tomaten bei dir?', 'Combien coûte un kilo de tomates chez toi ?', 'Ein Kilo Tomaten kostet ungefähr zwei Euro.', 'Un kilo de tomates coûte environ deux euros.'),
+ ('Einkaufen', 'Geld', 'Bezahlst du bar oder mit Karte?', 'Paies-tu en espèces ou par carte ?', 'Ich bezahle meistens bar.', 'Je paie la plupart du temps en espèces.'),
+ ('Einkaufen', 'Geschäft', 'Welches Geschäft magst du?', 'Quel magasin aimes-tu ?', 'Ich mag den Buchladen in meiner Straße.', "J'aime la librairie de ma rue."),
+ ('Einkaufen', 'Kleidung kaufen', 'Wo kaufst du deine Kleidung?', 'Où achètes-tu tes vêtements ?', 'Ich kaufe meine Kleidung im Kaufhaus.', "J'achète mes vêtements au grand magasin."),
+ ('Einkaufen', 'Schuhe', 'Wie viele Paar Schuhe hast du?', 'Combien de paires de chaussures as-tu ?', 'Ich habe fünf Paar Schuhe.', "J'ai cinq paires de chaussures."),
+ ('Einkaufen', 'Internet', 'Kaufst du oft im Internet ein?', 'Achètes-tu souvent sur Internet ?', 'Ja, ich kaufe Bücher im Internet.', "Oui, j'achète des livres sur Internet."),
+ ('Einkaufen', 'Öffnungszeiten', 'Wann öffnet der Supermarkt bei dir?', 'À quelle heure ouvre le supermarché chez toi ?', 'Er öffnet um acht Uhr.', 'Il ouvre à huit heures.'),
+ ('Einkaufen', 'Einkaufsliste', 'Schreibst du eine Einkaufsliste?', 'Écris-tu une liste de courses ?', 'Ja, immer auf meinem Handy.', 'Oui, toujours sur mon téléphone.'),
+ ('Einkaufen', 'Bäckerei', 'Wie weit ist die Bäckerei von deiner Wohnung?', 'À quelle distance est la boulangerie de ton appartement ?', 'Sie ist nur fünf Minuten zu Fuß.', "Elle n'est qu'à cinq minutes à pied."),
+ ('Einkaufen', 'Angebot', 'Kaufst du gern Sonderangebote?', 'Aimes-tu acheter des promotions ?', 'Ja, dann spare ich Geld.', "Oui, comme ça j'économise de l'argent."),
+ ('Einkaufen', 'Tasche', 'Nimmst du eine Tasche zum Einkaufen mit?', 'Emportes-tu un sac pour faire les courses ?', 'Ja, ich nehme immer meine Stofftasche mit.', "Oui, j'emporte toujours mon sac en tissu."),
+ ('Einkaufen', 'Geschenk', 'Was kaufst du als Geschenk für einen Freund?', "Qu'achètes-tu comme cadeau pour un ami ?", 'Ich kaufe meistens ein Buch.', "J'achète généralement un livre."),
+ ('Einkaufen', 'Handy', 'Wie viel kostet ein gutes Handy?', 'Combien coûte un bon téléphone ?', 'Ein gutes Handy kostet ungefähr dreihundert Euro.', 'Un bon téléphone coûte environ trois cents euros.'),
+ ('Einkaufen', 'Größe', 'Welche Schuhgröße hast du?', 'Quelle pointure fais-tu ?', 'Ich habe Schuhgröße zweiundvierzig.', 'Je fais du quarante-deux.'),
+ ('Einkaufen', 'Kasse', 'Wartest du lange an der Kasse?', 'Attends-tu longtemps à la caisse ?', 'Am Samstag warte ich oft zehn Minuten.', "Le samedi, j'attends souvent dix minutes."),
+ ('Einkaufen', 'Kiosk', 'Was kaufst du am Kiosk?', "Qu'achètes-tu au kiosque ?", 'Ich kaufe dort eine Zeitung und Wasser.', "J'y achète un journal et de l'eau."),
+ ('Einkaufen', 'Wochenmarkt', 'An welchem Tag ist bei dir Markt?', 'Quel jour y a-t-il le marché chez toi ?', 'Bei mir ist am Mittwoch und Samstag Markt.', 'Chez moi, il y a marché le mercredi et le samedi.'),
+ ('Wohnen', 'Wohnung', 'Wie groß ist deine Wohnung?', 'Quelle est la taille de ton appartement ?', 'Meine Wohnung hat drei Zimmer.', 'Mon appartement a trois pièces.'),
+ ('Wohnen', 'Zimmer', 'Wie ist dein Zimmer?', 'Comment est ta chambre ?', 'Mein Zimmer ist klein, aber hell.', 'Ma chambre est petite mais lumineuse.'),
+ ('Wohnen', 'Küche', 'Ist deine Küche groß?', 'Ta cuisine est-elle grande ?', 'Nein, meine Küche ist ziemlich klein.', 'Non, ma cuisine est assez petite.'),
+ ('Wohnen', 'Balkon', 'Hast du einen Balkon?', 'As-tu un balcon ?', 'Ja, ich habe einen kleinen Balkon.', "Oui, j'ai un petit balcon."),
+ ('Wohnen', 'Garten', 'Hast du einen Garten?', 'As-tu un jardin ?', 'Nein, ich habe keinen Garten.', "Non, je n'ai pas de jardin."),
+ ('Wohnen', 'Miete', 'Wie hoch ist deine Miete?', 'Combien est ton loyer ?', 'Meine Miete ist fünfhundert Euro im Monat.', 'Mon loyer est de cinq cents euros par mois.'),
+ ('Wohnen', 'Nachbarn', 'Kennst du deine Nachbarn?', 'Connais-tu tes voisins ?', 'Ja, meine Nachbarn sind sehr nett.', 'Oui, mes voisins sont très gentils.'),
+ ('Wohnen', 'Stadt', 'In welcher Stadt wohnst du?', 'Dans quelle ville habites-tu ?', 'Ich wohne in Yaoundé.', "J'habite à Yaoundé."),
+ ('Wohnen', 'Stockwerk', 'In welchem Stock wohnst du?', 'À quel étage habites-tu ?', 'Ich wohne im zweiten Stock.', "J'habite au deuxième étage."),
+ ('Wohnen', 'Möbel', 'Welche Möbel hast du im Wohnzimmer?', 'Quels meubles as-tu dans le salon ?', 'Ich habe ein Sofa, einen Tisch und einen Fernseher.', "J'ai un canapé, une table et une télévision."),
+ ('Wohnen', 'Haus', 'Wohnst du in einem Haus oder in einer Wohnung?', 'Habites-tu dans une maison ou un appartement ?', 'Ich wohne in einer Wohnung.', "J'habite dans un appartement."),
+ ('Wohnen', 'Bad', 'Hast du eine Dusche oder eine Badewanne?', 'As-tu une douche ou une baignoire ?', 'Ich habe nur eine Dusche.', "J'ai seulement une douche."),
+ ('Wohnen', 'Umzug', 'Möchtest du umziehen?', 'Voudrais-tu déménager ?', 'Ja, ich suche eine größere Wohnung.', 'Oui, je cherche un appartement plus grand.'),
+ ('Wohnen', 'Aufräumen', 'Wann räumst du deine Wohnung auf?', 'Quand ranges-tu ton appartement ?', 'Ich räume am Samstagmorgen auf.', 'Je range le samedi matin.'),
+ ('Wohnen', 'Bett', 'Wann gehst du ins Bett?', 'À quelle heure vas-tu au lit ?', 'Ich gehe um elf Uhr ins Bett.', 'Je vais au lit à onze heures.'),
+ ('Wohnen', 'Fenster', 'Wie viele Fenster hat dein Zimmer?', 'Combien de fenêtres a ta chambre ?', 'Mein Zimmer hat zwei Fenster.', 'Ma chambre a deux fenêtres.'),
+ ('Wohnen', 'Adresse', 'Wie ist deine Adresse?', 'Quelle est ton adresse ?', 'Meine Adresse ist Bahnhofstraße zwölf.', 'Mon adresse est douze, rue de la Gare.'),
+ ('Wohnen', 'Mitbewohner', 'Wohnst du allein?', 'Habites-tu seul ?', 'Nein, ich wohne mit meinem Bruder zusammen.', "Non, j'habite avec mon frère."),
+ ('Wohnen', 'Licht', 'Ist deine Wohnung hell?', 'Ton appartement est-il lumineux ?', 'Ja, sie hat viel Licht.', 'Oui, il est très lumineux.'),
+ ('Wohnen', 'Waschmaschine', 'Hast du eine Waschmaschine?', 'As-tu une machine à laver ?', 'Ja, sie steht im Bad.', 'Oui, elle est dans la salle de bains.'),
+ ('Freizeit', 'Hobby', 'Was ist dein Hobby?', 'Quel est ton loisir ?', 'Mein Hobby ist Fußball spielen.', "Mon loisir, c'est jouer au football."),
+ ('Freizeit', 'Sport', 'Welchen Sport machst du?', 'Quel sport pratiques-tu ?', 'Ich gehe zweimal pro Woche joggen.', 'Je fais du jogging deux fois par semaine.'),
+ ('Freizeit', 'Musik', 'Welche Musik hörst du gern?', 'Quelle musique aimes-tu écouter ?', 'Ich höre gern Makossa und Pop.', "J'aime écouter du makossa et de la pop."),
+ ('Freizeit', 'Kino', 'Wie oft gehst du ins Kino?', 'À quelle fréquence vas-tu au cinéma ?', 'Ich gehe einmal im Monat ins Kino.', 'Je vais au cinéma une fois par mois.'),
+ ('Freizeit', 'Film', 'Welche Filme siehst du gern?', 'Quels films aimes-tu regarder ?', 'Ich sehe gern Actionfilme.', "J'aime regarder des films d'action."),
+ ('Freizeit', 'Buch', 'Liest du gern Bücher?', 'Aimes-tu lire des livres ?', 'Ja, ich lese jeden Abend ein bisschen.', 'Oui, je lis un peu chaque soir.'),
+ ('Freizeit', 'Fernsehen', 'Wie lange siehst du am Tag fern?', 'Combien de temps regardes-tu la télévision par jour ?', 'Ich sehe ungefähr eine Stunde fern.', 'Je regarde la télévision environ une heure.'),
+ ('Freizeit', 'Schwimmen', 'Kannst du schwimmen?', 'Sais-tu nager ?', 'Ja, ich schwimme sehr gern.', "Oui, j'aime beaucoup nager."),
+ ('Freizeit', 'Tanzen', 'Tanzt du gern?', 'Aimes-tu danser ?', 'Ja, auf Partys tanze ich viel.', 'Oui, aux fêtes je danse beaucoup.'),
+ ('Freizeit', 'Instrument', 'Spielst du ein Instrument?', "Joues-tu d'un instrument ?", 'Ja, ich spiele Gitarre.', 'Oui, je joue de la guitare.'),
+ ('Freizeit', 'Freunde', 'Wann triffst du deine Freunde?', 'Quand vois-tu tes amis ?', 'Ich treffe meine Freunde am Freitagabend.', 'Je retrouve mes amis le vendredi soir.'),
+ ('Freizeit', 'Computerspiel', 'Spielst du Computerspiele?', 'Joues-tu à des jeux vidéo ?', 'Manchmal, am Wochenende.', 'Parfois, le week-end.'),
+ ('Freizeit', 'Park', 'Gehst du gern in den Park?', 'Aimes-tu aller au parc ?', 'Ja, am Sonntag gehe ich im Park spazieren.', 'Oui, le dimanche je me promène au parc.'),
+ ('Freizeit', 'Konzert', 'Wann warst du im Konzert?', 'Quand es-tu allé à un concert ?', 'Ich war letzten Monat in einem Konzert.', 'Je suis allé à un concert le mois dernier.'),
+ ('Freizeit', 'Fotografieren', 'Machst du gern Fotos?', 'Aimes-tu prendre des photos ?', 'Ja, ich fotografiere gern die Natur.', "Oui, j'aime photographier la nature."),
+ ('Freizeit', 'Fußball', 'Welche Fußballmannschaft magst du?', 'Quelle équipe de football aimes-tu ?', 'Ich mag die Mannschaft von Kamerun.', "J'aime l'équipe du Cameroun."),
+ ('Freizeit', 'Internet', 'Wie lange bist du am Tag im Internet?', 'Combien de temps passes-tu sur Internet par jour ?', 'Ich bin ungefähr zwei Stunden im Internet.', 'Je passe environ deux heures sur Internet.'),
+ ('Freizeit', 'Zeitung', 'Liest du Zeitung?', 'Lis-tu le journal ?', 'Ich lese die Nachrichten auf dem Handy.', 'Je lis les informations sur mon téléphone.'),
+ ('Freizeit', 'Spazieren', 'Wo gehst du gern spazieren?', 'Où aimes-tu te promener ?', 'Ich gehe gern am Fluss spazieren.', "J'aime me promener au bord de la rivière."),
+ ('Freizeit', 'Malen', 'Malst du gern?', 'Aimes-tu peindre ?', 'Nein, ich kann nicht gut malen.', 'Non, je ne sais pas bien peindre.'),
+ ('Familie', 'Geschwister', 'Hast du Geschwister?', 'As-tu des frères et sœurs ?', 'Ja, ich habe einen Bruder und zwei Schwestern.', "Oui, j'ai un frère et deux sœurs."),
+ ('Familie', 'Eltern', 'Wo wohnen deine Eltern?', 'Où habitent tes parents ?', 'Meine Eltern wohnen in Douala.', 'Mes parents habitent à Douala.'),
+ ('Familie', 'Kinder', 'Hast du Kinder?', 'As-tu des enfants ?', 'Nein, ich habe noch keine Kinder.', "Non, je n'ai pas encore d'enfants."),
+ ('Familie', 'Großeltern', 'Besuchst du oft deine Großeltern?', 'Rends-tu souvent visite à tes grands-parents ?', 'Ja, jeden Monat im Dorf.', 'Oui, chaque mois au village.'),
+ ('Familie', 'Bruder', 'Wie alt ist dein Bruder?', 'Quel âge a ton frère ?', 'Mein Bruder ist fünfzehn Jahre alt.', 'Mon frère a quinze ans.'),
+ ('Familie', 'Schwester', 'Was macht deine Schwester?', 'Que fait ta sœur ?', 'Meine Schwester ist Studentin.', 'Ma sœur est étudiante.'),
+ ('Familie', 'Mutter', 'Was ist deine Mutter von Beruf?', 'Quel est le métier de ta mère ?', 'Meine Mutter ist Lehrerin.', 'Ma mère est enseignante.'),
+ ('Familie', 'Vater', 'Wo arbeitet dein Vater?', 'Où travaille ton père ?', 'Mein Vater arbeitet bei einer Bank.', 'Mon père travaille dans une banque.'),
+ ('Familie', 'Geburtstag', 'Wann hast du Geburtstag?', 'Quand est ton anniversaire ?', 'Ich habe im März Geburtstag.', 'Mon anniversaire est en mars.'),
+ ('Familie', 'Hochzeit', 'Wann warst du auf einer Hochzeit?', 'Quand es-tu allé à un mariage ?', 'Im Sommer war ich auf der Hochzeit von meiner Cousine.', "En été, j'étais au mariage de ma cousine."),
+ ('Familie', 'Familienfest', 'Wie feiert deine Familie Weihnachten?', 'Comment ta famille fête-t-elle Noël ?', 'Wir essen zusammen und gehen in die Kirche.', "Nous mangeons ensemble et allons à l'église."),
+ ('Familie', 'Haustier', 'Hast du ein Haustier?', 'As-tu un animal domestique ?', 'Ja, ich habe eine Katze.', "Oui, j'ai un chat."),
+ ('Familie', 'Onkel', 'Wo wohnt dein Onkel?', 'Où habite ton oncle ?', 'Mein Onkel wohnt in Frankreich.', 'Mon oncle habite en France.'),
+ ('Familie', 'Familienname', 'Wie ist dein Familienname?', 'Quel est ton nom de famille ?', 'Mein Familienname ist Mbarga.', 'Mon nom de famille est Mbarga.'),
+ ('Familie', 'verheiratet', 'Bist du verheiratet?', 'Es-tu marié ?', 'Nein, ich bin ledig.', 'Non, je suis célibataire.'),
+ ('Familie', 'Telefonieren', 'Wie oft telefonierst du mit deiner Familie?', 'À quelle fréquence téléphones-tu à ta famille ?', 'Ich telefoniere jeden Sonntag mit meiner Familie.', 'Je téléphone à ma famille chaque dimanche.'),
+ ('Familie', 'Cousin', 'Hast du viele Cousins?', 'As-tu beaucoup de cousins ?', 'Ja, ich habe mehr als zwanzig Cousins.', "Oui, j'ai plus de vingt cousins."),
+ ('Familie', 'Freund', 'Wie heißt dein bester Freund?', "Comment s'appelle ton meilleur ami ?", 'Mein bester Freund heißt Paul.', "Mon meilleur ami s'appelle Paul."),
+ ('Familie', 'Besuch', 'Wer besucht dich am Wochenende?', 'Qui te rend visite le week-end ?', 'Meine Tante besucht mich oft am Sonntag.', 'Ma tante me rend souvent visite le dimanche.'),
+ ('Familie', 'Foto', 'Hast du ein Foto von deiner Familie?', 'As-tu une photo de ta famille ?', 'Ja, auf meinem Handy.', 'Oui, sur mon téléphone.'),
+ ('Arbeit und Beruf', 'Beruf', 'Was bist du von Beruf?', 'Quel est ton métier ?', 'Ich arbeite im Büro.', 'Je travaille dans un bureau.'),
+ ('Arbeit und Beruf', 'Arbeitszeit', 'Wann beginnt deine Arbeit?', 'À quelle heure commence ton travail ?', 'Meine Arbeit beginnt um acht Uhr.', 'Mon travail commence à huit heures.'),
+ ('Arbeit und Beruf', 'Kollegen', 'Wie sind deine Kollegen?', 'Comment sont tes collègues ?', 'Meine Kollegen sind sehr freundlich.', 'Mes collègues sont très aimables.'),
+ ('Arbeit und Beruf', 'Chef', 'Wie heißt dein Chef?', "Comment s'appelle ton chef ?", 'Mein Chef heißt Herr Nana.', "Mon chef s'appelle M. Nana."),
+ ('Arbeit und Beruf', 'Büro', 'Wo ist dein Büro?', 'Où est ton bureau ?', 'Mein Büro ist im Zentrum.', 'Mon bureau est dans le centre.'),
+ ('Arbeit und Beruf', 'Urlaub', 'Wie viele Tage Urlaub hast du?', 'Combien de jours de congé as-tu ?', 'Ich habe dreißig Tage Urlaub im Jahr.', "J'ai trente jours de congé par an."),
+ ('Arbeit und Beruf', 'Computer', 'Arbeitest du viel am Computer?', "Travailles-tu beaucoup sur l'ordinateur ?", 'Ja, ich arbeite den ganzen Tag am Computer.', "Oui, je travaille toute la journée sur l'ordinateur."),
+ ('Arbeit und Beruf', 'Pause', 'Wann machst du Mittagspause?', 'Quand fais-tu ta pause déjeuner ?', 'Ich mache um zwölf Uhr Pause.', 'Je fais une pause à midi.'),
+ ('Arbeit und Beruf', 'Arbeitsweg', 'Wie lange brauchst du zur Arbeit?', 'Combien de temps mets-tu pour aller au travail ?', 'Ich brauche dreißig Minuten.', 'Je mets trente minutes.'),
+ ('Arbeit und Beruf', 'Traumberuf', 'Was ist dein Traumberuf?', 'Quel est le métier de tes rêves ?', 'Mein Traumberuf ist Pilot.', "Le métier de mes rêves, c'est pilote."),
+ ('Arbeit und Beruf', 'Samstag', 'Arbeitest du am Samstag?', 'Travailles-tu le samedi ?', 'Nein, am Samstag habe ich frei.', 'Non, le samedi je suis libre.'),
+ ('Arbeit und Beruf', 'Firma', 'Wie groß ist deine Firma?', 'Quelle est la taille de ton entreprise ?', 'Meine Firma hat fünfzig Mitarbeiter.', 'Mon entreprise a cinquante employés.'),
+ ('Arbeit und Beruf', 'Telefon', 'Telefonierst du viel bei der Arbeit?', 'Téléphones-tu beaucoup au travail ?', 'Ja, ich telefoniere oft mit Kunden.', 'Oui, je téléphone souvent à des clients.'),
+ ('Arbeit und Beruf', 'Uniform', 'Trägst du bei der Arbeit eine Uniform?', 'Portes-tu un uniforme au travail ?', 'Nein, ich trage normale Kleidung.', 'Non, je porte des vêtements normaux.'),
+ ('Arbeit und Beruf', 'Feierabend', 'Wann hast du Feierabend?', 'À quelle heure finis-tu le travail ?', 'Ich habe um siebzehn Uhr Feierabend.', 'Je finis le travail à dix-sept heures.'),
+ ('Arbeit und Beruf', 'E-Mail', 'Wie viele E-Mails schreibst du am Tag?', "Combien d'e-mails écris-tu par jour ?", 'Ich schreibe ungefähr zwanzig E-Mails.', "J'écris environ vingt e-mails."),
+ ('Arbeit und Beruf', 'Besprechung', 'Wann hast du Besprechungen?', 'Quand as-tu des réunions ?', 'Ich habe jeden Montag eine Besprechung.', "J'ai une réunion chaque lundi."),
+ ('Arbeit und Beruf', 'Gehalt', 'Bist du mit deiner Arbeit zufrieden?', 'Es-tu satisfait de ton travail ?', 'Ja, die Arbeit macht mir Spaß.', 'Oui, le travail me plaît.'),
+ ('Arbeit und Beruf', 'Praktikum', 'Hast du schon ein Praktikum gemacht?', 'As-tu déjà fait un stage ?', 'Ja, ich habe ein Praktikum in einem Hotel gemacht.', "Oui, j'ai fait un stage dans un hôtel."),
+ ('Arbeit und Beruf', 'Deutsch', 'Brauchst du Deutsch für die Arbeit?', "As-tu besoin de l'allemand pour le travail ?", 'Ja, ich möchte in Deutschland arbeiten.', 'Oui, je voudrais travailler en Allemagne.'),
+ ('Reisen', 'Urlaub', 'Wohin fährst du gern in Urlaub?', 'Où aimes-tu partir en vacances ?', 'Ich fahre gern ans Meer nach Kribi.', "J'aime aller à la mer à Kribi."),
+ ('Reisen', 'Flugzeug', 'Bist du schon mit dem Flugzeug geflogen?', "As-tu déjà pris l'avion ?", 'Ja, ich bin einmal nach Paris geflogen.', "Oui, j'ai pris l'avion une fois pour Paris."),
+ ('Reisen', 'Zug', 'Fährst du gern mit dem Zug?', 'Aimes-tu voyager en train ?', 'Ja, im Zug kann ich lesen.', 'Oui, dans le train je peux lire.'),
+ ('Reisen', 'Hotel', 'Schläfst du im Urlaub im Hotel?', "Dors-tu à l'hôtel en vacances ?", 'Nein, ich schlafe bei Freunden.', 'Non, je dors chez des amis.'),
+ ('Reisen', 'Koffer', 'Was nimmst du in den Koffer mit?', "Qu'emportes-tu dans ta valise ?", 'Ich nehme Kleidung, Bücher und mein Handy mit.', "J'emporte des vêtements, des livres et mon téléphone."),
+ ('Reisen', 'Land', 'Welches Land möchtest du besuchen?', 'Quel pays voudrais-tu visiter ?', 'Ich möchte Deutschland besuchen.', "Je voudrais visiter l'Allemagne."),
+ ('Reisen', 'Strand', 'Gehst du gern an den Strand?', 'Aimes-tu aller à la plage ?', 'Ja, ich schwimme gern im Meer.', "Oui, j'aime nager dans la mer."),
+ ('Reisen', 'Berge', 'Fährst du lieber ans Meer oder in die Berge?', 'Préfères-tu la mer ou la montagne ?', 'Ich fahre lieber in die Berge.', 'Je préfère la montagne.'),
+ ('Reisen', 'Fahrkarte', 'Wo kaufst du deine Fahrkarte?', 'Où achètes-tu ton billet ?', 'Ich kaufe meine Fahrkarte im Internet.', "J'achète mon billet sur Internet."),
+ ('Reisen', 'Pass', 'Hast du einen Reisepass?', 'As-tu un passeport ?', 'Ja, mein Pass ist noch drei Jahre gültig.', 'Oui, mon passeport est encore valable trois ans.'),
+ ('Reisen', 'Ferien', 'Wie lange dauern deine Ferien?', 'Combien de temps durent tes vacances ?', 'Meine Ferien dauern zwei Wochen.', 'Mes vacances durent deux semaines.'),
+ ('Reisen', 'Andenken', 'Was kaufst du im Urlaub?', "Qu'achètes-tu en vacances ?", 'Ich kaufe Postkarten und kleine Geschenke.', "J'achète des cartes postales et de petits cadeaux."),
+ ('Reisen', 'Reise', 'Wohin war deine letzte Reise?', 'Où était ton dernier voyage ?', 'Meine letzte Reise war nach Bamenda.', 'Mon dernier voyage était à Bamenda.'),
+ ('Reisen', 'Bus', 'Fährst du oft mit dem Bus?', 'Prends-tu souvent le bus ?', 'Ja, jeden Tag zur Arbeit.', 'Oui, tous les jours pour aller au travail.'),
+ ('Reisen', 'Camping', 'Hast du schon Camping gemacht?', 'As-tu déjà fait du camping ?', 'Nein, noch nie.', 'Non, jamais.'),
+ ('Reisen', 'Flughafen', 'Wie weit ist der Flughafen von deiner Stadt?', "À quelle distance est l'aéroport de ta ville ?", 'Der Flughafen ist zwanzig Kilometer entfernt.', "L'aéroport est à vingt kilomètres."),
+ ('Reisen', 'Sprache', 'Welche Sprachen sprichst du auf Reisen?', 'Quelles langues parles-tu en voyage ?', 'Ich spreche Französisch und Englisch.', 'Je parle français et anglais.'),
+ ('Reisen', 'Foto', 'Machst du im Urlaub viele Fotos?', 'Prends-tu beaucoup de photos en vacances ?', 'Ja, ich mache sehr viele Fotos.', 'Oui, je prends énormément de photos.'),
+ ('Reisen', 'Wetter im Urlaub', 'Wie ist das Wetter in Kribi?', 'Quel temps fait-il à Kribi ?', 'In Kribi ist es meistens warm und sonnig.', 'À Kribi, il fait généralement chaud et beau.'),
+ ('Reisen', 'Stadtplan', 'Brauchst du einen Stadtplan?', "As-tu besoin d'un plan de ville ?", 'Nein, ich benutze mein Handy.', "Non, j'utilise mon téléphone."),
+ ('Wochenende', 'Samstag', 'Was machst du am Samstag?', 'Que fais-tu le samedi ?', 'Am Samstag kaufe ich ein und treffe Freunde.', 'Le samedi, je fais les courses et je vois des amis.'),
+ ('Wochenende', 'Sonntag', 'Was machst du am Sonntag?', 'Que fais-tu le dimanche ?', 'Am Sonntag gehe ich in die Kirche und ruhe mich aus.', "Le dimanche, je vais à l'église et je me repose."),
+ ('Wochenende', 'Ausschlafen', 'Schläfst du am Wochenende lange?', 'Fais-tu la grasse matinée le week-end ?', 'Ja, am Sonntag stehe ich um zehn Uhr auf.', 'Oui, le dimanche je me lève à dix heures.'),
+ ('Wochenende', 'Party', 'Gehst du am Wochenende auf Partys?', 'Vas-tu à des fêtes le week-end ?', 'Manchmal, wenn ein Freund Geburtstag hat.', 'Parfois, quand un ami fête son anniversaire.'),
+ ('Wochenende', 'Ausflug', 'Machst du am Wochenende Ausflüge?', 'Fais-tu des excursions le week-end ?', 'Ja, manchmal fahre ich zum See.', 'Oui, parfois je vais au lac.'),
+ ('Wochenende', 'Besuch', 'Wen besuchst du am Wochenende?', 'À qui rends-tu visite le week-end ?', 'Ich besuche meine Großmutter.', 'Je rends visite à ma grand-mère.'),
+ ('Wochenende', 'Hausarbeit', 'Putzt du am Wochenende?', 'Fais-tu le ménage le week-end ?', 'Ja, am Samstagmorgen putze ich die Wohnung.', "Oui, le samedi matin je nettoie l'appartement."),
+ ('Wochenende', 'Lernen', 'Lernst du am Wochenende Deutsch?', "Apprends-tu l'allemand le week-end ?", 'Ja, jeden Sonntag eine Stunde.', 'Oui, une heure chaque dimanche.'),
+ ('Wochenende', 'Kirche', 'Gehst du am Sonntag in die Kirche?', "Vas-tu à l'église le dimanche ?", 'Ja, mit meiner Familie.', 'Oui, avec ma famille.'),
+ ('Wochenende', 'Fußballspiel', 'Siehst du am Wochenende Fußball?', 'Regardes-tu le football le week-end ?', 'Ja, am Sonntagabend im Fernsehen.', 'Oui, le dimanche soir à la télévision.'),
+ ('Wochenende', 'letztes Wochenende', 'Was hast du letztes Wochenende gemacht?', "Qu'as-tu fait le week-end dernier ?", 'Ich habe Freunde besucht und gekocht.', "J'ai rendu visite à des amis et j'ai cuisiné."),
+ ('Wochenende', 'nächstes Wochenende', 'Was machst du nächstes Wochenende?', 'Que fais-tu le week-end prochain ?', 'Ich gehe mit meiner Schwester ins Kino.', 'Je vais au cinéma avec ma sœur.'),
+ ('Wochenende', 'Freitagabend', 'Was machst du am Freitagabend?', 'Que fais-tu le vendredi soir ?', 'Am Freitagabend esse ich mit Freunden.', 'Le vendredi soir, je dîne avec des amis.'),
+ ('Wochenende', 'Grillen', 'Grillst du gern am Wochenende?', 'Aimes-tu faire des grillades le week-end ?', 'Ja, im Garten von meinem Onkel.', 'Oui, dans le jardin de mon oncle.'),
+ ('Wochenende', 'Markt am Samstag', 'Gehst du am Samstag auf den Markt?', 'Vas-tu au marché le samedi ?', 'Ja, ich kaufe dort frisches Obst.', "Oui, j'y achète des fruits frais."),
+ ('Gesundheit', 'Arzt', 'Wann warst du zuletzt beim Arzt?', 'Quand es-tu allé chez le médecin pour la dernière fois ?', 'Ich war letzten Monat beim Arzt.', 'Je suis allé chez le médecin le mois dernier.'),
+ ('Gesundheit', 'krank', 'Was machst du, wenn du krank bist?', 'Que fais-tu quand tu es malade ?', 'Ich bleibe im Bett und trinke viel Tee.', 'Je reste au lit et je bois beaucoup de thé.'),
+ ('Gesundheit', 'Kopfschmerzen', 'Hast du oft Kopfschmerzen?', 'As-tu souvent mal à la tête ?', 'Nein, nur selten.', 'Non, seulement rarement.'),
+ ('Gesundheit', 'Apotheke', 'Wo ist die nächste Apotheke?', 'Où est la pharmacie la plus proche ?', 'Die Apotheke ist neben dem Supermarkt.', 'La pharmacie est à côté du supermarché.'),
+ ('Gesundheit', 'Medikament', 'Nimmst du Medikamente?', 'Prends-tu des médicaments ?', 'Nein, im Moment nicht.', 'Non, pas en ce moment.'),
+ ('Gesundheit', 'Schlafen', 'Wie viele Stunden schläfst du?', "Combien d'heures dors-tu ?", 'Ich schlafe sieben Stunden.', 'Je dors sept heures.'),
+ ('Gesundheit', 'Zahnarzt', 'Gehst du gern zum Zahnarzt?', 'Aimes-tu aller chez le dentiste ?', 'Nein, ich habe ein bisschen Angst.', "Non, j'ai un peu peur."),
+ ('Gesundheit', 'gesund essen', 'Isst du gesund?', 'Manges-tu sainement ?', 'Ja, ich esse viel Obst und Gemüse.', 'Oui, je mange beaucoup de fruits et de légumes.'),
+ ('Gesundheit', 'Rauchen', 'Rauchst du?', 'Fumes-tu ?', 'Nein, ich rauche nicht.', 'Non, je ne fume pas.'),
+ ('Gesundheit', 'Fitness', 'Gehst du ins Fitnessstudio?', 'Vas-tu à la salle de sport ?', 'Ja, dreimal pro Woche.', 'Oui, trois fois par semaine.'),
+ ('Gesundheit', 'Erkältung', 'Was hilft dir bei einer Erkältung?', "Qu'est-ce qui t'aide quand tu as un rhume ?", 'Heißer Tee mit Honig hilft mir.', "Le thé chaud au miel m'aide."),
+ ('Gesundheit', 'Krankenhaus', 'Warst du schon im Krankenhaus?', "As-tu déjà été à l'hôpital ?", 'Ja, als Kind einmal.', "Oui, une fois quand j'étais enfant."),
+ ('Gesundheit', 'Termin', 'Wie bekommst du einen Termin beim Arzt?', 'Comment obtiens-tu un rendez-vous chez le médecin ?', 'Ich rufe in der Praxis an.', "J'appelle le cabinet."),
+ ('Gesundheit', 'Bauchschmerzen', 'Was isst du bei Bauchschmerzen?', 'Que manges-tu quand tu as mal au ventre ?', 'Dann esse ich nur Reis und trinke Wasser.', "Alors je mange seulement du riz et je bois de l'eau."),
+ ('Gesundheit', 'Fieber', 'Was machst du bei Fieber?', 'Que fais-tu quand tu as de la fièvre ?', 'Ich nehme eine Tablette und gehe zum Arzt.', 'Je prends un comprimé et je vais chez le médecin.'),
+ ('Kleidung', 'Lieblingsfarbe', 'Welche Farbe trägst du gern?', 'Quelle couleur aimes-tu porter ?', 'Ich trage gern Blau.', "J'aime porter du bleu."),
+ ('Kleidung', 'Jeans', 'Trägst du oft Jeans?', 'Portes-tu souvent des jeans ?', 'Ja, fast jeden Tag.', 'Oui, presque tous les jours.'),
+ ('Kleidung', 'Jacke', 'Brauchst du in deiner Stadt eine Jacke?', "As-tu besoin d'une veste dans ta ville ?", 'Nur in der Regenzeit.', 'Seulement pendant la saison des pluies.'),
+ ('Kleidung', 'Schuhe tragen', 'Welche Schuhe trägst du gern?', 'Quelles chaussures aimes-tu porter ?', 'Ich trage gern Turnschuhe.', "J'aime porter des baskets."),
+ ('Kleidung', 'Kleid', 'Trägst du gern Kleider?', 'Aimes-tu porter des robes ?', 'Ja, zu Festen trage ich gern ein Kleid.', "Oui, aux fêtes j'aime porter une robe."),
+ ('Kleidung', 'Hemd', 'Was trägst du zur Arbeit?', 'Que portes-tu pour aller au travail ?', 'Ich trage ein Hemd und eine Hose.', 'Je porte une chemise et un pantalon.'),
+ ('Kleidung', 'Mütze', 'Trägst du eine Mütze?', 'Portes-tu un bonnet ?', 'Nein, bei uns ist es zu warm.', 'Non, chez nous il fait trop chaud.'),
+ ('Kleidung', 'Mode', 'Interessierst du dich für Mode?', "T'intéresses-tu à la mode ?", 'Ja, ein bisschen.', 'Oui, un peu.'),
+ ('Kleidung', 'Pullover', 'Hast du einen warmen Pullover?', 'As-tu un pull chaud ?', 'Ja, für die Reise nach Deutschland.', 'Oui, pour le voyage en Allemagne.'),
+ ('Kleidung', 'Brille', 'Trägst du eine Brille?', 'Portes-tu des lunettes ?', 'Ja, zum Lesen.', 'Oui, pour lire.'),
+ ('Kleidung', 'Uhr', 'Trägst du eine Uhr?', 'Portes-tu une montre ?', 'Nein, ich sehe die Uhrzeit auf dem Handy.', "Non, je regarde l'heure sur mon téléphone."),
+ ('Kleidung', 'Anzug', 'Wann trägst du einen Anzug?', 'Quand portes-tu un costume ?', 'Ich trage einen Anzug bei Hochzeiten.', 'Je porte un costume aux mariages.'),
+ ('Kleidung', 'T-Shirt', 'Wie viele T-Shirts hast du?', 'Combien de t-shirts as-tu ?', 'Ich habe ungefähr zehn T-Shirts.', "J'ai environ dix t-shirts."),
+ ('Kleidung', 'Größe Kleidung', 'Welche Größe trägst du?', 'Quelle taille portes-tu ?', 'Ich trage Größe M.', 'Je porte la taille M.'),
+ ('Kleidung', 'Waschen', 'Wie oft wäschst du deine Kleidung?', 'À quelle fréquence laves-tu tes vêtements ?', 'Ich wasche einmal pro Woche.', 'Je fais une lessive une fois par semaine.'),
+ ('Wetter', 'Wetter heute', 'Wie ist das Wetter heute?', "Quel temps fait-il aujourd'hui ?", 'Heute ist es sonnig und warm.', "Aujourd'hui, il fait beau et chaud."),
+ ('Wetter', 'Regen', 'Wann regnet es bei dir viel?', 'Quand pleut-il beaucoup chez toi ?', 'Von Juli bis Oktober regnet es viel.', 'De juillet à octobre, il pleut beaucoup.'),
+ ('Wetter', 'Sonne', 'Magst du die Sonne?', 'Aimes-tu le soleil ?', 'Ja, aber nicht zu viel.', 'Oui, mais pas trop.'),
+ ('Wetter', 'Schnee', 'Hast du schon Schnee gesehen?', 'As-tu déjà vu de la neige ?', 'Nein, noch nie, nur im Fernsehen.', 'Non, jamais, seulement à la télévision.'),
+ ('Wetter', 'Temperatur', 'Wie warm ist es bei dir im Sommer?', 'Quelle température fait-il chez toi en été ?', 'Es ist ungefähr dreißig Grad.', 'Il fait environ trente degrés.'),
+ ('Wetter', 'Jahreszeit', 'Welche Jahreszeit magst du?', 'Quelle saison aimes-tu ?', 'Ich mag die Trockenzeit.', "J'aime la saison sèche."),
+ ('Wetter', 'Wind', 'Ist es bei dir oft windig?', 'Y a-t-il souvent du vent chez toi ?', 'Nein, nur manchmal am Abend.', 'Non, seulement parfois le soir.'),
+ ('Wetter', 'Gewitter', 'Hast du Angst vor Gewitter?', "As-tu peur de l'orage ?", 'Nein, aber ich bleibe dann zu Hause.', 'Non, mais dans ce cas je reste à la maison.'),
+ ('Wetter', 'Regenschirm', 'Hast du immer einen Regenschirm dabei?', 'As-tu toujours un parapluie sur toi ?', 'In der Regenzeit ja.', 'Pendant la saison des pluies, oui.'),
+ ('Wetter', 'kalt', 'Wann ist es bei dir kalt?', 'Quand fait-il froid chez toi ?', 'Bei uns ist es fast nie kalt.', 'Chez nous, il ne fait presque jamais froid.'),
+ ('Wetter', 'Wetterbericht', 'Siehst du dir den Wetterbericht an?', 'Regardes-tu la météo ?', 'Ja, jeden Morgen auf dem Handy.', 'Oui, chaque matin sur mon téléphone.'),
+ ('Wetter', 'Winter', 'Was machst du im Winter in Deutschland?', 'Que feras-tu en hiver en Allemagne ?', 'Ich kaufe eine warme Jacke.', "J'achèterai une veste chaude."),
+ ('Schule und Lernen', 'Deutschkurs', 'Wann ist dein Deutschkurs?', "Quand a lieu ton cours d'allemand ?", 'Mein Kurs ist am Montag und am Mittwoch.', 'Mon cours a lieu le lundi et le mercredi.'),
+ ('Schule und Lernen', 'Hausaufgaben', 'Wann machst du deine Hausaufgaben?', 'Quand fais-tu tes devoirs ?', 'Ich mache meine Hausaufgaben am Abend.', 'Je fais mes devoirs le soir.'),
+ ('Schule und Lernen', 'Lehrer', 'Wie heißt dein Deutschlehrer?', "Comment s'appelle ton professeur d'allemand ?", 'Er heißt Herr Fischer.', "Il s'appelle M. Fischer."),
+ ('Schule und Lernen', 'Prüfung', 'Wann ist deine Prüfung?', 'Quand est ton examen ?', 'Meine Prüfung ist am fünften Dezember.', 'Mon examen est le cinq décembre.'),
+ ('Schule und Lernen', 'Wörterbuch', 'Benutzt du ein Wörterbuch?', 'Utilises-tu un dictionnaire ?', 'Ja, ich benutze eine App auf dem Handy.', "Oui, j'utilise une application sur mon téléphone."),
+ ('Schule und Lernen', 'Sprachen', 'Welche Sprachen sprichst du?', 'Quelles langues parles-tu ?', 'Ich spreche Französisch, Englisch und ein bisschen Deutsch.', 'Je parle français, anglais et un peu allemand.'),
+ ('Schule und Lernen', 'Lieblingsfach', 'Was war dein Lieblingsfach in der Schule?', "Quelle était ta matière préférée à l'école ?", 'Mein Lieblingsfach war Mathematik.', 'Ma matière préférée était les mathématiques.'),
+ ('Schule und Lernen', 'Universität', 'Hast du studiert?', 'As-tu fait des études ?', 'Ja, ich habe drei Jahre studiert.', "Oui, j'ai fait trois ans d'études."),
+ ('Schule und Lernen', 'Lernen', 'Wie lernst du neue Wörter?', 'Comment apprends-tu de nouveaux mots ?', 'Ich höre jeden Tag Playlists mit NATHO.', "J'écoute des playlists avec NATHO tous les jours."),
+ ('Schule und Lernen', 'Bibliothek', 'Gehst du in die Bibliothek?', 'Vas-tu à la bibliothèque ?', 'Ja, dort lerne ich gern.', "Oui, j'aime y étudier."),
+ ('Schule und Lernen', 'Grammatik', 'Ist die deutsche Grammatik schwer?', 'La grammaire allemande est-elle difficile ?', 'Ja, aber ich lerne jeden Tag.', "Oui, mais j'apprends chaque jour."),
+ ('Schule und Lernen', 'Kursbuch', 'Welches Buch benutzt ihr im Kurs?', 'Quel livre utilisez-vous en cours ?', 'Wir benutzen das Buch Menschen A1.', 'Nous utilisons le livre Menschen A1.'),
+ ('Schule und Lernen', 'Klasse', 'Wie viele Personen sind in deinem Kurs?', 'Combien de personnes y a-t-il dans ton cours ?', 'In meinem Kurs sind fünfzehn Personen.', 'Dans mon cours, il y a quinze personnes.'),
+ ('Schule und Lernen', 'Warum Deutsch', 'Warum lernst du Deutsch?', "Pourquoi apprends-tu l'allemand ?", 'Ich möchte in Deutschland arbeiten.', 'Je voudrais travailler en Allemagne.'),
+ ('Schule und Lernen', 'Schule', 'Wie lange warst du in der Schule?', "Combien de temps es-tu allé à l'école ?", 'Ich war dreizehn Jahre in der Schule.', "Je suis allé à l'école pendant treize ans."),
+ ('Tagesablauf', 'Aufstehen', 'Wann stehst du auf?', 'À quelle heure te lèves-tu ?', 'Ich stehe um sechs Uhr auf.', 'Je me lève à six heures.'),
+ ('Tagesablauf', 'Morgen', 'Was machst du am Morgen?', 'Que fais-tu le matin ?', 'Ich dusche, frühstücke und gehe zur Arbeit.', 'Je me douche, je prends mon petit-déjeuner et je vais au travail.'),
+ ('Tagesablauf', 'Abend', 'Was machst du am Abend?', 'Que fais-tu le soir ?', 'Am Abend koche ich und lerne Deutsch.', "Le soir, je cuisine et j'apprends l'allemand."),
+ ('Tagesablauf', 'Mittag', 'Was machst du in der Mittagspause?', 'Que fais-tu pendant la pause de midi ?', 'Ich esse und rufe meine Mutter an.', "Je mange et j'appelle ma mère."),
+ ('Tagesablauf', 'Dusche', 'Duschst du morgens oder abends?', 'Te douches-tu le matin ou le soir ?', 'Ich dusche morgens und abends.', 'Je me douche le matin et le soir.'),
+ ('Tagesablauf', 'Uhrzeit', 'Wie spät ist es jetzt?', 'Quelle heure est-il maintenant ?', 'Es ist halb zehn.', 'Il est neuf heures et demie.'),
+ ('Tagesablauf', 'Montag', 'Was machst du am Montag?', 'Que fais-tu le lundi ?', 'Am Montag arbeite ich und gehe zum Deutschkurs.', "Le lundi, je travaille et je vais au cours d'allemand."),
+ ('Tagesablauf', 'Wecker', 'Brauchst du einen Wecker?', "As-tu besoin d'un réveil ?", 'Ja, mein Handy weckt mich.', 'Oui, mon téléphone me réveille.'),
+ ('Tagesablauf', 'Zähne putzen', 'Wie oft putzt du die Zähne?', 'Combien de fois te brosses-tu les dents ?', 'Ich putze zweimal am Tag die Zähne.', 'Je me brosse les dents deux fois par jour.'),
+ ('Tagesablauf', 'Nachmittag', 'Was machst du am Nachmittag?', "Que fais-tu l'après-midi ?", 'Am Nachmittag arbeite ich im Büro.', "L'après-midi, je travaille au bureau."),
+ ('Tagesablauf', 'Heute', 'Was hast du heute gemacht?', "Qu'as-tu fait aujourd'hui ?", 'Ich habe gearbeitet und Deutsch gelernt.', "J'ai travaillé et j'ai appris l'allemand."),
+ ('Tagesablauf', 'Morgen früh', 'Was machst du morgen?', 'Que fais-tu demain ?', 'Morgen besuche ich meinen Bruder.', 'Demain, je rends visite à mon frère.'),
+ ('Tagesablauf', 'Zeit', 'Wann hast du Zeit?', 'Quand as-tu le temps ?', 'Ich habe am Dienstagabend Zeit.', "J'ai le temps le mardi soir."),
+ ('Tagesablauf', 'Mittagsschlaf', 'Machst du einen Mittagsschlaf?', 'Fais-tu une sieste ?', 'Am Sonntag schon.', 'Le dimanche, oui.'),
+ ('Verkehr', 'Auto', 'Hast du ein Auto?', 'As-tu une voiture ?', 'Nein, ich habe kein Auto.', "Non, je n'ai pas de voiture."),
+ ('Verkehr', 'Fahrrad', 'Fährst du Fahrrad?', 'Fais-tu du vélo ?', 'Ja, am Wochenende fahre ich Fahrrad.', 'Oui, le week-end je fais du vélo.'),
+ ('Verkehr', 'Taxi', 'Fährst du oft Taxi?', 'Prends-tu souvent le taxi ?', 'Ja, in Yaoundé fahre ich oft Taxi.', 'Oui, à Yaoundé je prends souvent le taxi.'),
+ ('Verkehr', 'Führerschein', 'Hast du einen Führerschein?', 'As-tu le permis de conduire ?', 'Ja, seit zwei Jahren.', 'Oui, depuis deux ans.'),
+ ('Verkehr', 'Haltestelle', 'Wo ist die nächste Bushaltestelle?', "Où est l'arrêt de bus le plus proche ?", 'Sie ist vor der Post.', 'Il est devant la poste.'),
+ ('Verkehr', 'Stau', 'Gibt es in deiner Stadt viel Stau?', "Y a-t-il beaucoup d'embouteillages dans ta ville ?", 'Ja, am Morgen gibt es viel Stau.', "Oui, le matin il y a beaucoup d'embouteillages."),
+ ('Verkehr', 'zu Fuß', 'Gehst du viel zu Fuß?', 'Marches-tu beaucoup à pied ?', 'Ja, ich gehe jeden Tag zu Fuß zum Markt.', 'Oui, je vais à pied au marché tous les jours.'),
+ ('Verkehr', 'Motorrad', 'Fährst du Motorrad?', 'Fais-tu de la moto ?', 'Nein, das ist mir zu gefährlich.', "Non, c'est trop dangereux pour moi."),
+ ('Verkehr', 'Weg', 'Wie kommst du zum Deutschkurs?', "Comment vas-tu au cours d'allemand ?", 'Ich fahre mit dem Bus zum Kurs.', 'Je vais au cours en bus.'),
+ ('Verkehr', 'Bahnhof', 'Wie weit ist der Bahnhof?', 'À quelle distance est la gare ?', 'Der Bahnhof ist zehn Minuten entfernt.', 'La gare est à dix minutes.'),
+ ('Verkehr', 'Ticket', 'Was kostet ein Busticket?', 'Combien coûte un ticket de bus ?', 'Ein Busticket kostet zwei Euro.', 'Un ticket de bus coûte deux euros.'),
+ ('Verkehr', 'Verspätung', 'Kommst du oft zu spät?', 'Arrives-tu souvent en retard ?', 'Nein, ich bin meistens pünktlich.', "Non, je suis la plupart du temps à l'heure."),
+ ('Feste', 'Weihnachten', 'Was machst du an Weihnachten?', 'Que fais-tu à Noël ?', 'An Weihnachten feiere ich mit meiner Familie.', 'À Noël, je fais la fête avec ma famille.'),
+ ('Feste', 'Silvester', 'Wo feierst du Silvester?', 'Où fêtes-tu le Nouvel An ?', 'Ich feiere Silvester bei Freunden.', 'Je fête le Nouvel An chez des amis.'),
+ ('Feste', 'Geschenke', 'Was schenkst du deiner Mutter?', "Qu'offres-tu à ta mère ?", 'Ich schenke ihr Blumen.', 'Je lui offre des fleurs.'),
+ ('Feste', 'Party', 'Wann hast du eine Party gemacht?', 'Quand as-tu organisé une fête ?', 'Ich habe zu meinem Geburtstag eine Party gemacht.', "J'ai fait une fête pour mon anniversaire."),
+ ('Feste', 'Einladung', 'Lädst du gern Freunde ein?', 'Aimes-tu inviter des amis ?', 'Ja, ich koche gern für meine Freunde.', "Oui, j'aime cuisiner pour mes amis."),
+ ('Feste', 'Ostern', 'Was machst du an Ostern?', 'Que fais-tu à Pâques ?', 'An Ostern gehe ich in die Kirche.', "À Pâques, je vais à l'église."),
+ ('Feste', 'Nationalfeiertag', 'Wie feiert ihr den Nationalfeiertag?', 'Comment fêtez-vous la fête nationale ?', 'Am zwanzigsten Mai gibt es eine Parade.', 'Le vingt mai, il y a un défilé.'),
+ ('Feste', 'Musik auf Festen', 'Welche Musik spielt man auf Festen?', 'Quelle musique joue-t-on aux fêtes ?', 'Man spielt Makossa und Bikutsi.', 'On joue du makossa et du bikutsi.'),
+ ('Feste', 'Kuchen backen', 'Wer backt bei euch den Geburtstagskuchen?', "Qui fait le gâteau d'anniversaire chez vous ?", 'Meine Schwester backt den Kuchen.', 'Ma sœur fait le gâteau.'),
+ ('Feste', 'Festessen', 'Was esst ihr an Festtagen?', 'Que mangez-vous les jours de fête ?', 'Wir essen Ndolé mit Fisch.', 'Nous mangeons du ndolé avec du poisson.'),
+ ('Feste', 'Kleidung zum Fest', 'Was ziehst du zum Fest an?', 'Que mets-tu pour la fête ?', 'Ich ziehe traditionelle Kleidung an.', 'Je mets des vêtements traditionnels.'),
+ ('Feste', 'Glückwunsch', 'Was sagt man auf Deutsch zum Geburtstag?', 'Que dit-on en allemand pour un anniversaire ?', 'Man sagt: Alles Gute zum Geburtstag!', 'On dit : joyeux anniversaire !'),
+ ('Medien', 'Handy', 'Wie lange benutzt du am Tag das Handy?', 'Combien de temps utilises-tu ton téléphone par jour ?', 'Ich benutze es ungefähr drei Stunden.', "Je l'utilise environ trois heures."),
+ ('Medien', 'Radio', 'Hörst du Radio?', 'Écoutes-tu la radio ?', 'Ja, im Auto höre ich Radio.', "Oui, dans la voiture j'écoute la radio."),
+ ('Medien', 'Nachrichten', 'Wo liest du die Nachrichten?', 'Où lis-tu les informations ?', 'Ich lese die Nachrichten im Internet.', 'Je lis les informations sur Internet.'),
+ ('Medien', 'Serie', 'Welche Serie siehst du gerade?', 'Quelle série regardes-tu en ce moment ?', 'Ich sehe gerade eine Serie auf Deutsch.', 'Je regarde en ce moment une série en allemand.'),
+ ('Medien', 'Video', 'Siehst du Videos auf Deutsch?', 'Regardes-tu des vidéos en allemand ?', 'Ja, jeden Abend ein kurzes Video.', 'Oui, une petite vidéo chaque soir.'),
+ ('Medien', 'Nachricht schreiben', 'Wem schreibst du die meisten Nachrichten?', 'À qui écris-tu le plus de messages ?', 'Ich schreibe meiner besten Freundin.', "J'écris à ma meilleure amie."),
+ ('Medien', 'Laptop', 'Hast du einen Laptop?', 'As-tu un ordinateur portable ?', 'Ja, ich arbeite jeden Tag mit meinem Laptop.', 'Oui, je travaille chaque jour avec mon ordinateur portable.'),
+ ('Medien', 'App', 'Welche App benutzt du oft?', 'Quelle application utilises-tu souvent ?', 'Ich benutze oft WhatsApp.', "J'utilise souvent WhatsApp."),
+ ('Medien', 'Brief', 'Schreibst du noch Briefe?', 'Écris-tu encore des lettres ?', 'Nein, ich schreibe nur E-Mails.', "Non, j'écris seulement des e-mails."),
+ ('Medien', 'Fernseher', 'Hast du einen Fernseher in deinem Zimmer?', 'As-tu une télévision dans ta chambre ?', 'Nein, der Fernseher steht im Wohnzimmer.', 'Non, la télévision est dans le salon.'),
+ ('Natur und Tiere', 'Tiere', 'Welches Tier magst du?', 'Quel animal aimes-tu ?', 'Ich mag Hunde sehr.', "J'aime beaucoup les chiens."),
+ ('Natur und Tiere', 'Zoo', 'Warst du schon im Zoo?', 'Es-tu déjà allé au zoo ?', 'Ja, im Zoo von Mvog-Betsi.', 'Oui, au zoo de Mvog-Betsi.'),
+ ('Natur und Tiere', 'Blumen', 'Hast du Blumen zu Hause?', 'As-tu des fleurs chez toi ?', 'Ja, ich habe Blumen auf dem Balkon.', "Oui, j'ai des fleurs sur le balcon."),
+ ('Natur und Tiere', 'Wald', 'Gehst du gern in den Wald?', 'Aimes-tu aller en forêt ?', 'Ja, die Luft ist dort sehr gut.', "Oui, l'air y est très bon."),
+ ('Natur und Tiere', 'Meer', 'Wann warst du zuletzt am Meer?', 'Quand es-tu allé à la mer pour la dernière fois ?', 'Ich war im August am Meer.', "J'étais à la mer en août."),
+ ('Natur und Tiere', 'Hund', 'Hast du Angst vor Hunden?', 'As-tu peur des chiens ?', 'Nein, ich mag Hunde.', "Non, j'aime les chiens."),
+ ('Natur und Tiere', 'Pflanzen', 'Gießt du deine Pflanzen jeden Tag?', 'Arroses-tu tes plantes tous les jours ?', 'Nein, zweimal pro Woche.', 'Non, deux fois par semaine.'),
+ ('Natur und Tiere', 'Fluss', 'Gibt es einen Fluss in deiner Stadt?', 'Y a-t-il une rivière dans ta ville ?', 'Ja, der Fluss heißt Mfoundi.', "Oui, la rivière s'appelle le Mfoundi."),
+ ('Natur und Tiere', 'Dorf', 'Wohnt deine Familie in der Stadt oder im Dorf?', 'Ta famille habite-t-elle en ville ou au village ?', 'Meine Großeltern wohnen im Dorf.', 'Mes grands-parents habitent au village.'),
+ ('Natur und Tiere', 'Vögel', 'Hörst du am Morgen Vögel?', 'Entends-tu des oiseaux le matin ?', 'Ja, jeden Morgen vor meinem Fenster.', 'Oui, chaque matin devant ma fenêtre.')]
+SIM_T3_CARDS = [('das Fenster', 'la fenêtre', 'Können Sie bitte das Fenster aufmachen?', "Pouvez-vous ouvrir la fenêtre, s'il vous plaît ?", 'Ja, gern. Es ist wirklich warm hier.', 'Oui, volontiers. Il fait vraiment chaud ici.'),
+ ('die Tür', 'la porte', 'Machen Sie bitte die Tür zu.', "Fermez la porte, s'il vous plaît.", 'Ja, natürlich, sofort.', 'Oui, bien sûr, tout de suite.'),
+ ('das Licht', 'la lumière', 'Können Sie bitte das Licht anmachen?', "Pouvez-vous allumer la lumière, s'il vous plaît ?", 'Ja, gern. Jetzt ist es hell.', 'Oui, volontiers. Maintenant, il fait clair.'),
+ ('das Wasser', "l'eau", 'Kann ich bitte ein Glas Wasser haben?', "Puis-je avoir un verre d'eau, s'il vous plaît ?", 'Ja, natürlich. Hier, bitte.', 'Oui, bien sûr. Tenez.'),
+ ('der Kaffee', 'le café', 'Ich möchte bitte einen Kaffee.', "Je voudrais un café, s'il vous plaît.", 'Gern. Mit Milch und Zucker?', 'Volontiers. Avec du lait et du sucre ?'),
+ ('der Tee', 'le thé', 'Bringen Sie mir bitte einen Tee.', "Apportez-moi un thé, s'il vous plaît.", 'Ja, gern. Einen Moment bitte.', "Oui, volontiers. Un instant, s'il vous plaît."),
+ ('der Stift', 'le stylo', 'Kannst du mir bitte einen Stift geben?', "Peux-tu me donner un stylo, s'il te plaît ?", 'Ja, klar. Hier ist ein Stift.', 'Oui, bien sûr. Voici un stylo.'),
+ ('der Bleistift', 'le crayon', 'Darf ich deinen Bleistift benutzen?', 'Puis-je utiliser ton crayon ?', 'Ja, natürlich. Bitte schön.', "Oui, bien sûr. Je t'en prie."),
+ ('das Papier', 'le papier', 'Hast du bitte ein Blatt Papier für mich?', "As-tu une feuille de papier pour moi, s'il te plaît ?", 'Ja, hier. Brauchst du noch eins?', 'Oui, tiens. Tu en veux encore une ?'),
+ ('das Handy', 'le téléphone portable', 'Darf ich bitte kurz dein Handy benutzen?', "Puis-je utiliser ton téléphone un instant, s'il te plaît ?", 'Tut mir leid, mein Akku ist leer.', 'Désolé, ma batterie est vide.'),
+ ('das Telefon', 'le téléphone', 'Kann ich bitte telefonieren?', "Puis-je téléphoner, s'il vous plaît ?", 'Ja, das Telefon ist dort auf dem Tisch.', 'Oui, le téléphone est là-bas sur la table.'),
+ ('das Buch', 'le livre', 'Kannst du mir bitte das Buch leihen?', "Peux-tu me prêter le livre, s'il te plaît ?", 'Ja, gern. Aber bring es bitte am Montag zurück.', "Oui, volontiers. Mais rapporte-le lundi, s'il te plaît."),
+ ('das Wörterbuch', 'le dictionnaire', 'Darf ich bitte dein Wörterbuch benutzen?', "Puis-je utiliser ton dictionnaire, s'il te plaît ?", 'Ja, natürlich. Hier ist es.', 'Oui, bien sûr. Le voici.'),
+ ('die Zeitung', 'le journal', 'Kann ich bitte Ihre Zeitung lesen?', "Puis-je lire votre journal, s'il vous plaît ?", 'Ja, gern. Ich bin schon fertig.', "Oui, volontiers. J'ai déjà fini."),
+ ('die Uhr', 'la montre', 'Können Sie mir bitte sagen, wie spät es ist?', "Pouvez-vous me dire quelle heure il est, s'il vous plaît ?", 'Ja, es ist Viertel nach drei.', 'Oui, il est trois heures et quart.'),
+ ('der Schlüssel', 'la clé', 'Kannst du mir bitte den Schlüssel geben?', "Peux-tu me donner la clé, s'il te plaît ?", 'Ja, hier ist der Schlüssel.', 'Oui, voici la clé.'),
+ ('die Tasche', 'le sac', 'Können Sie bitte meine Tasche tragen? Sie ist so schwer.', "Pouvez-vous porter mon sac, s'il vous plaît ? Il est si lourd.", 'Ja, natürlich, ich helfe Ihnen.', 'Oui, bien sûr, je vous aide.'),
+ ('der Koffer', 'la valise', 'Hilfst du mir bitte mit dem Koffer?', "M'aides-tu avec la valise, s'il te plaît ?", 'Ja, klar. Wohin soll er?', 'Oui, bien sûr. Où faut-il la mettre ?'),
+ ('die Rechnung', "l'addition", 'Die Rechnung, bitte.', "L'addition, s'il vous plaît.", 'Gern. Das macht zwölf Euro fünfzig.', 'Volontiers. Cela fait douze euros cinquante.'),
+ ('die Speisekarte', 'la carte du menu', 'Bringen Sie mir bitte die Speisekarte.', "Apportez-moi la carte, s'il vous plaît.", 'Ja, sofort. Hier ist die Speisekarte.', 'Oui, tout de suite. Voici la carte.'),
+ ('das Salz', 'le sel', 'Gibst du mir bitte das Salz?', "Me passes-tu le sel, s'il te plaît ?", 'Ja, hier bitte.', 'Oui, tiens.'),
+ ('der Zucker', 'le sucre', 'Kann ich bitte Zucker haben?', "Puis-je avoir du sucre, s'il vous plaît ?", 'Ja, der Zucker steht neben dir.', 'Oui, le sucre est à côté de toi.'),
+ ('das Brot', 'le pain', 'Kaufst du bitte Brot beim Bäcker?', "Achètes-tu du pain chez le boulanger, s'il te plaît ?", 'Ja, gern. Wie viele Brötchen?', 'Oui, volontiers. Combien de petits pains ?'),
+ ('die Milch', 'le lait', 'Bring bitte Milch aus dem Supermarkt mit.', "Rapporte du lait du supermarché, s'il te plaît.", 'Ja, mache ich. Einen Liter?', 'Oui, je le fais. Un litre ?'),
+ ('das Radio', 'la radio', 'Mach bitte das Radio leiser.', "Baisse la radio, s'il te plaît.", 'Oh, Entschuldigung! Ist es so besser?', "Oh, pardon ! C'est mieux comme ça ?"),
+ ('die Musik', 'la musique', 'Können Sie bitte die Musik leiser machen?', "Pouvez-vous baisser la musique, s'il vous plaît ?", 'Ja, natürlich. Entschuldigung.', 'Oui, bien sûr. Pardon.'),
+ ('der Fernseher', 'la télévision', 'Mach bitte den Fernseher aus.', "Éteins la télévision, s'il te plaît.", 'Moment, der Film ist gleich zu Ende.', 'Un instant, le film est presque fini.'),
+ ('der Computer', "l'ordinateur", 'Darf ich bitte deinen Computer benutzen?', "Puis-je utiliser ton ordinateur, s'il te plaît ?", 'Ja, aber nur zehn Minuten.', 'Oui, mais seulement dix minutes.'),
+ ('die Kamera', "l'appareil photo", 'Können Sie bitte ein Foto von uns machen?', "Pouvez-vous prendre une photo de nous, s'il vous plaît ?", 'Ja, gern. Bitte lächeln!', 'Oui, volontiers. Souriez !'),
+ ('der Regenschirm', 'le parapluie', 'Kannst du mir bitte deinen Regenschirm leihen?', "Peux-tu me prêter ton parapluie, s'il te plaît ?", 'Ja, nimm ihn. Es regnet stark.', 'Oui, prends-le. Il pleut fort.'),
+ ('die Jacke', 'la veste', 'Gib mir bitte meine Jacke. Mir ist kalt.', "Donne-moi ma veste, s'il te plaît. J'ai froid.", 'Ja, hier ist deine Jacke.', 'Oui, voici ta veste.'),
+ ('die Brille', 'les lunettes', 'Kannst du bitte meine Brille suchen?', "Peux-tu chercher mes lunettes, s'il te plaît ?", 'Ja, sie liegt auf dem Sofa.', 'Oui, elles sont sur le canapé.'),
+ ('das Auto', 'la voiture', 'Kannst du mich bitte mit dem Auto abholen?', "Peux-tu venir me chercher en voiture, s'il te plaît ?", 'Ja, ich komme um sechs Uhr.', 'Oui, je viens à six heures.'),
+ ('das Taxi', 'le taxi', 'Rufen Sie mir bitte ein Taxi.', "Appelez-moi un taxi, s'il vous plaît.", 'Ja, gern. Das Taxi kommt in fünf Minuten.', 'Oui, volontiers. Le taxi arrive dans cinq minutes.'),
+ ('die Fahrkarte', 'le billet', 'Ich möchte bitte eine Fahrkarte nach Berlin.', "Je voudrais un billet pour Berlin, s'il vous plaît.", 'Gern. Einfach oder hin und zurück?', 'Volontiers. Aller simple ou aller-retour ?'),
+ ('der Fahrplan', "l'horaire", 'Können Sie mir bitte den Fahrplan zeigen?', "Pouvez-vous me montrer l'horaire, s'il vous plaît ?", 'Ja, er hängt dort an der Wand.', 'Oui, il est affiché là-bas au mur.'),
+ ('der Stadtplan', 'le plan de ville', 'Haben Sie bitte einen Stadtplan für mich?', "Avez-vous un plan de ville pour moi, s'il vous plaît ?", 'Ja, hier ist ein Stadtplan. Er ist kostenlos.', 'Oui, voici un plan. Il est gratuit.'),
+ ('der Weg', 'le chemin', 'Können Sie mir bitte den Weg zum Bahnhof zeigen?', "Pouvez-vous m'indiquer le chemin de la gare, s'il vous plaît ?", 'Ja, gehen Sie geradeaus und dann links.', 'Oui, allez tout droit puis à gauche.'),
+ ('der Platz', 'la place', 'Ist der Platz hier frei? Darf ich mich setzen?', "Cette place est-elle libre ? Puis-je m'asseoir ?", 'Ja, bitte, setzen Sie sich.', 'Oui, je vous en prie, asseyez-vous.'),
+ ('die Zigarette', 'la cigarette', 'Bitte rauchen Sie hier nicht.', "Ne fumez pas ici, s'il vous plaît.", 'Oh, Entschuldigung, das wusste ich nicht.', 'Oh, pardon, je ne le savais pas.'),
+ ('der Hund', 'le chien', 'Können Sie bitte Ihren Hund an die Leine nehmen?', "Pouvez-vous tenir votre chien en laisse, s'il vous plaît ?", 'Ja, natürlich. Er ist aber sehr lieb.', 'Oui, bien sûr. Mais il est très gentil.'),
+ ('das Fahrrad', 'le vélo', 'Leihst du mir bitte dein Fahrrad?', "Me prêtes-tu ton vélo, s'il te plaît ?", 'Ja, aber bitte bring es heute Abend zurück.', "Oui, mais rapporte-le ce soir, s'il te plaît."),
+ ('die Adresse', "l'adresse", 'Schreiben Sie mir bitte Ihre Adresse auf.', "Notez-moi votre adresse, s'il vous plaît.", 'Ja, gern. Haben Sie einen Stift?', 'Oui, volontiers. Avez-vous un stylo ?'),
+ ('die Telefonnummer',
+  'le numéro de téléphone',
+  'Gibst du mir bitte deine Telefonnummer?',
+  "Me donnes-tu ton numéro de téléphone, s'il te plaît ?",
+  'Ja, klar. Null eins sieben sechs, zwei drei vier fünf.',
+  'Oui, bien sûr. Zéro un sept six, deux trois quatre cinq.'),
+ ('der Name', 'le nom', 'Können Sie Ihren Namen bitte buchstabieren?', "Pouvez-vous épeler votre nom, s'il vous plaît ?", 'Ja, gern. M, Ü, L, L, E, R.', 'Oui, volontiers. M, U tréma, L, L, E, R.'),
+ ('der Ausweis', "la carte d'identité", 'Zeigen Sie mir bitte Ihren Ausweis.', "Montrez-moi votre carte d'identité, s'il vous plaît.", 'Ja, hier ist mein Ausweis.', "Oui, voici ma carte d'identité."),
+ ('der Pass', 'le passeport', 'Darf ich bitte Ihren Pass sehen?', "Puis-je voir votre passeport, s'il vous plaît ?", 'Ja, natürlich. Bitte schön.', 'Oui, bien sûr. Le voici.'),
+ ('das Formular', 'le formulaire', 'Können Sie mir bitte beim Formular helfen?', "Pouvez-vous m'aider avec le formulaire, s'il vous plaît ?", 'Ja, gern. Was verstehen Sie nicht?', "Oui, volontiers. Qu'est-ce que vous ne comprenez pas ?"),
+ ('die Unterschrift', 'la signature', 'Unterschreiben Sie bitte hier unten.', "Signez ici en bas, s'il vous plaît.", 'Ja, gern. Hier?', 'Oui, volontiers. Ici ?'),
+ ('das Geld', "l'argent", 'Kannst du mir bitte zehn Euro leihen?', "Peux-tu me prêter dix euros, s'il te plaît ?", 'Tut mir leid, ich habe kein Geld dabei.', "Désolé, je n'ai pas d'argent sur moi."),
+ ('das Kleingeld', 'la monnaie', 'Können Sie mir bitte zwanzig Euro wechseln?', "Pouvez-vous me faire la monnaie de vingt euros, s'il vous plaît ?", 'Ja, ich habe zwei Zehn-Euro-Scheine.', "Oui, j'ai deux billets de dix euros."),
+ ('die Kreditkarte', 'la carte de crédit', 'Kann ich bitte mit Karte bezahlen?', "Puis-je payer par carte, s'il vous plaît ?", 'Ja, natürlich. Hier ist das Gerät.', "Oui, bien sûr. Voici l'appareil."),
+ ('die Tablette',
+  'le comprimé',
+  'Haben Sie bitte eine Tablette gegen Kopfschmerzen?',
+  "Avez-vous un comprimé contre le mal de tête, s'il vous plaît ?",
+  'Ja, hier. Nehmen Sie eine Tablette nach dem Essen.',
+  'Oui, tenez. Prenez un comprimé après le repas.'),
+ ('der Arzt', 'le médecin', 'Rufen Sie bitte einen Arzt!', "Appelez un médecin, s'il vous plaît !", 'Ja, sofort! Bleiben Sie ruhig.', 'Oui, tout de suite ! Restez calme.'),
+ ('die Apotheke', 'la pharmacie', 'Kannst du mir bitte Medikamente aus der Apotheke holen?', "Peux-tu me chercher des médicaments à la pharmacie, s'il te plaît ?", 'Ja, natürlich. Was brauchst du?', 'Oui, bien sûr. De quoi as-tu besoin ?'),
+ ('der Termin', 'le rendez-vous', 'Ich möchte bitte einen Termin beim Arzt.', "Je voudrais un rendez-vous chez le médecin, s'il vous plaît.", 'Gern. Geht es am Donnerstag um zehn Uhr?', 'Volontiers. Jeudi à dix heures, ça vous va ?'),
+ ('die Hausaufgaben', 'les devoirs', 'Kannst du mir bitte bei den Hausaufgaben helfen?', "Peux-tu m'aider pour les devoirs, s'il te plaît ?", 'Ja, gern. Nach dem Essen?', 'Oui, volontiers. Après le repas ?'),
+ ('die Tafel', 'le tableau', 'Können Sie bitte das Wort an die Tafel schreiben?', "Pouvez-vous écrire le mot au tableau, s'il vous plaît ?", 'Ja, natürlich. So, jetzt können Sie es lesen.', 'Oui, bien sûr. Voilà, maintenant vous pouvez le lire.'),
+ ('die Wiederholung', 'la répétition', 'Können Sie das bitte wiederholen?', "Pouvez-vous répéter, s'il vous plaît ?", 'Ja, natürlich. Ich spreche langsamer.', 'Oui, bien sûr. Je parle plus lentement.'),
+ ('das Ohr', "l'oreille", 'Sprechen Sie bitte etwas lauter.', "Parlez un peu plus fort, s'il vous plaît.", 'Ja, gern. Hören Sie mich jetzt?', "Oui, volontiers. Vous m'entendez maintenant ?"),
+ ('die Heizung', 'le chauffage', 'Kannst du bitte die Heizung anmachen?', "Peux-tu allumer le chauffage, s'il te plaît ?", 'Ja, mir ist auch kalt.', "Oui, j'ai froid aussi."),
+ ('die Klimaanlage', 'la climatisation', 'Können Sie bitte die Klimaanlage ausmachen?', "Pouvez-vous éteindre la climatisation, s'il vous plaît ?", 'Ja, gern. Ist Ihnen kalt?', 'Oui, volontiers. Vous avez froid ?'),
+ ('der Müll', 'les ordures', 'Bring bitte den Müll raus.', "Sors la poubelle, s'il te plaît.", 'Ja, mache ich gleich.', 'Oui, je le fais tout de suite.'),
+ ('das Geschirr', 'la vaisselle', 'Kannst du bitte das Geschirr spülen?', "Peux-tu faire la vaisselle, s'il te plaît ?", 'Ja, aber erst nach dem Film.', 'Oui, mais seulement après le film.'),
+ ('der Tisch', 'la table', 'Deck bitte den Tisch.', "Mets la table, s'il te plaît.", 'Ja, gern. Für wie viele Personen?', 'Oui, volontiers. Pour combien de personnes ?'),
+ ('der Stuhl', 'la chaise', 'Bringen Sie bitte noch einen Stuhl.', "Apportez encore une chaise, s'il vous plaît.", 'Ja, sofort. Hier ist ein Stuhl.', 'Oui, tout de suite. Voici une chaise.'),
+ ('das Bett', 'le lit', 'Kannst du bitte dein Bett machen?', "Peux-tu faire ton lit, s'il te plaît ?", 'Ja, Mama, sofort.', 'Oui, maman, tout de suite.'),
+ ('die Blumen', 'les fleurs', 'Gieß bitte die Blumen, wenn ich im Urlaub bin.', "Arrose les fleurs quand je suis en vacances, s'il te plaît.", 'Ja, gern. Wann fährst du?', 'Oui, volontiers. Quand pars-tu ?'),
+ ('die Katze', 'le chat', 'Kannst du bitte meine Katze füttern?', "Peux-tu nourrir mon chat, s'il te plaît ?", 'Ja, klar. Wo ist das Katzenfutter?', 'Oui, bien sûr. Où est la nourriture pour chat ?'),
+ ('das Paket', 'le colis', 'Können Sie bitte mein Paket annehmen?', "Pouvez-vous réceptionner mon colis, s'il vous plaît ?", 'Ja, natürlich. Ich bin den ganzen Tag zu Hause.', 'Oui, bien sûr. Je suis à la maison toute la journée.'),
+ ('der Brief', 'la lettre', 'Wirfst du bitte den Brief in den Briefkasten?', "Mets-tu la lettre dans la boîte aux lettres, s'il te plaît ?", 'Ja, ich gehe sowieso zur Post.', 'Oui, je vais à la poste de toute façon.'),
+ ('die Briefmarke', 'le timbre', 'Ich möchte bitte drei Briefmarken.', "Je voudrais trois timbres, s'il vous plaît.", 'Gern. Das macht zwei Euro fünfundfünfzig.', 'Volontiers. Cela fait deux euros cinquante-cinq.'),
+ ('das Zimmer', 'la chambre', 'Ich möchte bitte ein Zimmer für zwei Nächte.', "Je voudrais une chambre pour deux nuits, s'il vous plaît.", 'Gern. Ein Einzelzimmer oder ein Doppelzimmer?', 'Volontiers. Une chambre simple ou double ?'),
+ ('das Frühstück', 'le petit-déjeuner', 'Bringen Sie bitte das Frühstück aufs Zimmer.', "Apportez le petit-déjeuner dans la chambre, s'il vous plaît.", 'Ja, gern. Um wie viel Uhr?', 'Oui, volontiers. À quelle heure ?'),
+ ('der Aufzug', "l'ascenseur", 'Halten Sie bitte den Aufzug an!', "Retenez l'ascenseur, s'il vous plaît !", 'Ja, kommen Sie, ich warte.', "Oui, venez, j'attends."),
+ ('die Treppe', "l'escalier", 'Können Sie mir bitte mit dem Kinderwagen auf der Treppe helfen?', "Pouvez-vous m'aider avec la poussette dans l'escalier, s'il vous plaît ?", 'Ja, natürlich. Ich nehme vorne.', "Oui, bien sûr. Je prends l'avant."),
+ ('der Kuchen', 'le gâteau', 'Kann ich bitte noch ein Stück Kuchen haben?', "Puis-je avoir encore un morceau de gâteau, s'il vous plaît ?", 'Ja, gern. Er schmeckt gut, oder?', "Oui, volontiers. Il est bon, n'est-ce pas ?"),
+ ('das Eis', 'la glace', 'Ich möchte bitte ein Eis mit zwei Kugeln.', "Je voudrais une glace à deux boules, s'il vous plaît.", 'Gern. Welche Sorten?', 'Volontiers. Quels parfums ?'),
+ ('die Suppe', 'la soupe', 'Bringen Sie mir bitte noch einen Löffel für die Suppe.', "Apportez-moi encore une cuillère pour la soupe, s'il vous plaît.", 'Oh, Entschuldigung! Hier ist ein Löffel.', 'Oh, pardon ! Voici une cuillère.'),
+ ('die Gabel', 'la fourchette', 'Können Sie mir bitte eine neue Gabel bringen?', "Pouvez-vous m'apporter une nouvelle fourchette, s'il vous plaît ?", 'Ja, sofort. Entschuldigen Sie bitte.', 'Oui, tout de suite. Excusez-nous.'),
+ ('das Glas', 'le verre', 'Kann ich bitte noch ein Glas haben?', "Puis-je avoir encore un verre, s'il vous plaît ?", 'Ja, natürlich. Für Wasser oder Saft?', "Oui, bien sûr. Pour de l'eau ou du jus ?"),
+ ('die Flasche', 'la bouteille', 'Kannst du bitte die Flasche aufmachen?', "Peux-tu ouvrir la bouteille, s'il te plaît ?", 'Ja, klar. Wo ist der Öffner?', "Oui, bien sûr. Où est l'ouvre-bouteille ?"),
+ ('das Obst', 'les fruits', 'Bringst du bitte Obst vom Markt mit?', "Rapportes-tu des fruits du marché, s'il te plaît ?", 'Ja, gern. Bananen und Äpfel?', 'Oui, volontiers. Des bananes et des pommes ?'),
+ ('die Einkaufstasche', 'le sac de courses', 'Kannst du bitte die Einkaufstasche tragen?', "Peux-tu porter le sac de courses, s'il te plaît ?", 'Ja, gib her. Die ist ja schwer!', 'Oui, donne. Il est vraiment lourd !'),
+ ('der Einkaufswagen', 'le chariot', 'Können Sie mir bitte einen Euro für den Einkaufswagen wechseln?', "Pouvez-vous me changer un euro pour le chariot, s'il vous plaît ?", 'Tut mir leid, ich habe kein Kleingeld.', "Désolé, je n'ai pas de monnaie."),
+ ('die Größe', 'la taille', 'Haben Sie diese Hose bitte eine Nummer größer?', "Avez-vous ce pantalon une taille au-dessus, s'il vous plaît ?", 'Ja, einen Moment. Ich hole sie.', 'Oui, un instant. Je vais la chercher.'),
+ ('die Kabine', "la cabine d'essayage", 'Wo kann ich bitte die Jacke anprobieren?', "Où puis-je essayer la veste, s'il vous plaît ?", 'Die Kabine ist dort hinten rechts.', 'La cabine est là-bas au fond à droite.'),
+ ('der Pullover', 'le pull', 'Kann ich bitte den Pullover umtauschen?', "Puis-je échanger le pull, s'il vous plaît ?", 'Ja, haben Sie den Kassenzettel?', 'Oui, avez-vous le ticket de caisse ?'),
+ ('die Schuhe', 'les chaussures', 'Zieh bitte die Schuhe aus.', "Enlève tes chaussures, s'il te plaît.", 'Ja, natürlich. Wo kann ich sie hinstellen?', 'Oui, bien sûr. Où puis-je les mettre ?'),
+ ('der Kuli', 'le stylo à bille', 'Leihst du mir bitte deinen Kuli?', "Me prêtes-tu ton stylo, s'il te plaît ?", 'Ja, aber er schreibt nicht so gut.', "Oui, mais il n'écrit pas très bien."),
+ ('die Lampe', 'la lampe', 'Kannst du bitte die Lampe ausmachen? Ich möchte schlafen.', "Peux-tu éteindre la lampe, s'il te plaît ? Je voudrais dormir.", 'Ja, gute Nacht!', 'Oui, bonne nuit !'),
+ ('der Wecker', 'le réveil', 'Stell bitte den Wecker auf sechs Uhr.', "Règle le réveil sur six heures, s'il te plaît.", 'Ja, mache ich. So früh?', 'Oui, je le fais. Si tôt ?'),
+ ('das Ladegerät', 'le chargeur', 'Hast du bitte ein Ladegerät für mein Handy?', "As-tu un chargeur pour mon téléphone, s'il te plaît ?", 'Ja, es liegt neben meinem Bett.', 'Oui, il est à côté de mon lit.'),
+ ('das Internet', 'Internet', 'Wie ist bitte das WLAN-Passwort?', "Quel est le mot de passe du wifi, s'il vous plaît ?", 'Das Passwort steht auf dem Zettel an der Tür.', 'Le mot de passe est sur le papier sur la porte.'),
+ ('die Hilfe', "l'aide", 'Können Sie mir bitte helfen?', "Pouvez-vous m'aider, s'il vous plaît ?", 'Ja, gern. Was ist los?', "Oui, volontiers. Qu'est-ce qui se passe ?"),
+ ('die Information', "l'information", 'Können Sie mir bitte sagen, wo die Toilette ist?', "Pouvez-vous me dire où sont les toilettes, s'il vous plaît ?", 'Ja, im ersten Stock links.', 'Oui, au premier étage à gauche.'),
+ ('der Bus',
+  'le bus',
+  'Sagen Sie mir bitte, wann ich aussteigen muss.',
+  "Dites-moi quand je dois descendre, s'il vous plaît.",
+  'Ja, gern. Sie müssen an der dritten Haltestelle aussteigen.',
+  'Oui, volontiers. Vous devez descendre au troisième arrêt.'),
+ ('der Zug', 'le train', 'Entschuldigung, können Sie bitte Ihre Tasche wegnehmen?', "Excusez-moi, pouvez-vous enlever votre sac, s'il vous plaît ?", 'Oh, natürlich. Bitte setzen Sie sich.', 'Oh, bien sûr. Asseyez-vous, je vous en prie.'),
+ ('das Gepäck', 'les bagages', 'Können Sie bitte auf mein Gepäck aufpassen?', "Pouvez-vous surveiller mes bagages, s'il vous plaît ?", 'Ja, gern. Wie lange sind Sie weg?', 'Oui, volontiers. Combien de temps vous absentez-vous ?'),
+ ('die Karte', 'la carte', 'Kannst du mir bitte zwei Karten für das Konzert kaufen?', "Peux-tu m'acheter deux billets pour le concert, s'il te plaît ?", 'Ja, gern. Für Samstag oder Sonntag?', 'Oui, volontiers. Pour samedi ou dimanche ?'),
+ ('die Einladung', "l'invitation", 'Kommst du bitte zu meiner Geburtstagsparty?', "Viens-tu à ma fête d'anniversaire, s'il te plaît ?", 'Ja, sehr gern! Wann ist die Party?', "Oui, avec plaisir ! C'est quand, la fête ?"),
+ ('das Geschenk', 'le cadeau', 'Kannst du bitte das Geschenk einpacken?', "Peux-tu emballer le cadeau, s'il te plaît ?", 'Ja, klar. Hast du Geschenkpapier?', 'Oui, bien sûr. As-tu du papier cadeau ?'),
+ ('der Ball', 'le ballon', 'Wirf mir bitte den Ball zu!', "Lance-moi le ballon, s'il te plaît !", 'Ja, hier kommt er!', 'Oui, le voilà !'),
+ ('das Spiel', 'le jeu', 'Spielst du bitte mit mir Karten?', "Joues-tu aux cartes avec moi, s'il te plaît ?", 'Ja, gern, aber nur eine Runde.', 'Oui, volontiers, mais seulement une partie.'),
+ ('die Gitarre', 'la guitare', 'Spiel bitte ein Lied auf der Gitarre.', "Joue une chanson à la guitare, s'il te plaît.", 'Ja, gern. Welches Lied möchtest du hören?', 'Oui, volontiers. Quelle chanson veux-tu entendre ?'),
+ ('das Foto', 'la photo', 'Schick mir bitte die Fotos vom Wochenende.', "Envoie-moi les photos du week-end, s'il te plaît.", 'Ja, ich schicke sie dir heute Abend.', 'Oui, je te les envoie ce soir.'),
+ ('die E-Mail', "l'e-mail", 'Schreiben Sie mir bitte eine E-Mail.', "Écrivez-moi un e-mail, s'il vous plaît.", 'Ja, gern. Wie ist Ihre E-Mail-Adresse?', 'Oui, volontiers. Quelle est votre adresse e-mail ?'),
+ ('der Drucker', "l'imprimante", 'Kannst du bitte das Dokument drucken?', "Peux-tu imprimer le document, s'il te plaît ?", 'Tut mir leid, der Drucker ist kaputt.', "Désolé, l'imprimante est en panne."),
+ ('die Kopie', 'la copie', 'Machen Sie bitte zwei Kopien von dem Blatt.', "Faites deux copies de la feuille, s'il vous plaît.", 'Ja, gern. Ich bin gleich zurück.', 'Oui, volontiers. Je reviens tout de suite.'),
+ ('der Kalender', 'le calendrier', 'Schreib bitte den Termin in den Kalender.', "Note le rendez-vous dans le calendrier, s'il te plaît.", 'Ja, am Dienstag um neun, oder?', "Oui, mardi à neuf heures, c'est ça ?"),
+ ('die Rezeption', 'la réception', 'Können Sie mich bitte um sieben Uhr wecken?', "Pouvez-vous me réveiller à sept heures, s'il vous plaît ?", 'Ja, gern. Gute Nacht!', 'Oui, volontiers. Bonne nuit !'),
+ ('das Handtuch', 'la serviette', 'Bringen Sie mir bitte noch ein Handtuch.', "Apportez-moi encore une serviette, s'il vous plaît.", 'Ja, sofort. Brauchen Sie noch etwas?', "Oui, tout de suite. Avez-vous besoin d'autre chose ?"),
+ ('die Seife', 'le savon', 'Gibst du mir bitte die Seife?', "Me passes-tu le savon, s'il te plaît ?", 'Ja, hier ist sie.', 'Oui, le voici.'),
+ ('der Schirm', 'le parasol', 'Können Sie bitte den Schirm aufmachen? Die Sonne ist so stark.', "Pouvez-vous ouvrir le parasol, s'il vous plaît ? Le soleil est si fort.", 'Ja, gern. So ist es besser.', "Oui, volontiers. C'est mieux comme ça."),
+ ('der Parkplatz',
+  'la place de parking',
+  'Können Sie bitte Ihr Auto wegfahren? Das ist mein Parkplatz.',
+  "Pouvez-vous déplacer votre voiture, s'il vous plaît ? C'est ma place de parking.",
+  'Oh, Entschuldigung! Ich fahre sofort weg.',
+  'Oh, pardon ! Je pars tout de suite.'),
+ ('die Ampel', 'le feu', 'Warte bitte, die Ampel ist rot.', "Attends, s'il te plaît, le feu est rouge.", 'Oh ja, danke!', 'Ah oui, merci !'),
+ ('das Kind', "l'enfant", 'Können Sie bitte kurz auf mein Kind aufpassen?', "Pouvez-vous surveiller mon enfant un instant, s'il vous plaît ?", 'Ja, natürlich. Gehen Sie nur.', 'Oui, bien sûr. Allez-y.'),
+ ('der Kinderwagen', 'la poussette', 'Machen Sie bitte Platz für den Kinderwagen.', "Faites de la place pour la poussette, s'il vous plaît.", 'Ja, natürlich. Bitte schön.', 'Oui, bien sûr. Je vous en prie.'),
+ ('das Essen', 'le repas', 'Kochst du bitte heute das Essen?', "Prépares-tu le repas aujourd'hui, s'il te plaît ?", 'Ja, gern. Ich mache Reis mit Gemüse.', 'Oui, volontiers. Je fais du riz aux légumes.'),
+ ('der Kühlschrank', 'le réfrigérateur', 'Stell bitte die Milch in den Kühlschrank.', "Mets le lait au réfrigérateur, s'il te plaît.", 'Ja, mache ich sofort.', 'Oui, je le fais tout de suite.'),
+ ('die Waschmaschine', 'la machine à laver', 'Kannst du bitte die Waschmaschine anmachen?', "Peux-tu mettre la machine à laver en marche, s'il te plaît ?", 'Ja, mit sechzig Grad?', 'Oui, à soixante degrés ?'),
+ ('das Bügeleisen', 'le fer à repasser', 'Bügelst du bitte mein Hemd?', "Repasses-tu ma chemise, s'il te plaît ?", 'Tut mir leid, ich habe keine Zeit. Mach das bitte selbst.', "Désolé, je n'ai pas le temps. Fais-le toi-même, s'il te plaît."),
+ ('der Staubsauger', "l'aspirateur", 'Kannst du bitte im Wohnzimmer staubsaugen?', "Peux-tu passer l'aspirateur dans le salon, s'il te plaît ?", 'Ja, nach dem Mittagessen.', 'Oui, après le déjeuner.'),
+ ('die Schere', 'les ciseaux', 'Gib mir bitte die Schere.', "Donne-moi les ciseaux, s'il te plaît.", 'Ja, aber pass auf, sie ist scharf.', 'Oui, mais fais attention, ils sont coupants.'),
+ ('das Pflaster', 'le pansement', 'Hast du bitte ein Pflaster für mich?', "As-tu un pansement pour moi, s'il te plaît ?", 'Ja, hier. Hast du dich verletzt?', "Oui, tiens. Tu t'es blessé ?"),
+ ('das Fieberthermometer', 'le thermomètre', 'Bring mir bitte das Fieberthermometer.', "Apporte-moi le thermomètre, s'il te plaît.", 'Ja, sofort. Hast du Fieber?', 'Oui, tout de suite. As-tu de la fièvre ?'),
+ ('der Termin absagen',
+  'annuler le rendez-vous',
+  'Können Sie bitte meinen Termin am Freitag absagen?',
+  "Pouvez-vous annuler mon rendez-vous de vendredi, s'il vous plaît ?",
+  'Ja, gern. Möchten Sie einen neuen Termin?',
+  'Oui, volontiers. Voulez-vous un nouveau rendez-vous ?'),
+ ('die Tür abschließen', 'fermer à clé', 'Schließ bitte die Tür ab, wenn du gehst.', "Ferme la porte à clé quand tu pars, s'il te plaît.", 'Ja, natürlich. Den Schlüssel lege ich unter die Matte.', 'Oui, bien sûr. Je mets la clé sous le paillasson.'),
+ ('das Fenster schließen', 'fermer la fenêtre', 'Mach bitte das Fenster zu. Es regnet.', "Ferme la fenêtre, s'il te plaît. Il pleut.", 'Ja, sofort.', 'Oui, tout de suite.'),
+ ('die Hand', 'la main', 'Gib mir bitte die Hand, die Straße ist gefährlich.', "Donne-moi la main, s'il te plaît, la rue est dangereuse.", 'Ja, Papa.', 'Oui, papa.'),
+ ('der Moment', 'le moment', 'Warten Sie bitte einen Moment.', "Attendez un instant, s'il vous plaît.", 'Ja, kein Problem.', 'Oui, pas de problème.'),
+ ('langsam', 'lentement', 'Sprechen Sie bitte langsamer.', "Parlez plus lentement, s'il vous plaît.", 'Ja, natürlich. Entschuldigung.', 'Oui, bien sûr. Pardon.'),
+ ('leise', 'doucement', 'Sei bitte leise, das Baby schläft.', "Sois silencieux, s'il te plaît, le bébé dort.", 'Oh, okay. Entschuldigung.', "Oh, d'accord. Pardon."),
+ ('die Hausnummer', 'le numéro de maison', 'Können Sie mir bitte sagen, wo Hausnummer zwölf ist?', "Pouvez-vous me dire où est le numéro douze, s'il vous plaît ?", 'Ja, das ist das gelbe Haus dort.', "Oui, c'est la maison jaune là-bas."),
+ ('der Bahnhof', 'la gare', 'Bringen Sie mich bitte zum Bahnhof.', "Conduisez-moi à la gare, s'il vous plaît.", 'Ja, gern. Steigen Sie ein.', 'Oui, volontiers. Montez.'),
+ ('die Post', 'la poste', 'Kannst du bitte das Paket zur Post bringen?', "Peux-tu apporter le colis à la poste, s'il te plaît ?", 'Ja, ich gehe heute Nachmittag.', "Oui, j'y vais cet après-midi."),
+ ('der Fahrschein', 'le titre de transport', 'Zeigen Sie bitte Ihren Fahrschein.', "Montrez votre titre de transport, s'il vous plaît.", 'Ja, hier ist meine Monatskarte.', 'Oui, voici mon abonnement mensuel.'),
+ ('die Sonnenbrille', 'les lunettes de soleil', 'Gibst du mir bitte meine Sonnenbrille?', "Me donnes-tu mes lunettes de soleil, s'il te plaît ?", 'Ja, sie ist in deiner Tasche.', 'Oui, elles sont dans ton sac.'),
+ ('das Zelt', 'la tente', 'Hilfst du mir bitte beim Zelt aufbauen?', "M'aides-tu à monter la tente, s'il te plaît ?", 'Ja, gern. Wo ist die Anleitung?', 'Oui, volontiers. Où est la notice ?'),
+ ('die Gitarrenstunde', 'le cours de guitare', 'Kannst du mir bitte Gitarre beibringen?', "Peux-tu m'apprendre la guitare, s'il te plaît ?", 'Ja, gern. Am Samstag habe ich Zeit.', "Oui, volontiers. Samedi, j'ai le temps."),
+ ('das Lied', 'la chanson', 'Sing bitte noch ein Lied!', "Chante encore une chanson, s'il te plaît !", 'Ja, gern. Das letzte!', 'Oui, volontiers. La dernière !'),
+ ('der Garten', 'le jardin', 'Kannst du bitte im Garten helfen?', "Peux-tu aider au jardin, s'il te plaît ?", 'Ja, was soll ich machen?', 'Oui, que dois-je faire ?'),
+ ('die Leiter', "l'échelle", 'Halt bitte die Leiter fest.', "Tiens l'échelle, s'il te plaît.", 'Ja, ich halte sie. Pass auf!', 'Oui, je la tiens. Fais attention !'),
+ ('der Kaffee zum Mitnehmen', 'le café à emporter', 'Einen Kaffee zum Mitnehmen, bitte.', "Un café à emporter, s'il vous plaît.", 'Gern. Groß oder klein?', 'Volontiers. Grand ou petit ?'),
+ ('die Tüte', 'le sachet', 'Kann ich bitte eine Tüte haben?', "Puis-je avoir un sachet, s'il vous plaît ?", 'Ja, die Tüte kostet zwanzig Cent.', 'Oui, le sachet coûte vingt centimes.'),
+ ('der Kassenzettel', 'le ticket de caisse', 'Geben Sie mir bitte den Kassenzettel.', "Donnez-moi le ticket de caisse, s'il vous plaît.", 'Ja, hier bitte. Schönen Tag noch!', 'Oui, tenez. Bonne journée !')]
+
+# Réponses adaptées au personnage (Teil 2)
+SIM_T2_PERSONA = {
+    ("Beruf", "sankara"): ("Ich bin Informatiker. Ich programmiere Apps.", "Je suis informaticien. Je programme des applications."),
+    ("Beruf", "nefertiti"): ("Ich bin Ärztin im Krankenhaus.", "Je suis médecin à l'hôpital."),
+    ("Büro", "nefertiti"): ("Ich arbeite nicht im Büro, ich arbeite im Krankenhaus.", "Je ne travaille pas dans un bureau, je travaille à l'hôpital."),
+    ("Büro", "sankara"): ("Mein Büro ist in Bastos, im Zentrum von Yaoundé.", "Mon bureau est à Bastos, dans le centre de Yaoundé."),
+    ("Uniform", "nefertiti"): ("Ja, im Krankenhaus trage ich einen weißen Kittel.", "Oui, à l'hôpital je porte une blouse blanche."),
+    ("Computer", "nefertiti"): ("Nicht so viel. Ich arbeite meistens mit Patienten.", "Pas tellement. Je travaille surtout avec des patients."),
+    ("Traumberuf", "nefertiti"): ("Ich bin schon Ärztin. Das ist mein Traumberuf.", "Je suis déjà médecin. C'est le métier de mes rêves."),
+    ("Traumberuf", "sankara"): ("Ich möchte Programmierer bei einer großen Firma in Deutschland werden.", "Je voudrais devenir programmeur dans une grande entreprise en Allemagne."),
+    ("Chef", "nefertiti"): ("Meine Chefin heißt Frau Doktor Ngo.", "Ma cheffe s'appelle Dr Ngo."),
+    ("Stadt", "nefertiti"): ("Ich wohne in Douala.", "J'habite à Douala."),
+    ("Eltern", "nefertiti"): ("Meine Eltern wohnen in Yaoundé.", "Mes parents habitent à Yaoundé."),
+    ("Geschwister", "nefertiti"): ("Ja, ich habe zwei Brüder.", "Oui, j'ai deux frères."),
+    ("Familienname", "sankara"): ("Mein Familienname ist Sankara.", "Mon nom de famille est Sankara."),
+    ("Familienname", "nefertiti"): ("Mein Familienname ist Nefertiti.", "Mon nom de famille est Nefertiti."),
+    ("Arbeitszeit", "nefertiti"): ("Meine Arbeit beginnt um sieben Uhr im Krankenhaus.", "Mon travail commence à sept heures à l'hôpital."),
+    ("Telefon", "nefertiti"): ("Ja, ich telefoniere oft mit Patienten.", "Oui, je téléphone souvent à des patients."),
+    ("Krankenhaus", "nefertiti"): ("Ja, ich arbeite jeden Tag im Krankenhaus.", "Oui, je travaille tous les jours à l'hôpital."),
+    ("Arzt", "nefertiti"): ("Ich bin selbst Ärztin!", "Je suis moi-même médecin !"),
+    ("Deutsch", "nefertiti"): ("Ja, ich möchte in einem Krankenhaus in Deutschland arbeiten.", "Oui, je voudrais travailler dans un hôpital en Allemagne."),
+    ("Warum Deutsch", "nefertiti"): ("Ich möchte als Ärztin in Deutschland arbeiten.", "Je voudrais travailler comme médecin en Allemagne."),
+    ("Warum Deutsch", "sankara"): ("Ich möchte als Informatiker in Deutschland arbeiten.", "Je voudrais travailler comme informaticien en Allemagne."),
+    ("Kleid", "sankara"): ("Nein, aber meine Schwester trägt gern Kleider.", "Non, mais ma sœur aime porter des robes."),
+    ("Anzug", "nefertiti"): ("Ich trage keinen Anzug, ich trage lieber ein Kleid.", "Je ne porte pas de costume, je préfère porter une robe."),
+    ("Hemd", "nefertiti"): ("Ich trage eine Bluse und eine Hose, im Krankenhaus einen Kittel.", "Je porte un chemisier et un pantalon, à l'hôpital une blouse."),
+    ("Laptop", "sankara"): ("Ja, natürlich, ich bin Informatiker!", "Oui, bien sûr, je suis informaticien !"),
+}
+
+# --- Teil 1 : les deux personnages ---
+SIM_PERSONA = {
+    "sankara": {
+        "intro": [
+            ("Guten Tag. Mein Name ist Sankara.", "Bonjour. Je m'appelle Sankara."),
+            ("Ich bin zwanzig Jahre alt.", "J'ai vingt ans."),
+            ("Ich komme aus Kamerun.", "Je viens du Cameroun."),
+            ("Ich wohne in Yaoundé.", "J'habite à Yaoundé."),
+            ("Ich spreche Französisch, Englisch und ein bisschen Deutsch.", "Je parle français, anglais et un peu allemand."),
+            ("Ich bin Informatiker von Beruf.", "Je suis informaticien de métier."),
+        ],
+        "extra": [
+            [("Ich arbeite bei einer kleinen Firma und programmiere Apps.", "Je travaille dans une petite entreprise et je programme des applications.")],
+            [("Ich arbeite in einer Firma in Bastos. Dort mache ich Webseiten.", "Je travaille dans une entreprise à Bastos. J'y fais des sites web.")],
+        ],
+        "hobby": [
+            ("Mein Hobby ist Fußball. Ich spiele jeden Samstag mit Freunden.", "Mon loisir, c'est le football. Je joue chaque samedi avec des amis."),
+            ("In meiner Freizeit höre ich gern Musik und spiele Computerspiele.", "Pendant mon temps libre, j'aime écouter de la musique et jouer aux jeux vidéo."),
+            ("Ich gehe gern joggen und lese Bücher über Technik.", "J'aime faire du jogging et lire des livres sur la technique."),
+        ],
+        "family": [
+            ("Ich bin ledig. Ich habe einen Bruder und zwei Schwestern.", "Je suis célibataire. J'ai un frère et deux sœurs."),
+            ("Ich bin nicht verheiratet. Meine Eltern wohnen auch in Yaoundé.", "Je ne suis pas marié. Mes parents habitent aussi à Yaoundé."),
+        ],
+        "spell": "S, A, N, K, A, R, A.",
+    },
+    "nefertiti": {
+        "intro": [
+            ("Guten Tag. Ich heiße Nefertiti.", "Bonjour. Je m'appelle Nefertiti."),
+            ("Ich bin einundzwanzig Jahre alt.", "J'ai vingt et un ans."),
+            ("Ich komme aus Kamerun und ich lebe in Douala.", "Je viens du Cameroun et je vis à Douala."),
+            ("Ich spreche Französisch, Englisch und jetzt lerne ich Deutsch.", "Je parle français, anglais et maintenant j'apprends l'allemand."),
+            ("Ich bin Ärztin von Beruf.", "Je suis médecin de métier."),
+        ],
+        "extra": [
+            [("Ich arbeite in einem Krankenhaus in Douala.", "Je travaille dans un hôpital à Douala.")],
+            [("Ich arbeite im Krankenhaus. Ich helfe kranken Kindern.", "Je travaille à l'hôpital. J'aide les enfants malades.")],
+        ],
+        "hobby": [
+            ("In meiner Freizeit lese ich gern und ich tanze sehr gern.", "Pendant mon temps libre, j'aime lire et j'adore danser."),
+            ("Mein Hobby ist Kochen. Am Wochenende gehe ich auch schwimmen.", "Mon loisir, c'est la cuisine. Le week-end, je vais aussi nager."),
+            ("Ich höre gern Musik und ich gehe gern ins Kino.", "J'aime écouter de la musique et j'aime aller au cinéma."),
+        ],
+        "family": [
+            ("Ich bin ledig. Ich habe zwei Brüder.", "Je suis célibataire. J'ai deux frères."),
+            ("Ich bin nicht verheiratet. Meine Eltern wohnen in Yaoundé.", "Je ne suis pas mariée. Mes parents habitent à Yaoundé."),
+        ],
+        "spell": "N, E, F, E, R, T, I, T, I.",
+    },
+}
+
+# Questions complémentaires du prüfer (Sie) : (question, question FR, réponse Sankara, FR, réponse Nefertiti, FR)
+SIM_T1_PROF_Q = [
+    ("Seit wann lernen Sie Deutsch?", "Depuis quand apprenez-vous l'allemand ?",
+     "Ich lerne seit sechs Monaten Deutsch.", "J'apprends l'allemand depuis six mois.",
+     "Ich lerne seit einem Jahr Deutsch.", "J'apprends l'allemand depuis un an."),
+    ("Warum lernen Sie Deutsch?", "Pourquoi apprenez-vous l'allemand ?",
+     "Ich möchte in Deutschland als Informatiker arbeiten.", "Je voudrais travailler en Allemagne comme informaticien.",
+     "Ich möchte in Deutschland als Ärztin arbeiten.", "Je voudrais travailler en Allemagne comme médecin."),
+    ("Wo arbeiten Sie?", "Où travaillez-vous ?",
+     "Ich arbeite in einer Firma in Yaoundé.", "Je travaille dans une entreprise à Yaoundé.",
+     "Ich arbeite in einem Krankenhaus in Douala.", "Je travaille dans un hôpital à Douala."),
+    ("Was machen Sie am Wochenende?", "Que faites-vous le week-end ?",
+     "Am Wochenende spiele ich Fußball und treffe Freunde.", "Le week-end, je joue au football et je vois des amis.",
+     "Am Wochenende koche ich und besuche meine Familie.", "Le week-end, je cuisine et je rends visite à ma famille."),
+    ("Haben Sie Geschwister?", "Avez-vous des frères et sœurs ?",
+     "Ja, ich habe einen Bruder und zwei Schwestern.", "Oui, j'ai un frère et deux sœurs.",
+     "Ja, ich habe zwei Brüder.", "Oui, j'ai deux frères."),
+    ("Wie ist Ihre Adresse?", "Quelle est votre adresse ?",
+     "Meine Adresse ist Rue de Bastos, Nummer vierzehn, in Yaoundé.", "Mon adresse est rue de Bastos, numéro quatorze, à Yaoundé.",
+     "Meine Adresse ist Boulevard de la Liberté, Nummer acht, in Douala.", "Mon adresse est boulevard de la Liberté, numéro huit, à Douala."),
+    ("Wann stehen Sie morgens auf?", "À quelle heure vous levez-vous le matin ?",
+     "Ich stehe um halb sieben auf.", "Je me lève à six heures et demie.",
+     "Ich stehe schon um sechs Uhr auf, weil ich früh im Krankenhaus bin.", "Je me lève déjà à six heures, parce que je suis tôt à l'hôpital."),
+    ("Wie kommen Sie zur Arbeit?", "Comment allez-vous au travail ?",
+     "Ich fahre mit dem Taxi zur Arbeit.", "Je vais au travail en taxi.",
+     "Ich fahre mit dem Auto zum Krankenhaus.", "Je vais à l'hôpital en voiture."),
+    ("Was essen Sie gern?", "Qu'aimez-vous manger ?",
+     "Ich esse gern Ndolé mit Reis.", "J'aime manger du ndolé avec du riz.",
+     "Ich esse gern Fisch mit Bananen.", "J'aime manger du poisson avec des bananes plantains."),
+    ("Waren Sie schon einmal in Deutschland?", "Êtes-vous déjà allé en Allemagne ?",
+     "Nein, noch nicht. Aber ich möchte Berlin besuchen.", "Non, pas encore. Mais je voudrais visiter Berlin.",
+     "Nein, aber nächstes Jahr fahre ich nach München.", "Non, mais l'année prochaine je vais à Munich."),
+    ("Was ist Ihr Lieblingsessen?", "Quel est votre plat préféré ?",
+     "Mein Lieblingsessen ist Poulet DG.", "Mon plat préféré est le poulet DG.",
+     "Mein Lieblingsessen ist Fisch mit Gemüse.", "Mon plat préféré est le poisson aux légumes."),
+    ("Wie lange arbeiten Sie jeden Tag?", "Combien de temps travaillez-vous chaque jour ?",
+     "Ich arbeite acht Stunden am Tag.", "Je travaille huit heures par jour.",
+     "Ich arbeite manchmal zehn Stunden am Tag.", "Je travaille parfois dix heures par jour."),
+    ("Wohnen Sie allein?", "Habitez-vous seul ?",
+     "Nein, ich wohne mit meinem Bruder zusammen.", "Non, j'habite avec mon frère.",
+     "Ja, ich habe eine kleine Wohnung in Douala.", "Oui, j'ai un petit appartement à Douala."),
+    ("Was machen Sie am Abend?", "Que faites-vous le soir ?",
+     "Am Abend lerne ich Deutsch mit NATHO.", "Le soir, j'apprends l'allemand avec NATHO.",
+     "Am Abend lese ich ein Buch oder sehe fern.", "Le soir, je lis un livre ou je regarde la télévision."),
+]
+
+# Questions entre les candidats (du) : (question, FR, réponse Sankara, FR, réponse Nefertiti, FR)
+SIM_T1_MUTUAL = [
+    ("Was ist dein Lieblingsfilm?", "Quel est ton film préféré ?",
+     "Mein Lieblingsfilm ist ein Actionfilm aus Amerika.", "Mon film préféré est un film d'action américain.",
+     "Mein Lieblingsfilm ist Black Panther.", "Mon film préféré est Black Panther."),
+    ("Hast du ein Haustier?", "As-tu un animal domestique ?",
+     "Ja, ich habe einen Hund. Er heißt Rex.", "Oui, j'ai un chien. Il s'appelle Rex.",
+     "Nein, ich habe kein Haustier.", "Non, je n'ai pas d'animal domestique."),
+    ("Welche Musik hörst du gern?", "Quelle musique aimes-tu écouter ?",
+     "Ich höre gern Rap und Makossa.", "J'aime écouter du rap et du makossa.",
+     "Ich höre gern Bikutsi und Pop.", "J'aime écouter du bikutsi et de la pop."),
+    ("Wann hast du Geburtstag?", "Quand est ton anniversaire ?",
+     "Ich habe im April Geburtstag.", "Mon anniversaire est en avril.",
+     "Ich habe im September Geburtstag.", "Mon anniversaire est en septembre."),
+    ("Was machst du heute Abend?", "Que fais-tu ce soir ?",
+     "Heute Abend sehe ich ein Fußballspiel.", "Ce soir, je regarde un match de football.",
+     "Heute Abend koche ich für meine Familie.", "Ce soir, je cuisine pour ma famille."),
+    ("Was ist deine Lieblingsfarbe?", "Quelle est ta couleur préférée ?",
+     "Meine Lieblingsfarbe ist Blau.", "Ma couleur préférée est le bleu.",
+     "Meine Lieblingsfarbe ist Grün.", "Ma couleur préférée est le vert."),
+    ("Treibst du Sport?", "Fais-tu du sport ?",
+     "Ja, ich spiele Fußball und gehe joggen.", "Oui, je joue au football et je fais du jogging.",
+     "Ja, ich gehe zweimal pro Woche schwimmen.", "Oui, je vais nager deux fois par semaine."),
+    ("Wo machst du gern Urlaub?", "Où aimes-tu passer tes vacances ?",
+     "Ich mache gern Urlaub in Kribi am Meer.", "J'aime passer mes vacances à Kribi, à la mer.",
+     "Ich fahre gern in die Berge nach Bamenda.", "J'aime aller à la montagne à Bamenda."),
+    ("Kochst du gern?", "Aimes-tu cuisiner ?",
+     "Nein, ich koche nicht so gern. Ich esse lieber im Restaurant.", "Non, je n'aime pas trop cuisiner. Je préfère manger au restaurant.",
+     "Ja, ich koche sehr gern, besonders Ndolé.", "Oui, j'adore cuisiner, surtout le ndolé."),
+    ("Welche Sprachen sprichst du?", "Quelles langues parles-tu ?",
+     "Ich spreche Französisch, Englisch und ein bisschen Deutsch.", "Je parle français, anglais et un peu allemand.",
+     "Ich spreche Französisch, Englisch und Duala.", "Je parle français, anglais et douala."),
+    ("Was trinkst du am Morgen?", "Que bois-tu le matin ?",
+     "Am Morgen trinke ich einen Kaffee.", "Le matin, je bois un café.",
+     "Am Morgen trinke ich Tee mit Milch.", "Le matin, je bois du thé au lait."),
+    ("Wie viele Stunden schläfst du?", "Combien d'heures dors-tu ?",
+     "Ich schlafe sieben Stunden.", "Je dors sept heures.",
+     "Ich schlafe nur sechs Stunden, ich arbeite viel.", "Je dors seulement six heures, je travaille beaucoup."),
+    ("Liest du gern?", "Aimes-tu lire ?",
+     "Ja, ich lese gern Bücher über Computer.", "Oui, j'aime lire des livres sur l'informatique.",
+     "Ja, ich lese jeden Abend einen Roman.", "Oui, je lis un roman chaque soir."),
+    ("Hast du ein Auto?", "As-tu une voiture ?",
+     "Nein, ich fahre mit dem Taxi.", "Non, je prends le taxi.",
+     "Ja, ich habe ein kleines rotes Auto.", "Oui, j'ai une petite voiture rouge."),
+    ("Was ist dein Lieblingsessen?", "Quel est ton plat préféré ?",
+     "Mein Lieblingsessen ist Poulet DG.", "Mon plat préféré est le poulet DG.",
+     "Mein Lieblingsessen ist Eru mit Fufu.", "Mon plat préféré est l'eru avec du fufu."),
+    ("Wohin möchtest du reisen?", "Où voudrais-tu voyager ?",
+     "Ich möchte nach Berlin reisen.", "Je voudrais voyager à Berlin.",
+     "Ich möchte nach Wien und München reisen.", "Je voudrais voyager à Vienne et à Munich."),
+]
+
+_SIM_DIGITS = ["null", "eins", "zwei", "drei", "vier", "fünf", "sechs", "sieben", "acht", "neun"]
+
+def _sim_phone():
+    digits = "6" + "".join(random.choice("579") for _ in range(1)) + "".join(random.choice("0123456789") for _ in range(7))
+    groups = [digits[0:3], digits[3:5], digits[5:7], digits[7:9]]
+    de = ", ".join(" ".join(_SIM_DIGITS[int(c)] for c in g) for g in groups)
+    return de[0].upper() + de[1:] + ".", " ".join(groups)
+
+def _sim_word_questions(k):
+    """« Wie heißt … auf Deutsch ? » avec des noms courants du dictionnaire."""
+    pool = [(fr, de) for fr, de in DICO_FR_DE
+            if re.match(r"^(le |la |l')", fr) and re.match(r"^(der|die|das) [A-ZÄÖÜ]", de) and "(" not in fr and len(de.split()) == 2]
+    return random.sample(pool, k)
+
+def _sim_generate(cards):
+    """Crée une simulation complète. cards = nombre de cartes PAR candidat (Teil 2 et Teil 3)."""
+    P, S, N = "prof", "sankara", "nefertiti"
+    teile = []
+
+    # ---------------- TEIL 1 ----------------
+    b = []
+    b.append([[P, "Guten Tag und herzlich willkommen zur Prüfung Start Deutsch eins, Teil Sprechen. Ich heiße Wagner und ich bin heute Ihr Prüfer.",
+               "Bonjour et bienvenue à l'examen Start Deutsch 1, épreuve orale. Je m'appelle Wagner et je suis votre examinateur aujourd'hui."],
+              [P, "Die Prüfung hat drei Teile. Im Teil eins stellen Sie sich bitte vor. Herr Sankara, fangen Sie bitte an.",
+               "L'épreuve comporte trois parties. Dans la partie un, présentez-vous s'il vous plaît. Monsieur Sankara, commencez s'il vous plaît."]])
+    prof_q = random.sample(SIM_T1_PROF_Q, 2)
+    words = _sim_word_questions(2)
+    for who, q, w in ((S, prof_q[0], words[0]), (N, prof_q[1], words[1])):
+        per = SIM_PERSONA[who]
+        sentences = per["intro"] + random.choice(per["extra"]) + [random.choice(per["hobby"]), random.choice(per["family"])]
+        if who == N:
+            b.append([[P, "Vielen Dank. Frau Nefertiti, jetzt sind Sie dran. Bitte stellen Sie sich vor.",
+                       "Merci beaucoup. Madame Nefertiti, c'est à vous. Présentez-vous, s'il vous plaît."]])
+        for i in range(0, len(sentences), 3):
+            b.append([[who, " ".join(x[0] for x in sentences[i:i + 3]), " ".join(x[1] for x in sentences[i:i + 3])]])
+        title = "Herr Sankara" if who == S else "Frau Nefertiti"
+        b.append([[P, f"Danke, {title}. Können Sie bitte Ihren Namen buchstabieren?", f"Merci. Pouvez-vous épeler votre nom, s'il vous plaît ?"],
+                  [who, "Ja, gern. " + per["spell"], "Oui, volontiers. " + per["spell"]]])
+        ph_de, ph_fr = _sim_phone()
+        b.append([[P, "Und wie ist Ihre Telefonnummer?", "Et quel est votre numéro de téléphone ?"],
+                  [who, "Meine Telefonnummer ist: " + ph_de, "Mon numéro de téléphone est : " + ph_fr]])
+        ans = (q[2], q[3]) if who == S else (q[4], q[5])
+        b.append([[P, q[0], q[1]], [who, ans[0], ans[1]]])
+        fr_w, de_w = w
+        b.append([[P, f"Noch eine Frage: Wie heißt „{fr_w}“ auf Deutsch?", f"Encore une question : comment dit-on « {fr_w} » en allemand ?"],
+                  [who, f"Das heißt „{de_w}“.", f"On dit « {de_w} »."]])
+    b.append([[P, "Sehr gut. Jetzt stellen Sie sich bitte gegenseitig zwei Fragen. Herr Sankara, Sie beginnen.",
+               "Très bien. Maintenant, posez-vous mutuellement deux questions. Monsieur Sankara, vous commencez."]])
+    mq = random.sample(SIM_T1_MUTUAL, 4)
+    for i, q in enumerate(mq):
+        asker, answerer = (S, N) if i % 2 == 0 else (N, S)
+        ans = (q[2], q[3]) if answerer == S else (q[4], q[5])
+        b.append([[asker, q[0], q[1]], [answerer, ans[0], ans[1]]])
+    b.append([[P, "Vielen Dank. Der Teil eins ist jetzt zu Ende.", "Merci beaucoup. La partie un est maintenant terminée."]])
+    teile.append({"title": "Teil 1 — Sich vorstellen", "blocks": b})
+
+    # ---------------- TEIL 2 ----------------
+    b = []
+    b.append([[P, "Wir kommen jetzt zum Teil zwei. Hier sind Karten mit einem Thema und einem Wort.",
+               "Nous passons maintenant à la partie deux. Voici des cartes avec un thème et un mot."],
+              [P, "Ziehen Sie eine Karte, stellen Sie Ihrem Partner eine Frage mit dem Wort, und Ihr Partner antwortet. Dann zieht Ihr Partner eine Karte.",
+               "Tirez une carte, posez une question à votre partenaire avec le mot, et votre partenaire répond. Ensuite, votre partenaire tire une carte."]])
+    by_theme = {}
+    for c in SIM_T2_CARDS:
+        by_theme.setdefault(c[0], []).append(c)
+    themes = list(by_theme)
+    random.shuffle(themes)
+    for t in themes:
+        random.shuffle(by_theme[t])
+    need = cards * 2
+    picked, used_words = [], set()
+    def ncards():
+        return sum(1 for x in picked if x[0] != "THEME")
+    while ncards() < need and any(by_theme.values()):
+        for t in themes:
+            batch = []
+            while by_theme[t] and len(batch) < 4:
+                c = by_theme[t].pop()
+                if c[1] in used_words:
+                    continue
+                used_words.add(c[1])
+                batch.append(c)
+            if batch:
+                picked.append(("THEME", t))
+                picked.extend(batch)
+            if ncards() >= need:
+                break
+    turn = 0
+    pending = None
+    for x in picked:
+        if turn >= need:
+            break
+        if x[0] == "THEME":
+            pending = [P, f"Das Thema ist jetzt: {x[1]}.", f"Le thème est maintenant : {x[1]}."]
+            continue
+        thema, wort, q, qfr, a, afr = x
+        asker, answerer = (S, N) if turn % 2 == 0 else (N, S)
+        a, afr = SIM_T2_PERSONA.get((wort, answerer), (a, afr))
+        lines = []
+        if pending:
+            lines.append(pending)
+            pending = None
+        lines.append([asker, f"Ich habe die Karte „{wort}“ gezogen. {q}", f"J'ai tiré la carte « {wort} ». {qfr}"])
+        lines.append([answerer, a, afr])
+        b.append(lines)
+        turn += 1
+    b.append([[P, "Danke schön. Der Teil zwei ist zu Ende.", "Merci beaucoup. La partie deux est terminée."]])
+    teile.append({"title": "Teil 2 — Fragen und Antworten (Karten)", "blocks": b, "cards": turn})
+
+    # ---------------- TEIL 3 ----------------
+    b = []
+    b.append([[P, "Jetzt kommt der letzte Teil, Teil drei. Sie bekommen Karten mit Bildern.",
+               "Voici la dernière partie, la partie trois. Vous recevez des cartes avec des images."],
+              [P, "Bitten Sie Ihren Partner um etwas oder bitten Sie ihn, etwas zu tun. Ihr Partner reagiert. Herr Sankara, bitte.",
+               "Demandez quelque chose à votre partenaire ou demandez-lui de faire quelque chose. Votre partenaire réagit. Monsieur Sankara, s'il vous plaît."]])
+    deck = random.sample(SIM_T3_CARDS, min(len(SIM_T3_CARDS), cards * 2))
+    for i, (bild, bild_fr, bitte, bitte_fr, rea, rea_fr) in enumerate(deck):
+        asker, answerer = (S, N) if i % 2 == 0 else (N, S)
+        b.append([[asker, f"Auf meiner Karte sehe ich: {bild}. {bitte}", f"Sur ma carte, je vois : {bild_fr}. {bitte_fr}"],
+                  [answerer, rea, rea_fr]])
+    b.append([[P, "Vielen Dank. Die Prüfung ist jetzt zu Ende. Sie bekommen das Ergebnis in zwei Wochen. Auf Wiedersehen!",
+               "Merci beaucoup. L'examen est maintenant terminé. Vous recevrez le résultat dans deux semaines. Au revoir !"],
+              [S, "Vielen Dank. Auf Wiedersehen!", "Merci beaucoup. Au revoir !"],
+              [N, "Danke schön. Auf Wiedersehen!", "Merci beaucoup. Au revoir !"]])
+    teile.append({"title": "Teil 3 — Bitten formulieren (Bildkarten)", "blocks": b, "cards": len(deck)})
+    return {"cards": cards, "teile": teile}
+
+# --- Base de données ---
+def _sim_table(db):
+    db.execute("""CREATE TABLE IF NOT EXISTS sprechen_sims (
+        id TEXT PRIMARY KEY,
+        user_id INTEGER NOT NULL,
+        created_at TEXT NOT NULL,
+        cards INTEGER NOT NULL,
+        data_json TEXT NOT NULL)""")
+
+def _sim_create(user_id, cards):
+    db = get_db()
+    _sim_table(db)
+    sid = secrets.token_hex(8)
+    data = _sim_generate(cards)
+    db.execute("INSERT INTO sprechen_sims(id,user_id,created_at,cards,data_json) VALUES(?,?,?,?,?)",
+               (sid, user_id, datetime.now().strftime("%Y-%m-%d %H:%M"), cards, json.dumps(data, ensure_ascii=False)))
+    old = db.execute("SELECT id FROM sprechen_sims WHERE user_id=? ORDER BY created_at DESC, rowid DESC LIMIT -1 OFFSET 3", (user_id,)).fetchall()
+    for r in old:
+        db.execute("DELETE FROM sprechen_sims WHERE id=?", (r["id"],))
+    db.commit()
+    return sid
+
+def _sim_latest(user_id):
+    db = get_db()
+    _sim_table(db)
+    return db.execute("SELECT * FROM sprechen_sims WHERE user_id=? ORDER BY created_at DESC, rowid DESC LIMIT 1", (user_id,)).fetchone()
+
+def _sim_load(sid, user_id):
+    db = get_db()
+    _sim_table(db)
+    row = db.execute("SELECT * FROM sprechen_sims WHERE id=? AND user_id=?", (sid, user_id)).fetchone()
+    return json.loads(row["data_json"]) if row else None
+
+def _sim_playlists(sid, data):
+    """Playlists de la simulation : avec traduction (+FR) et en allemand seulement (DE)."""
+    out = {}
+    for mode in ("tr", "de"):
+        full = []
+        for ti, teil in enumerate(data["teile"]):
+            items = []
+            for bi, block in enumerate(teil["blocks"]):
+                de = "  ".join(f"{SIM_SPEAKERS[sp]['name']} : {txt}" for sp, txt, _fr in block)
+                fr = "  ".join(f"{SIM_SPEAKERS[sp]['name']} : {frt}" for sp, _t, frt in block) if mode == "tr" else ""
+                items.append({"de": de, "fr": fr, "rate": 1,
+                              "url": url_for("tts_sim", sid=sid, t=ti + 1, b=bi) + ("?tr=1" if mode == "tr" else "?tr=0")})
+            out[f"Sprechen {teil['title'].split(' —')[0]} ({'DE+FR' if mode == 'tr' else 'DE'})"] = items
+            full += items
+        out[f"Sprechen Teil 1+2+3 ({'DE+FR' if mode == 'tr' else 'DE'})"] = full
+    return out
+
+# --- Voix : edge-tts (3 voix différentes), sinon la voix serveur habituelle ---
+def _edge_bytes(text, voice, rate):
+    async def run():
+        com = edge_tts.Communicate(text, voice, rate=rate)
+        data = b""
+        async for chunk in com.stream():
+            if chunk.get("type") == "audio":
+                data += chunk["data"]
+        return data
+    loop = asyncio.new_event_loop()
+    try:
+        return loop.run_until_complete(asyncio.wait_for(run(), timeout=25))
+    finally:
+        loop.close()
+
+def _sim_seg(text, voice, lang):
+    """MP3 d'une réplique avec la voix du personnage (cache sur disque)."""
+    path = os.path.join(TTS_DIR, "sv_" + hashlib.sha1(("v1|" + voice + "|" + text).encode("utf-8")).hexdigest() + ".mp3")
+    if os.path.exists(path):
+        return path
+    if edge_tts is not None and time.time() > _EDGE_COOLDOWN["until"]:
+        try:
+            data = _edge_bytes(text, voice, "-8%" if lang == "de" else "+0%")
+            if len(data) < 500:
+                raise RuntimeError("audio vide")
+            tmp = path + "." + secrets.token_hex(4) + ".tmp"
+            with open(tmp, "wb") as f:
+                f.write(data)
+            os.replace(tmp, path)
+            return path
+        except Exception as e:
+            _EDGE_COOLDOWN["until"] = time.time() + 300
+            _EDGE_COOLDOWN["err"] = str(e)[:200]
+            print("edge-tts indisponible, voix serveur utilisée :", str(e)[:200])
+    return _tts_seg_file(text, lang)
+
+def _sim_block_file(sid, t, b, tr):
+    return os.path.join(TTS_DIR, "sim_" + hashlib.sha1(f"{sid}|{t}|{b}|{tr}".encode()).hexdigest() + ".mp3")
+
+def _sim_build_block(sid, t, b, tr, block):
+    path = _sim_block_file(sid, t, b, tr)
+    if os.path.exists(path):
+        return path
+    os.makedirs(TTS_DIR, exist_ok=True)
+    parts, fmt, secs = [], None, 0.0
+    for sp, de, fr in block:
+        segs = [(_sim_seg(de, SIM_SPEAKERS[sp]["voice"], "de"), 0.55 if tr else 0.75)]
+        if tr:
+            segs.append((_sim_seg(fr, SIM_FR_VOICE, "fr"), 0.85))
+        for seg_path, pause in segs:
+            with open(seg_path, "rb") as f:
+                frames, f_fmt = _mp3_frames(f.read())
+            if not frames or not f_fmt:
+                continue
+            if fmt is None:
+                fmt = f_fmt
+            elif (f_fmt["ver"], f_fmt["sri"], f_fmt["mono"]) != (fmt["ver"], fmt["sri"], fmt["mono"]):
+                continue
+            parts.append(b"".join(frames))
+            sil, n_sil = _mp3_silence(fmt, pause)
+            parts.append(sil)
+            secs += (len(frames) + n_sil) * fmt["samples"] / fmt["sr"]
+    if fmt is None:
+        raise RuntimeError("aucun audio")
+    lead, n_lead = _mp3_silence(fmt, 0.2)
+    data = lead + b"".join(parts)
+    total = secs + n_lead * fmt["samples"] / fmt["sr"]
+    tail = 0.6 + max(0.0, 5.6 - total - 0.6)
+    data += _mp3_silence(fmt, tail)[0]
+    tmp = path + "." + secrets.token_hex(4) + ".tmp"
+    with open(tmp, "wb") as f:
+        f.write(data)
+    os.replace(tmp, path)
+    return path
+
+def _sim_prepare_ahead(sid, data, t, b, tr):
+    nxt = []
+    tt, bb = t, b
+    for _ in range(3):
+        bb += 1
+        if bb >= len(data["teile"][tt - 1]["blocks"]):
+            tt, bb = tt + 1, 0
+            if tt > len(data["teile"]):
+                break
+        nxt.append((tt, bb))
+    todo = [(x, y) for x, y in nxt if not os.path.exists(_sim_block_file(sid, x, y, tr))]
+    if not todo:
+        return
+    def work():
+        for x, y in todo:
+            key = _sim_block_file(sid, x, y, tr)
+            with _tts_ahead_lock:
+                if key in _tts_ahead_busy:
+                    continue
+                _tts_ahead_busy.add(key)
+            try:
+                _sim_build_block(sid, x, y, tr, data["teile"][x - 1]["blocks"][y])
+            except Exception as e:
+                print("Préparation simulation impossible :", str(e)[:200])
+            finally:
+                with _tts_ahead_lock:
+                    _tts_ahead_busy.discard(key)
+    threading.Thread(target=work, daemon=True).start()
+
+@app.route("/tts-sim/<sid>/<int:t>/<int:b>")
+@login_required
+def tts_sim(sid, t, b):
+    if not TTS_OK or not re.fullmatch(r"[0-9a-f]{16}", sid or ""):
+        return ("", 404)
+    data = _sim_load(sid, session["user_id"])
+    if not data or not (1 <= t <= len(data["teile"])) or not (0 <= b < len(data["teile"][t - 1]["blocks"])):
+        return ("", 404)
+    tr = 1 if request.args.get("tr") == "1" else 0
+    path = _sim_block_file(sid, t, b, tr)
+    if not os.path.exists(path):
+        if not _tts_rate_ok(session.get("user_id")):
+            return ("", 429)
+        try:
+            _sim_build_block(sid, t, b, tr, data["teile"][t - 1]["blocks"][b])
+        except Exception as e:
+            print("Simulation audio impossible :", str(e)[:300])
+            return ("", 502)
+        if random.random() < 0.05:
+            _tts_purge()
+    _sim_prepare_ahead(sid, data, t, b, tr)
+    return send_file(path, mimetype="audio/mpeg", conditional=True, max_age=604800)
+
+@app.route("/sprechen-simulation/nouvelle", methods=["POST"])
+@login_required
+def sprechen_sim_new():
+    cards = 10 if request.form.get("cartes") == "10" else 50
+    _sim_create(session["user_id"], cards)
+    flash("🎲 Nouvelle simulation prête : nouvelles questions et nouvelles cartes !", "success")
+    return redirect(url_for("sprechen_sim"))
+
+@app.route("/sprechen-simulation")
+@login_required
+def sprechen_sim():
+    row = _sim_latest(session["user_id"])
+    if not row:
+        _sim_create(session["user_id"], 50)
+        row = _sim_latest(session["user_id"])
+    sid, data = row["id"], json.loads(row["data_json"])
+    pls = _sim_playlists(sid, data)
+    n_lines = sum(len(bl) for t in data["teile"] for bl in t["blocks"])
+    voices_ok = edge_tts is not None
+    cast = ""
+    for key in ("prof", "sankara", "nefertiti"):
+        spk = SIM_SPEAKERS[key]
+        cast += f"""<div class="sim-person" style="--c:{spk['color']}">
+          <div class="sim-avatar">{spk['emoji']}</div>
+          <div><b>{h(spk['name'])}</b><br><small>{h(spk['role'])}</small></div></div>"""
+    teil_html = ""
+    for ti, teil in enumerate(data["teile"]):
+        rows = ""
+        for bi, block in enumerate(teil["blocks"]):
+            lines = ""
+            for sp, de, fr in block:
+                spk = SIM_SPEAKERS[sp]
+                side = " right" if sp == "nefertiti" else (" center" if sp == "prof" else "")
+                lines += f"""<div class="sim-line{side}" style="--c:{spk['color']}">
+                  <div class="sim-who">{spk['emoji']} {h(spk['name'])}</div>
+                  <div class="sim-de">{h(de)}</div><div class="sim-fr">{h(fr)}</div></div>"""
+            rows += f"""<div class="sim-block" id="sim-{ti + 1}-{bi}" data-t="{ti + 1}" data-b="{bi}">
+              <button type="button" class="sim-play" data-t="{ti + 1}" data-b="{bi}" title="Écouter à partir d'ici">▶</button>{lines}</div>"""
+        extra = f" · {teil.get('cards', 0)} cartes" if teil.get("cards") else ""
+        teil_html += f"""
+        <section class="sim-teil" id="teil-{ti + 1}">
+          <div class="sim-teil-head">
+            <div><h2 style="margin:0">{h(teil['title'])}</h2>
+            <small style="color:var(--muted)">{len(teil['blocks'])} échanges{extra}</small></div>
+            <button type="button" class="btn ok sim-listen" data-t="{ti + 1}">▶ Écouter le Teil {ti + 1}</button>
+          </div>
+          {rows}
+        </section>"""
+    if voices_ok:
+        voice_note = "<span>🔊 3 voix différentes : le prüfer, Sankara et Nefertiti</span>"
+    elif session.get("is_admin"):
+        voice_note = "<span>🔊 Admin : ajoute <code>edge-tts</code> dans requirements.txt pour avoir 3 voix différentes.</span>"
+    else:
+        voice_note = ""
+    body = f"""
+    <div class="sim-hero">
+      <div>
+        <h1 style="margin:0">Simulation Sprechen A1 🎤</h1>
+        <p style="margin:6px 0 0 0;opacity:.95">L'épreuve orale du Goethe-Zertifikat A1, jouée en entier : Teil 1, Teil 2 et Teil 3.
+        Écoute, répète à voix haute, puis relance une nouvelle simulation : les questions et les cartes changent à chaque fois.</p>
+      </div>
+      <div class="sim-cast">{cast}</div>
+    </div>
+
+    <div class="card sim-controls">
+      <div class="sim-ctrl-row">
+        <div class="sim-seg" role="group" aria-label="Traduction">
+          <button type="button" data-mode="tr" class="on">🇩🇪 + 🇫🇷 Avec traduction</button>
+          <button type="button" data-mode="de">🇩🇪 Allemand seulement</button>
+        </div>
+        <button type="button" class="btn ok" id="sim-all">▶ Écouter toute l'épreuve</button>
+      </div>
+      <form method="post" action="{url_for('sprechen_sim_new')}" class="sim-ctrl-row">
+        <select name="cartes" aria-label="Nombre de cartes" style="margin:0;max-width:260px;">
+          <option value="50"{" selected" if data['cards'] == 50 else ""}>Version complète : 50 cartes chacun</option>
+          <option value="10"{" selected" if data['cards'] == 10 else ""}>Version courte : 10 cartes chacun</option>
+        </select>
+        <button class="btn" type="submit">🎲 Nouvelle simulation</button>
+      </form>
+      <div class="sim-meta">
+        <span>📅 Créée le {h(row['created_at'])}</span><span>🗣️ {n_lines} répliques</span>
+        <span>🃏 {data['cards']} cartes chacun (Teil 2 et 3)</span>{voice_note}
+      </div>
+      <label class="sim-follow"><input type="checkbox" id="sim-follow" checked> Suivre la lecture dans le texte</label>
+    </div>
+
+    <div class="nk-chips">
+      <a class="nk-chip" href="#teil-1">Teil 1 · Sich vorstellen</a>
+      <a class="nk-chip" href="#teil-2">Teil 2 · Karten</a>
+      <a class="nk-chip" href="#teil-3">Teil 3 · Bitten</a>
+    </div>
+    <div class="card sim-tip">💡 <b>Comment t'entraîner :</b> écoute une réplique, mets en pause (⏸) et réponds à la place de Sankara ou de Nefertiti,
+      puis compare. En mode « Allemand seulement », tu es dans les conditions de l'examen.</div>
+    <div id="sim-script" class="sim-mode-tr">{teil_html}</div>
+    {playlist_data_script({"sprechen": pls})}
+    <script>
+    (function(){{
+      var mode = 'tr';
+      try {{ mode = localStorage.getItem('natho_sim_mode') || 'tr'; }} catch(e) {{}}
+      var script = document.getElementById('sim-script');
+      function key(t){{ return 'Sprechen ' + (t ? 'Teil ' + t : 'Teil 1+2+3') + ' (' + (mode === 'tr' ? 'DE+FR' : 'DE') + ')'; }}
+      function items(t){{ var d = (window.NATHO_PLAYLISTS || {{}}).sprechen || {{}}; return d[key(t)] || []; }}
+      function setMode(m){{
+        mode = m; try {{ localStorage.setItem('natho_sim_mode', m); }} catch(e) {{}}
+        script.className = 'sim-mode-' + m;
+        document.querySelectorAll('.sim-seg button').forEach(function(b){{ b.classList.toggle('on', b.getAttribute('data-mode') === m); }});
+      }}
+      setMode(mode);
+      document.querySelectorAll('.sim-seg button').forEach(function(b){{ b.addEventListener('click', function(){{ setMode(b.getAttribute('data-mode')); }}); }});
+      function play(t, b){{
+        if (!window.NathoAudio) return;
+        NathoAudio.unlock();
+        var all = !t, list = items(t), start = b || 0;
+        if (all) {{ list = items(0); }}
+        NathoAudio.startPlaylist(list, key(t), start);
+      }}
+      document.getElementById('sim-all').addEventListener('click', function(){{ play(0, 0); }});
+      document.querySelectorAll('.sim-listen').forEach(function(btn){{ btn.addEventListener('click', function(){{ play(+btn.getAttribute('data-t'), 0); }}); }});
+      document.querySelectorAll('.sim-play').forEach(function(btn){{ btn.addEventListener('click', function(){{ play(+btn.getAttribute('data-t'), +btn.getAttribute('data-b')); }}); }});
+      // surligne l'échange en cours de lecture
+      var counts = [];
+      document.querySelectorAll('.sim-teil').forEach(function(s){{ counts.push(s.querySelectorAll('.sim-block').length); }});
+      var last = null;
+      setInterval(function(){{
+        if (document.hidden || !window.NathoAudio || !NathoAudio.state) return;
+        var st = NathoAudio.state();
+        if (!st || !st.title || st.title.indexOf('Sprechen ') !== 0) return;
+        var m = st.title.match(/Teil (\\d)\\b/); var t, b;
+        if (st.title.indexOf('1+2+3') > 0) {{
+          var i = st.idx; t = 1;
+          while (t <= counts.length && i >= counts[t - 1]) {{ i -= counts[t - 1]; t++; }}
+          b = i;
+        }} else if (m) {{ t = +m[1]; b = st.idx; }} else return;
+        var el = document.getElementById('sim-' + t + '-' + b);
+        if (el === last) return;
+        if (last) last.classList.remove('playing');
+        last = el;
+        if (el) {{
+          el.classList.add('playing');
+          var f = document.getElementById('sim-follow');
+          if (f && f.checked) el.scrollIntoView({{behavior: 'smooth', block: 'center'}});
+        }}
+      }}, 1000);
+    }})();
+    </script>
+    """
+    return page(layout("Simulation Sprechen", body, {"is_admin": session.get("is_admin")}))
+
 @app.route("/playlists")
 @login_required
 def playlists():
@@ -13009,6 +14174,13 @@ def playlists():
     n_vocab = sum(len(v) for v in playlist_data_vocab.values())
     n_dialogues = sum(len(v) for v in playlist_data_dialogues.values())
 
+    # v5.0 : simulation Sprechen (dernière simulation de l'élève)
+    sim_row = _sim_latest(session["user_id"])
+    if not sim_row:
+        _sim_create(session["user_id"], 50)
+        sim_row = _sim_latest(session["user_id"])
+    playlist_data_sprechen = {k: v for k, v in _sim_playlists(sim_row["id"], json.loads(sim_row["data_json"])).items()
+                              if "1+2+3" not in k}   # l'épreuve complète est recomposée dans le navigateur (page plus légère)
     # v4.9 : 500 verbes, dictionnaire (A à Z) et Guide aussi dans les playlists
     playlist_data_verbes500 = _verbes500_playlists()
     playlist_data_dico = {f"Dictionnaire : lettre {l}": [{"fr": fr, "de": de} for fr, de in DICO_BY_LETTER.get(l, [])]
@@ -13019,6 +14191,7 @@ def playlists():
     n_guide = sum(len(v) for v in playlist_data_guide.values())
 
     js_payload = ({
+        "sprechen": playlist_data_sprechen,
         "verbes500": playlist_data_verbes500,
         "dico": playlist_data_dico,
         "guide": playlist_data_guide,
@@ -13167,6 +14340,15 @@ def playlists():
             {playlist_btn("▶ Lire tout", "all", "kind:guide", css="btn ok")}
         </div>
     """
+    _sim_labels = {"TR": "avec traduction 🇩🇪+🇫🇷", "DE": "allemand seulement 🇩🇪"}
+    cards_sprechen = "".join(
+        _pl_card(t.replace("Sprechen ", "").replace("(DE+FR)", "").replace("(DE)", "").strip() + " — " + _sim_labels["TR" if t.endswith("(DE+FR)") else "DE"],
+                 f"{len(v)} échanges · Sankara, Nefertiti et le prüfer.", "sprechen", t, css="btn ok" if t.endswith("(DE+FR)") else "btn")
+        for t, v in playlist_data_sprechen.items())
+    _n_full = sum(len(v) for k, v in playlist_data_sprechen.items() if k.endswith("(DE+FR)"))
+    cards_sprechen = (_pl_card("Toute l'épreuve (Teil 1+2+3) — avec traduction 🇩🇪+🇫🇷", f"{_n_full} échanges à la suite.", "all", "sprechfull:DE+FR")
+                      + _pl_card("Toute l'épreuve (Teil 1+2+3) — allemand seulement 🇩🇪", f"{_n_full} échanges, comme à l'examen.", "all", "sprechfull:DE", css="btn")
+                      + cards_sprechen)
     cards_verbes500 = "".join(_pl_card(t.replace("500 verbes : ", ""), f"{len(v)} verbes avec leur phrase.", "verbes500", t)
                               for t, v in playlist_data_verbes500.items())
     cards_dico = "".join(_pl_card(t.replace("Dictionnaire : lettre ", "Lettre "), f"{len(v)} mots.", "dico", t)
@@ -13180,6 +14362,9 @@ def playlists():
 
     <h2>🎧 Blocs complets</h2>
     {cards_all}
+
+    <h2 style="margin-top:30px;">🎤 Simulation Sprechen A1 <a href="/sprechen-simulation" style="font-size:14px;">(voir le texte · nouvelle simulation)</a></h2>
+    {cards_sprechen}
 
     <h2 style="margin-top:30px;">🇫🇷🇩🇪 Les 500 verbes du quotidien</h2>
     {cards_verbes500}
@@ -14026,6 +15211,11 @@ def goethe():
                  f'<p>{"✔ Bestanden" if ok else "✘ Nicht bestanden"} — Durchschnitt Ihrer letzten Ergebnisse in den vier Modulen.</p></div>')
     body = f"""{GX_CSS}
     <h1>Modellprüfung Goethe-Zertifikat A1</h1>
+    <div class="card sim-goethe-card">
+      <div><h3 style="margin:0">🎤 Simulation Sprechen</h3>
+      <p style="margin:4px 0 0 0;color:var(--muted);">Hören Sie eine komplette mündliche Prüfung mit Sankara und Nefertiti: Teil 1, 2 und 3 — jedes Mal mit neuen Fragen und Karten.</p></div>
+      <a href="/sprechen-simulation" class="btn ok">Zur Simulation</a>
+    </div>
     <p style="margin-bottom:20px;color:var(--muted);">Start Deutsch 1 — Die Prüfung hat vier Module: Hören, Lesen, Schreiben und Sprechen.
     Jedes Modul hat 100 Punkte. Sie bekommen Ihr Ergebnis in Prozent. Bestanden ab {GX_PASS} %. Bei jeder neuen Prüfung bekommen Sie andere Aufgaben.</p>
     {total}
@@ -14643,6 +15833,8 @@ def compte_supprimer():
         return redirect(url_for("compte"))
     for table in ("progress", "goethe_exam", "neferti_memory", "neferti_history", "neferti_asked"):
         db.execute(f"DELETE FROM {table} WHERE user_id=?", (uid,))
+    _sim_table(db)
+    db.execute("DELETE FROM sprechen_sims WHERE user_id=?", (uid,))
     db.execute("DELETE FROM users WHERE id=?", (uid,))
     db.commit()
     session.clear()
