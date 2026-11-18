@@ -4,6 +4,7 @@
 # + Apprendre à parler + Essentiels A1 + Mode nuit + Menu mobile
 # + NOM/AKK (Nominativ vs Akkusativ) + NEFERTI (bot Sprechen)
 # v4.1 : correctifs (sécurité, playlists, progression, Goethe, Neferti, contenu)
+# v4.8 : écran éteint — chaque élément de playlist est un MP3 assemblé par le serveur (préparé à l'avance), plus rien à calculer sur le téléphone
 # v4.7 : lecture en arrière-plan fiable (voix serveur intégrée sans gTTS, un fichier audio de 5,5 s+ par élément pour les commandes de l'écran de verrouillage), test de la voix dans l'admin
 # v4.6 : écoute écran éteint (lecteur type Spotify + barre de défilement), dictionnaire FR→DE de 3000+ mots, installation directe de l'app, CSS mobile
 # v4.5 : bouton « Télécharger l'app » (APK Android) + page « 500 verbes » français → allemand
@@ -21,6 +22,7 @@ import random
 import re
 import stat
 import hmac
+import threading
 import unicodedata
 import base64
 import time
@@ -5669,6 +5671,11 @@ AUDIO_JS = r"""
       auHooked = true;
       // la barre avance pendant la lecture (aussi écran éteint, pour l'écran de verrouillage)
       au.addEventListener('timeupdate', function () { updSeek(false); });
+      au.addEventListener('loadedmetadata', function () {
+        if (itemMode && isFinite(au.duration) && au.duration > 0) {
+          itemDur = au.duration / ITEM_RATE; fixDur(idx, itemDur); updSeek(true);
+        }
+      });
       // le téléphone a mis en pause (appel, casque débranché…) : on synchronise l'état
       au.addEventListener('pause', function () {
         setTimeout(function () {
@@ -5702,7 +5709,7 @@ AUDIO_JS = r"""
     return silCache[ms];
   }
 
-  function playUrl(url, rate) {
+  function playUrl(url, rate, wdMs) {
     return new Promise(function (resolve) {
       var a = getAudio();
       var finished = false;
@@ -5731,7 +5738,7 @@ AUDIO_JS = r"""
       a.addEventListener('playing', onPlaying);
       wd = setTimeout(function () {
         if (!started) { try { a.pause(); } catch (e) {} done(false); }
-      }, 20000);
+      }, wdMs || 20000);
       try {
         a.src = url;
         a.defaultPlaybackRate = rate;
@@ -5790,88 +5797,27 @@ AUDIO_JS = r"""
 
   function el(id) { return document.getElementById(id); }
 
-  // ===== v4.7 : un seul fichier audio par élément (français + pause + allemand + pause) =====
-  // Chrome n'affiche les commandes « musique » (écran de verrouillage, notification) et ne garde la
-  // lecture en arrière-plan que pour des sons de plus de 5 secondes : chaque élément est donc assemblé
-  // en un seul fichier de 5,5 s minimum.
-  var ITEM_RATE = 0.93;
-  var DE_STRETCH = 0.92;
-  var MIX_SR = 24000;
-  var itemCache = {};
+  // ===== v4.8 : un fichier audio par élément, assemblé par le SERVEUR =====
+  // Écran éteint, le téléphone n'exécute presque plus le JavaScript : le lecteur charge lui-même
+  // /tts-item (français + pause + allemand + pause, 5,6 s mini) et le serveur prépare les suivants.
+  var ITEM_RATE = 0.9;
   var itemMode = false;
   var itemDur = 0;
   var warnedNoServerVoice = false;
-
-  function canMix() {
-    return !!(window.OfflineAudioContext || window.webkitOfflineAudioContext) && !!window.fetch && !!window.Blob;
+  function enc(s) { return encodeURIComponent(s || ''); }
+  function itemUrl(i) {
+    var it = list[i];
+    var u = '/tts-item?fr=' + enc(it.fr) + '&de=' + enc(it.de);
+    for (var k = 1; k <= 2; k++) {
+      var nx = list[i + k];
+      if (nx) u += '&nfr' + k + '=' + enc(nx.fr) + '&nde' + k + '=' + enc(nx.de);
+    }
+    return u;
   }
-  function fetchBuf(text, lang) {
-    return fetch('/tts?lang=' + lang + '&text=' + encodeURIComponent(text), { credentials: 'same-origin' })
-      .then(function (r) { if (!r.ok) throw new Error('tts ' + r.status); return r.arrayBuffer(); });
-  }
-  function decodeAt(buf, rate) {
-    var C = window.OfflineAudioContext || window.webkitOfflineAudioContext;
-    var c = new C(1, 2, rate);
-    return new Promise(function (res, rej) {
-      var p = c.decodeAudioData(buf, res, rej);
-      if (p && p.then) p.then(res, rej);
-    });
-  }
-  function monoData(ab) {
-    var a = ab.getChannelData(0);
-    if (ab.numberOfChannels < 2) return a;
-    var b = ab.getChannelData(1), o = new Float32Array(ab.length);
-    for (var i = 0; i < o.length; i++) o[i] = (a[i] + b[i]) / 2;
-    return o;
-  }
-  function buildItem(it) {
-    return Promise.all([
-      fetchBuf(it.fr, 'fr').then(function (b) { return decodeAt(b, MIX_SR); }),
-      fetchBuf(it.de, 'de').then(function (b) { return decodeAt(b, Math.round(MIX_SR / DE_STRETCH)); })
-    ]).then(function (r) {
-      var fr = monoData(r[0]), de = monoData(r[1]);
-      var lead = Math.round(0.15 * MIX_SR);
-      var g1 = Math.round(GAP_FR_DE / 1000 * MIX_SR);
-      var g2 = Math.round(GAP_NEXT / 1000 * MIX_SR);
-      var n = lead + fr.length + g1 + de.length + g2;
-      var minN = Math.ceil(5.6 * MIX_SR * ITEM_RATE);
-      if (n < minN) { g2 += minN - n; n = minN; }
-      var buf = new ArrayBuffer(44 + n * 2);
-      var v = new DataView(buf);
-      function ws(o, s) { for (var i = 0; i < s.length; i++) v.setUint8(o + i, s.charCodeAt(i)); }
-      ws(0, 'RIFF'); v.setUint32(4, 36 + n * 2, true); ws(8, 'WAVE'); ws(12, 'fmt ');
-      v.setUint32(16, 16, true); v.setUint16(20, 1, true); v.setUint16(22, 1, true);
-      v.setUint32(24, MIX_SR, true); v.setUint32(28, MIX_SR * 2, true);
-      v.setUint16(32, 2, true); v.setUint16(34, 16, true);
-      ws(36, 'data'); v.setUint32(40, n * 2, true);
-      var off = 44 + lead * 2;
-      function put(arr) {
-        for (var i = 0; i < arr.length; i++) {
-          var s = arr[i]; if (s > 1) s = 1; else if (s < -1) s = -1;
-          v.setInt16(off, s < 0 ? s * 0x8000 : s * 0x7FFF, true); off += 2;
-        }
-      }
-      put(fr); off += g1 * 2; put(de);
-      return { url: URL.createObjectURL(new Blob([buf], { type: 'audio/wav' })), dur: n / MIX_SR / ITEM_RATE };
-    });
-  }
-  function getItem(i) {
-    if (i < 0 || i >= list.length) return Promise.resolve(null);
-    if (!itemCache[i]) itemCache[i] = buildItem(list[i]).catch(function () { return null; });
-    return itemCache[i];
-  }
-  function prefetchItem(i) { if (i < list.length && useMp3() && canMix()) getItem(i); }
-  function dropItem(k) {
-    var p = itemCache[k];
-    delete itemCache[k];
-    if (p) p.then(function (r) { if (r && r.url) { try { URL.revokeObjectURL(r.url); } catch (e) {} } });
-  }
-  function clearItems() { Object.keys(itemCache).forEach(function (k) { dropItem(k); }); }
-  function trimItems() {
-    Object.keys(itemCache).forEach(function (k) { if (+k < idx - 1 || +k > idx + 3) dropItem(k); });
-  }
+  function clearItems() {}
+  function trimItems() {}
   function fixDur(i, d) {
-    if (cum.length !== list.length + 1) return;
+    if (cum.length !== list.length + 1 || !isFinite(d) || d <= 0) return;
     var diff = d - (cum[i + 1] - cum[i]);
     if (Math.abs(diff) < 0.05) return;
     for (var k = i + 1; k < cum.length; k++) cum[k] += diff;
@@ -6080,19 +6026,14 @@ AUDIO_JS = r"""
       phase = 0;
       updSeek(true);
       trimItems();
-      if (useMp3() && canMix()) {
+      if (useMp3()) {
         curMode = 'mp3';
-        var r = await getItem(idx);
+        itemMode = true; itemDur = cum[idx + 1] - cum[idx];
+        var okItem = await playUrl(itemUrl(idx), ITEM_RATE, 45000);
+        itemMode = false;
         if (my !== token) return;
-        prefetchItem(idx + 1);
-        if (r) {
-          itemMode = true; itemDur = r.dur; fixDur(idx, r.dur);
-          updSeek(true);
-          var okItem = await playUrl(r.url, ITEM_RATE);
-          itemMode = false;
-          if (my !== token) return;
-          if (okItem) { ttsFails = 0; idx++; continue; }
-        } else {
+        if (okItem) { ttsFails = 0; idx++; continue; }
+        {
           ttsFails++;
           if (!warnedNoServerVoice) {
             warnedNoServerVoice = true;
@@ -6672,7 +6613,7 @@ def layout(title, body, user=None):
 <audio id="natho-audio" preload="auto" playsinline></audio>
 
 <footer>
-    © NATHO — Plateforme d'apprentissage de l'allemand A1 · v4.7<br>
+    © NATHO — Plateforme d'apprentissage de l'allemand A1 · v4.8<br>
     <a href="/politique">Politique de confidentialité</a> |
     <a href="/cgu">Conditions d'utilisation</a> |
     <a href="/mentions">Mentions légales</a>
@@ -6852,6 +6793,168 @@ def admin_tts_test():
     body = f"""<h1>Test de la voix serveur</h1><div class="card">{''.join(results)}{advice}
     <a class="btn ghost" href="{url_for('admin')}#voix">← Retour à l'admin</a></div>"""
     return page(layout("Test voix", body, {"is_admin": True}))
+
+
+# ---------------------------------------------------------
+# v4.8 : UN FICHIER MP3 PAR ÉLÉMENT DE PLAYLIST, ASSEMBLÉ PAR LE SERVEUR
+# (français + pause + allemand + pause, 5,6 s minimum).
+# Écran éteint, le téléphone n'exécute presque plus le JavaScript : le lecteur charge donc lui-même
+# des fichiers prêts à l'emploi, et le serveur prépare toujours l'élément suivant à l'avance.
+# ---------------------------------------------------------
+_MP3_BR = {1: [0, 32, 40, 48, 56, 64, 80, 96, 112, 128, 160, 192, 224, 256, 320],
+           2: [0, 8, 16, 24, 32, 40, 48, 56, 64, 80, 96, 112, 128, 144, 160]}
+_MP3_SR = {3: [44100, 48000, 32000], 2: [22050, 24000, 16000], 0: [11025, 12000, 8000]}
+
+def _mp3_header(b, i):
+    if i + 4 > len(b) or b[i] != 0xFF or (b[i + 1] & 0xE0) != 0xE0:
+        return None
+    ver = (b[i + 1] >> 3) & 3          # 3 = MPEG-1, 2 = MPEG-2, 0 = MPEG-2.5
+    layer = (b[i + 1] >> 1) & 3        # 1 = Layer III
+    bri = (b[i + 2] >> 4) & 15
+    sri = (b[i + 2] >> 2) & 3
+    pad = (b[i + 2] >> 1) & 1
+    mono = ((b[i + 3] >> 6) & 3) == 3
+    if ver == 1 or layer != 1 or bri in (0, 15) or sri == 3:
+        return None
+    br = _MP3_BR[1 if ver == 3 else 2][bri] * 1000
+    sr = _MP3_SR[ver][sri]
+    size = (144 if ver == 3 else 72) * br // sr + pad
+    samples = 1152 if ver == 3 else 576
+    side = (17 if mono else 32) if ver == 3 else (9 if mono else 17)
+    return {"ver": ver, "bri": bri, "sri": sri, "mono": mono, "size": size, "samples": samples, "sr": sr, "side": side,
+            "h": bytes(b[i:i + 4])}
+
+def _mp3_frames(data):
+    """Renvoie (liste des trames audio, format) ; supprime les balises ID3 et les trames Xing/Info/VBRI."""
+    b = data
+    if b[:3] == b"ID3" and len(b) > 10:
+        b = b[10 + ((b[6] & 127) << 21 | (b[7] & 127) << 14 | (b[8] & 127) << 7 | (b[9] & 127)):]
+    if len(b) >= 128 and b[-128:-125] == b"TAG":
+        b = b[:-128]
+    frames, fmt, i = [], None, 0
+    while i < len(b) - 4:
+        hd = _mp3_header(b, i)
+        if not hd or i + hd["size"] > len(b):
+            i += 1
+            continue
+        fr = bytes(b[i:i + hd["size"]])
+        if not frames and (b"Xing" in fr[:64] or b"Info" in fr[:64] or b"VBRI" in fr[:64]):
+            i += hd["size"]
+            continue
+        if fmt is None:
+            fmt = hd
+        elif (hd["ver"], hd["sri"], hd["mono"]) != (fmt["ver"], fmt["sri"], fmt["mono"]):
+            i += hd["size"]
+            continue
+        frames.append(fr)
+        i += hd["size"]
+    return frames, fmt
+
+def _mp3_silence(fmt, seconds):
+    """Trames MP3 silencieuses au même format que la voix."""
+    h0 = fmt["h"]
+    hdr = bytes([h0[0], h0[1] | 0x01, h0[2] & 0xFD, h0[3]])   # sans CRC, sans octet de bourrage
+    size = (144 if fmt["ver"] == 3 else 72) * _MP3_BR[1 if fmt["ver"] == 3 else 2][fmt["bri"]] * 1000 // fmt["sr"]
+    frame = hdr + bytes(size - 4)
+    n = max(1, int(round(seconds * fmt["sr"] / fmt["samples"])))
+    return frame * n, n
+
+def _tts_seg_file(text, lang):
+    path = os.path.join(TTS_DIR, hashlib.sha1((lang + "|" + text).encode("utf-8")).hexdigest() + ".mp3")
+    if not os.path.exists(path):
+        _tts_generate(text, lang, path)
+    return path
+
+def _tts_item_file(fr, de):
+    return os.path.join(TTS_DIR, "item_" + hashlib.sha1(("item2|" + fr + "|" + de).encode("utf-8")).hexdigest() + ".mp3")
+
+def _tts_build_item(fr, de):
+    path = _tts_item_file(fr, de)
+    if os.path.exists(path):
+        return path
+    os.makedirs(TTS_DIR, exist_ok=True)
+    with open(_tts_seg_file(fr, "fr"), "rb") as f:
+        fr_frames, fmt = _mp3_frames(f.read())
+    with open(_tts_seg_file(de, "de"), "rb") as f:
+        de_frames, fmt2 = _mp3_frames(f.read())
+    if not fmt or not fmt2 or not fr_frames or not de_frames:
+        raise RuntimeError("MP3 illisible")
+    if (fmt["ver"], fmt["sri"], fmt["mono"]) != (fmt2["ver"], fmt2["sri"], fmt2["mono"]):
+        raise RuntimeError("formats MP3 différents")
+    lead, n_lead = _mp3_silence(fmt, 0.15)
+    gap1, n_gap1 = _mp3_silence(fmt, 1.2)
+    tail_sec = 2.5
+    n_total = n_lead + len(fr_frames) + n_gap1 + len(de_frames)
+    total_sec = n_total * fmt["samples"] / fmt["sr"] + tail_sec
+    if total_sec < 5.6:
+        tail_sec += 5.6 - total_sec
+    tail, _n = _mp3_silence(fmt, tail_sec)
+    data = lead + b"".join(fr_frames) + gap1 + b"".join(de_frames) + tail
+    tmp = path + "." + secrets.token_hex(4) + ".tmp"
+    try:
+        with open(tmp, "wb") as f:
+            f.write(data)
+        os.replace(tmp, path)
+    finally:
+        try:
+            os.remove(tmp)
+        except OSError:
+            pass
+    return path
+
+_tts_ahead_lock = threading.Lock()
+_tts_ahead_busy = set()
+
+def _tts_prepare_ahead(pairs):
+    """Prépare en arrière-plan les éléments suivants de la playlist (le téléphone n'a rien à faire)."""
+    todo = [(fr, de) for fr, de in pairs if fr and de and not os.path.exists(_tts_item_file(fr, de))]
+    if not todo:
+        return
+    def work():
+        for fr, de in todo:
+            key = _tts_item_file(fr, de)
+            with _tts_ahead_lock:
+                if key in _tts_ahead_busy:
+                    continue
+                _tts_ahead_busy.add(key)
+            try:
+                _tts_build_item(fr, de)
+            except Exception as e:
+                print("Préparation audio impossible :", str(e)[:200])
+            finally:
+                with _tts_ahead_lock:
+                    _tts_ahead_busy.discard(key)
+    threading.Thread(target=work, daemon=True).start()
+
+@app.route("/tts-item")
+@login_required
+def tts_item():
+    if not TTS_OK:
+        return ("", 404)
+    fr = re.sub(r"\s+", " ", request.args.get("fr", "")).strip()[:300]
+    de = re.sub(r"\s+", " ", request.args.get("de", "")).strip()[:300]
+    if not fr or not de:
+        return ("", 400)
+    path = _tts_item_file(fr, de)
+    if not os.path.exists(path):
+        if not _tts_rate_ok(session.get("user_id")):
+            return ("", 429)
+        try:
+            _tts_build_item(fr, de)
+        except Exception as e:
+            print("Élément audio impossible :", str(e)[:300])
+            return ("", 502)
+        if random.random() < 0.05:
+            _tts_purge()
+    ahead = []
+    for k in ("1", "2"):
+        nfr = re.sub(r"\s+", " ", request.args.get("nfr" + k, "")).strip()[:300]
+        nde = re.sub(r"\s+", " ", request.args.get("nde" + k, "")).strip()[:300]
+        if nfr and nde:
+            ahead.append((nfr, nde))
+    if ahead and _tts_rate_ok(session.get("user_id")):
+        _tts_prepare_ahead(ahead)
+    return send_file(path, mimetype="audio/mpeg", conditional=True, max_age=604800)
 
 @app.route("/tts")
 @login_required
