@@ -4,6 +4,7 @@
 # + Apprendre à parler + Essentiels A1 + Mode nuit + Menu mobile
 # + NOM/AKK (Nominativ vs Akkusativ) + NEFERTI (bot Sprechen)
 # v4.1 : correctifs (sécurité, playlists, progression, Goethe, Neferti, contenu)
+# v4.7 : lecture en arrière-plan fiable (voix serveur intégrée sans gTTS, un fichier audio de 5,5 s+ par élément pour les commandes de l'écran de verrouillage), test de la voix dans l'admin
 # v4.6 : écoute écran éteint (lecteur type Spotify + barre de défilement), dictionnaire FR→DE de 3000+ mots, installation directe de l'app, CSS mobile
 # v4.5 : bouton « Télécharger l'app » (APK Android) + page « 500 verbes » français → allemand
 # v4.4 : examen Goethe A1 refait (Hören 3 Teile, Lesen 4, Schreiben 2, Sprechen 3), tout en allemand, noté sur 100
@@ -35,10 +36,10 @@ from flask import (Flask, request, session, redirect, url_for,
 
 try:
     from gtts import gTTS
-    TTS_OK = True
 except Exception:
     gTTS = None
-    TTS_OK = False
+# v4.7 : la voix serveur marche même sans gTTS (voix intégrée). NATHO_TTS=off pour la couper.
+TTS_OK = os.environ.get("NATHO_TTS", "").strip().lower() != "off"
 
 # ---------------------------------------------------------
 # CONFIG
@@ -5789,6 +5790,100 @@ AUDIO_JS = r"""
 
   function el(id) { return document.getElementById(id); }
 
+  // ===== v4.7 : un seul fichier audio par élément (français + pause + allemand + pause) =====
+  // Chrome n'affiche les commandes « musique » (écran de verrouillage, notification) et ne garde la
+  // lecture en arrière-plan que pour des sons de plus de 5 secondes : chaque élément est donc assemblé
+  // en un seul fichier de 5,5 s minimum.
+  var ITEM_RATE = 0.93;
+  var DE_STRETCH = 0.92;
+  var MIX_SR = 24000;
+  var itemCache = {};
+  var itemMode = false;
+  var itemDur = 0;
+  var warnedNoServerVoice = false;
+
+  function canMix() {
+    return !!(window.OfflineAudioContext || window.webkitOfflineAudioContext) && !!window.fetch && !!window.Blob;
+  }
+  function fetchBuf(text, lang) {
+    return fetch('/tts?lang=' + lang + '&text=' + encodeURIComponent(text), { credentials: 'same-origin' })
+      .then(function (r) { if (!r.ok) throw new Error('tts ' + r.status); return r.arrayBuffer(); });
+  }
+  function decodeAt(buf, rate) {
+    var C = window.OfflineAudioContext || window.webkitOfflineAudioContext;
+    var c = new C(1, 2, rate);
+    return new Promise(function (res, rej) {
+      var p = c.decodeAudioData(buf, res, rej);
+      if (p && p.then) p.then(res, rej);
+    });
+  }
+  function monoData(ab) {
+    var a = ab.getChannelData(0);
+    if (ab.numberOfChannels < 2) return a;
+    var b = ab.getChannelData(1), o = new Float32Array(ab.length);
+    for (var i = 0; i < o.length; i++) o[i] = (a[i] + b[i]) / 2;
+    return o;
+  }
+  function buildItem(it) {
+    return Promise.all([
+      fetchBuf(it.fr, 'fr').then(function (b) { return decodeAt(b, MIX_SR); }),
+      fetchBuf(it.de, 'de').then(function (b) { return decodeAt(b, Math.round(MIX_SR / DE_STRETCH)); })
+    ]).then(function (r) {
+      var fr = monoData(r[0]), de = monoData(r[1]);
+      var lead = Math.round(0.15 * MIX_SR);
+      var g1 = Math.round(GAP_FR_DE / 1000 * MIX_SR);
+      var g2 = Math.round(GAP_NEXT / 1000 * MIX_SR);
+      var n = lead + fr.length + g1 + de.length + g2;
+      var minN = Math.ceil(5.6 * MIX_SR * ITEM_RATE);
+      if (n < minN) { g2 += minN - n; n = minN; }
+      var buf = new ArrayBuffer(44 + n * 2);
+      var v = new DataView(buf);
+      function ws(o, s) { for (var i = 0; i < s.length; i++) v.setUint8(o + i, s.charCodeAt(i)); }
+      ws(0, 'RIFF'); v.setUint32(4, 36 + n * 2, true); ws(8, 'WAVE'); ws(12, 'fmt ');
+      v.setUint32(16, 16, true); v.setUint16(20, 1, true); v.setUint16(22, 1, true);
+      v.setUint32(24, MIX_SR, true); v.setUint32(28, MIX_SR * 2, true);
+      v.setUint16(32, 2, true); v.setUint16(34, 16, true);
+      ws(36, 'data'); v.setUint32(40, n * 2, true);
+      var off = 44 + lead * 2;
+      function put(arr) {
+        for (var i = 0; i < arr.length; i++) {
+          var s = arr[i]; if (s > 1) s = 1; else if (s < -1) s = -1;
+          v.setInt16(off, s < 0 ? s * 0x8000 : s * 0x7FFF, true); off += 2;
+        }
+      }
+      put(fr); off += g1 * 2; put(de);
+      return { url: URL.createObjectURL(new Blob([buf], { type: 'audio/wav' })), dur: n / MIX_SR / ITEM_RATE };
+    });
+  }
+  function getItem(i) {
+    if (i < 0 || i >= list.length) return Promise.resolve(null);
+    if (!itemCache[i]) itemCache[i] = buildItem(list[i]).catch(function () { return null; });
+    return itemCache[i];
+  }
+  function prefetchItem(i) { if (i < list.length && useMp3() && canMix()) getItem(i); }
+  function dropItem(k) {
+    var p = itemCache[k];
+    delete itemCache[k];
+    if (p) p.then(function (r) { if (r && r.url) { try { URL.revokeObjectURL(r.url); } catch (e) {} } });
+  }
+  function clearItems() { Object.keys(itemCache).forEach(function (k) { dropItem(k); }); }
+  function trimItems() {
+    Object.keys(itemCache).forEach(function (k) { if (+k < idx - 1 || +k > idx + 3) dropItem(k); });
+  }
+  function fixDur(i, d) {
+    if (cum.length !== list.length + 1) return;
+    var diff = d - (cum[i + 1] - cum[i]);
+    if (Math.abs(diff) < 0.05) return;
+    for (var k = i + 1; k < cum.length; k++) cum[k] += diff;
+  }
+  function unlockAudio() {
+    // débloque la lecture sur iPhone (doit se faire pendant le clic)
+    try {
+      var a = getAudio();
+      if (a.paused && !list.length) { a.src = silenceUrl(120); var p = a.play(); if (p && p.catch) p.catch(function () {}); }
+    } catch (e) {}
+  }
+
   // --- Barre de défilement : durée estimée de chaque élément de la playlist ---
   function estSeg(t, isDe) { return 0.6 + (t ? t.length : 0) * (isDe ? 0.085 / MP3_RATE_DE : 0.07); }
   function phaseLens(it) { return [estSeg(it.fr, false), GAP_FR_DE / 1000, estSeg(it.de, true), GAP_NEXT / 1000]; }
@@ -5806,6 +5901,7 @@ AUDIO_JS = r"""
     var start = 0;
     for (var k = 0; k < phase; k++) start += p[k];
     var t = (curMode === 'mp3' && au && isFinite(au.currentTime)) ? au.currentTime : 0;
+    if (itemMode) return Math.min(cum[idx + 1] - 0.05, cum[idx] + Math.min(t / ITEM_RATE, itemDur));
     return Math.min(cum[idx + 1] - 0.05, cum[idx] + start + Math.min(t, p[phase] + 3));
   }
   function fmt(s) {
@@ -5983,6 +6079,27 @@ AUDIO_JS = r"""
       setMedia(it);
       phase = 0;
       updSeek(true);
+      trimItems();
+      if (useMp3() && canMix()) {
+        curMode = 'mp3';
+        var r = await getItem(idx);
+        if (my !== token) return;
+        prefetchItem(idx + 1);
+        if (r) {
+          itemMode = true; itemDur = r.dur; fixDur(idx, r.dur);
+          updSeek(true);
+          var okItem = await playUrl(r.url, ITEM_RATE);
+          itemMode = false;
+          if (my !== token) return;
+          if (okItem) { ttsFails = 0; idx++; continue; }
+        } else {
+          ttsFails++;
+          if (!warnedNoServerVoice) {
+            warnedNoServerVoice = true;
+            toast("⚠️ La voix du serveur ne répond pas : la lecture continue avec la voix du téléphone, qui s'arrête écran éteint.");
+          }
+        }
+      }
       prefetch(idx + 1);
       await seg(it.fr, 'fr', my);
       if (my !== token) return;
@@ -6001,11 +6118,16 @@ AUDIO_JS = r"""
   }
 
   async function startPlaylist(items, title) {
+    if (!useMp3() && !warnedNoServerVoice) {
+      warnedNoServerVoice = true;
+      toast("⚠️ Voix du serveur indisponible : la lecture utilisera la voix du téléphone et s'arrêtera si l'écran s'éteint.");
+    }
     if (!useMp3() && !ensure()) return;
     if (!items || !items.length) { toast("La playlist est vide."); return; }
     ttsFails = 0;
     var my = await begin();
     if (my !== token) return;
+    clearItems();
     list = items;
     idx = 0;
     listTitle = title || '';
@@ -6054,6 +6176,7 @@ AUDIO_JS = r"""
     ttsFails = 0;
     var my = await begin();
     if (my !== token) return;
+    clearItems();
     list = items;
     idx = Math.min(i, items.length - 1);
     listTitle = title;
@@ -6064,6 +6187,8 @@ AUDIO_JS = r"""
 
   function stopPlaylist() {
     token++;
+    clearItems();
+    itemMode = false;
     list = [];
     idx = 0;
     listTitle = '';
@@ -6171,7 +6296,7 @@ AUDIO_JS = r"""
       if (mode === 'pair') speakPair(fr, de);
       else if (mode === 'de') speak(de, 'de-DE');
       else if (mode === 'fr') speak(fr, 'fr-FR');
-      else if (mode === 'playlist') startPlaylistByKey(b.getAttribute('data-kind'), b.getAttribute('data-key'));
+      else if (mode === 'playlist') { unlockAudio(); startPlaylistByKey(b.getAttribute('data-kind'), b.getAttribute('data-key')); }
       return;
     }
     var a = t && t.closest ? t.closest('a[href]') : null;
@@ -6224,7 +6349,8 @@ AUDIO_JS = r"""
     resume: resumePlaylist,
     togglePause: togglePause,
     prev: function () { jump(-1); },
-    next: function () { jump(1); }
+    next: function () { jump(1); },
+    unlock: unlockAudio
   };
   window.speak = speak;
   window.speakPair = speakPair;
@@ -6522,7 +6648,7 @@ def layout(title, body, user=None):
   <div class="gp-top">
     <div class="info"><span id="gp-count">En cours de lecture...</span><small id="gp-text">En attente</small></div>
     <div class="gp-ctrl">
-      <button type="button" class="gp-btn" id="gp-resume" style="display:none" onclick="NathoAudio.resume()">▶ Reprendre</button>
+      <button type="button" class="gp-btn" id="gp-resume" style="display:none" onclick="NathoAudio.unlock();NathoAudio.resume()">▶ Reprendre</button>
       <button type="button" class="gp-btn" onclick="NathoAudio.prev()" title="Précédent">⏮</button>
       <button type="button" class="gp-btn" id="gp-pause" onclick="NathoAudio.togglePause()" title="Pause / Lecture">⏸</button>
       <button type="button" class="gp-btn" onclick="NathoAudio.next()" title="Suivant">⏭</button>
@@ -6546,7 +6672,7 @@ def layout(title, body, user=None):
 <audio id="natho-audio" preload="auto" playsinline></audio>
 
 <footer>
-    © NATHO — Plateforme d'apprentissage de l'allemand A1 · v4.6<br>
+    © NATHO — Plateforme d'apprentissage de l'allemand A1 · v4.7<br>
     <a href="/politique">Politique de confidentialité</a> |
     <a href="/cgu">Conditions d'utilisation</a> |
     <a href="/mentions">Mentions légales</a>
@@ -6605,6 +6731,128 @@ def _tts_purge():
     except Exception:
         pass
 
+
+# ---------------------------------------------------------
+# v4.7 : VOIX SERVEUR INTÉGRÉE (sans dépendance) — utilisée si gTTS n'est pas installé ou échoue.
+# La lecture écran éteint / application en arrière-plan a besoin de ces fichiers audio.
+# ---------------------------------------------------------
+import urllib.request
+import urllib.parse
+
+_GTTS_RPC_URL = "https://translate.google.com/_/TranslateWebserverUi/data/batchexecute"
+
+def _tts_chunks(text, maxlen=100):
+    """Découpe le texte en morceaux de 100 caractères max (limite du service), aux ponctuations puis aux espaces."""
+    text = re.sub(r"\s+", " ", text).strip()
+    out = []
+    while len(text) > maxlen:
+        cut = -1
+        for sep in (". ", "! ", "? ", "; ", ": ", ", ", " "):
+            k = text.rfind(sep, 0, maxlen)
+            if k > 0:
+                cut = k + len(sep.rstrip())
+                break
+        if cut <= 0:
+            cut = maxlen
+        out.append(text[:cut].strip())
+        text = text[cut:].strip()
+    if text:
+        out.append(text)
+    return out
+
+def _builtin_tts_bytes(text, lang):
+    audio = b""
+    for part in _tts_chunks(text):
+        param = json.dumps([part, lang, None, "null"], separators=(",", ":"))
+        rpc = json.dumps([[["jQ1olc", param, None, "generic"]]], separators=(",", ":"))
+        body = ("f.req=" + urllib.parse.quote(rpc) + "&").encode("utf-8")
+        req = urllib.request.Request(_GTTS_RPC_URL, data=body, method="POST", headers={
+            "Content-Type": "application/x-www-form-urlencoded;charset=utf-8",
+            "Referer": "https://translate.google.com/",
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36",
+        })
+        with urllib.request.urlopen(req, timeout=15) as resp:
+            raw = resp.read().decode("utf-8", "replace")
+        found = False
+        for line in raw.splitlines():
+            if "jQ1olc" in line:
+                m = re.search(r'jQ1olc","\[\\"(.*?)\\"]', line)
+                if m:
+                    audio += base64.b64decode(m.group(1))
+                    found = True
+                    break
+        if not found:
+            raise RuntimeError("réponse vocale vide")
+    if len(audio) < 200:
+        raise RuntimeError("audio trop court")
+    return audio
+
+def _tts_generate(text, lang, path):
+    """Crée le MP3 : gTTS s'il est installé, sinon (ou s'il échoue) la voix intégrée."""
+    tmp = path + "." + secrets.token_hex(4) + ".tmp"
+    errors = []
+    try:
+        if gTTS is not None:
+            try:
+                try:
+                    tts_obj = gTTS(text=text, lang=lang, timeout=15)
+                except TypeError:
+                    tts_obj = gTTS(text=text, lang=lang)
+                tts_obj.save(tmp)
+                os.replace(tmp, path)
+                return "gtts"
+            except Exception as e:
+                errors.append("gTTS : %s" % e)
+        try:
+            data = _builtin_tts_bytes(text, lang)
+            with open(tmp, "wb") as f:
+                f.write(data)
+            os.replace(tmp, path)
+            return "builtin"
+        except Exception as e:
+            errors.append("voix intégrée : %s" % e)
+        raise RuntimeError(" | ".join(errors))
+    finally:
+        try:
+            os.remove(tmp)
+        except OSError:
+            pass
+
+def _tts_admin_card():
+    eng = "gTTS (installé)" if gTTS is not None else "voix intégrée (gTTS non installé — ce n'est pas grave)"
+    state = "✅ activée" if TTS_OK else "⛔ désactivée par NATHO_TTS=off"
+    return f"""
+    <div class="card" id="voix">
+      <h2>🔊 Voix serveur (écoute écran éteint)</h2>
+      <p>État : {state} · Moteur : {h(eng)}</p>
+      <p style="color:var(--muted);font-size:13px;">Les playlists sont lues avec des fichiers audio créés par le serveur : c'est ce qui permet
+      d'écouter téléphone verrouillé ou appli en arrière-plan, avec les commandes sur l'écran de verrouillage.</p>
+      <a class="btn" href="{url_for('admin_tts_test')}">Tester la voix serveur</a>
+    </div>"""
+
+@app.route("/admin/tts-test")
+@admin_required
+def admin_tts_test():
+    os.makedirs(TTS_DIR, exist_ok=True)
+    results = []
+    for lang, text in (("de", "Hallo, wie geht es dir? Test %d." % random.randint(100, 999)),
+                       ("fr", "Bonjour, ceci est un test %d." % random.randint(100, 999))):
+        path = os.path.join(TTS_DIR, "test_" + lang + ".mp3")
+        t0 = time.time()
+        try:
+            eng = _tts_generate(text, lang, path)
+            size = os.path.getsize(path)
+            results.append(f'<div class="flash success">✔ {lang.upper()} : OK ({size // 1024} Ko, {time.time() - t0:.1f} s, moteur : {h(eng)})</div>')
+        except Exception as e:
+            results.append(f'<div class="flash danger">✘ {lang.upper()} : échec — {h(str(e))[:400]}</div>')
+    ok = all("success" in r for r in results)
+    advice = ("<p>La voix serveur fonctionne : les playlists continuent écran éteint (Chrome Android / app installée).</p>" if ok else
+              "<p>La voix serveur ne répond pas depuis Railway. Sans elle, les playlists utilisent la voix du téléphone, "
+              "qui s'arrête quand l'écran s'éteint. Ajoute <code>gTTS</code> dans <code>requirements.txt</code>, redéploie et refais le test.</p>")
+    body = f"""<h1>Test de la voix serveur</h1><div class="card">{''.join(results)}{advice}
+    <a class="btn ghost" href="{url_for('admin')}#voix">← Retour à l'admin</a></div>"""
+    return page(layout("Test voix", body, {"is_admin": True}))
+
 @app.route("/tts")
 @login_required
 def tts():
@@ -6619,19 +6867,10 @@ def tts():
     if not os.path.exists(path):
         if not _tts_rate_ok(session.get("user_id")):
             return ("", 429)
-        tmp = path + "." + secrets.token_hex(4) + ".tmp"
         try:
-            try:
-                tts_obj = gTTS(text=text, lang=lang, timeout=15)
-            except TypeError:
-                tts_obj = gTTS(text=text, lang=lang)
-            tts_obj.save(tmp)
-            os.replace(tmp, path)
-        except Exception:
-            try:
-                os.remove(tmp)
-            except OSError:
-                pass
+            _tts_generate(text, lang, path)
+        except Exception as e:
+            print("Voix serveur indisponible :", str(e)[:300])
             return ("", 502)
         if random.random() < 0.05:
             _tts_purge()
@@ -14095,6 +14334,7 @@ def admin():
       <div class="stat"><div class="num">{neferti_users_count}</div><div class="lbl">Users Neferti</div></div>
     </div>
     {_apk_admin_card()}
+    {_tts_admin_card()}
     <div class="card">
       <h2>Ajouter une leçon</h2>
       <form method="post" action="{url_for('admin_add_lesson')}">
